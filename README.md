@@ -1,5 +1,10 @@
 # Ruza-Lang (`v0.1.0`)
 
+> [!IMPORTANT]
+> **Untested / Vibe-Coded Educational Project**
+> - This project has **not been live-tested end-to-end in-game** because the target game has **not been officially released yet**.
+> - This is a **vibe-coded educational project** — expect quirks, rough edges, or breaking changes when the actual release drops. Always keep backups and use at your own risk.
+
 An educational desktop localization & asset-repacking study project demonstrating bilingual string patching (**English** & **Bahasa Indonesia**), exact-size compressed bundle repacking, SHA-256 verification, and safe one-click rollback.
 
 > **Pre-built Windows binary:** download `RuzaLangPatcher.exe` from [Releases](https://github.com/notnedar/ruza-lang/releases).
