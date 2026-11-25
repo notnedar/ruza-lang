@@ -11,6 +11,20 @@ An educational desktop localization & asset-repacking study project demonstratin
 
 ---
 
+## Preview & Usage Demo
+
+### Live Usage Walkthrough (`EN` ↔ `ID` + Rewrite Progress)
+
+![Ruza-Lang Usage Demo](docs/usage.webp)
+
+### Interface Screenshots
+
+| English (`EN`) | Bahasa Indonesia (`ID`) |
+| :---: | :---: |
+| ![English UI](docs/screenshot-en.png) | ![Indonesian UI](docs/screenshot-id.png) |
+
+---
+
 ## Features / Fitur
 
 - **Bilingual Switch (`EN` / `ID`):** Toggle between **English** and **Bahasa Indonesia** directly inside the GUI — switches both the app interface and the target localization pack.
