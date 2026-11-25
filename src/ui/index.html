@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ruza-Lang Patcher v0.1.0 — EN / ID</title>
+<style>
+  :root {
+    --bg: #080c15;
+    --panel: rgba(16, 23, 38, 0.88);
+    --border: rgba(148, 163, 184, 0.14);
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --dim: #64748b;
+    --cyan: #38bdf8;
+    --emerald: #10b981;
+    --amber: #f59e0b;
+    --rose: #f43f5e;
+    --term-bg: #05080f;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 80% 50% at 15% -10%, rgba(56, 189, 248, 0.16), transparent 60%),
+      radial-gradient(ellipse 65% 45% at 90% 5%, rgba(99, 102, 241, 0.14), transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 15px 18px 14px;
+    gap: 11px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 11px 16px;
+    backdrop-filter: blur(12px);
+    gap: 12px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .logo-badge {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 11px;
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(99, 102, 241, 0.28));
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.18);
+  }
+  .brand h1 {
+    font-size: 14.5px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    background: linear-gradient(90deg, #f8fafc, #7dd3fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .brand-meta {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 2px;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(56, 189, 248, 0.12);
+    color: #7dd3fc;
+    border: 1px solid rgba(56, 189, 248, 0.24);
+    letter-spacing: 0.3px;
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  /* Language Toggle Pill */
+  .lang-switch {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(6, 10, 20, 0.85);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 3px;
+    gap: 3px;
+  }
+  .lang-btn {
+    height: 28px;
+    padding: 0 11px;
+    border-radius: 7px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.16s ease;
+  }
+  .lang-btn:hover:not(.active):not(:disabled) { color: var(--text); background: rgba(30, 41, 59, 0.65); }
+  .lang-btn.active {
+    color: #04131c;
+    background: linear-gradient(135deg, #38bdf8, #10b981);
+    box-shadow: 0 2px 12px rgba(56, 189, 248, 0.3);
+  }
+
+  .proc-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: rgba(15, 23, 42, 0.75);
+    transition: all 0.2s ease;
+  }
+  .proc-pill.clear {
+    color: #6ee7b7;
+    border-color: rgba(16, 185, 129, 0.35);
+    background: rgba(16, 185, 129, 0.1);
+  }
+  .proc-pill.running {
+    color: #fda4af;
+    border-color: rgba(244, 63, 94, 0.45);
+    background: rgba(244, 63, 94, 0.14);
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--emerald);
+    box-shadow: 0 0 10px var(--emerald);
+  }
+  .proc-pill.running .dot {
+    background: var(--rose);
+    box-shadow: 0 0 10px var(--rose);
+    animation: pulse 1.2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(1.28); }
+  }
+
+  /* Cards */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    padding: 11px 14px;
+  }
+  .folder-row { display: flex; align-items: center; gap: 8px; }
+  .field-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .path-input {
+    flex: 1;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--term-bg);
+    color: var(--text);
+    font-family: "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .path-input:focus { border-color: var(--cyan); }
+
+  button {
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 12px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+  }
+  button:disabled { opacity: 0.45; cursor: not-allowed; filter: grayscale(0.4); }
+  .btn-ghost {
+    height: 36px;
+    padding: 0 12px;
+    background: rgba(30, 41, 59, 0.7);
+    border-color: var(--border);
+    color: var(--text);
+  }
+  .btn-ghost:hover:not(:disabled) { background: rgba(51, 65, 85, 0.85); border-color: rgba(148, 163, 184, 0.3); }
+  .btn-scan {
+    height: 36px;
+    padding: 0 14px;
+    background: rgba(56, 189, 248, 0.14);
+    border-color: rgba(56, 189, 248, 0.35);
+    color: #7dd3fc;
+  }
+  .btn-scan:hover:not(:disabled) { background: rgba(56, 189, 248, 0.24); }
+
+  /* Targets Grid */
+  .targets-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .target-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: rgba(9, 13, 24, 0.72);
+    border: 1px solid var(--border);
+    gap: 10px;
+  }
+  .target-left { min-width: 0; }
+  .target-name { font-weight: 600; font-size: 12.5px; color: var(--text); }
+  .target-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .target-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .badge.patched_en { background: rgba(56, 189, 248, 0.16); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.38); }
+  .badge.patched_id { background: rgba(16, 185, 129, 0.18); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.42); }
+  .badge.original { background: rgba(148, 163, 184, 0.14); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.28); }
+  .badge.modified { background: rgba(245, 158, 11, 0.16); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); }
+  .badge.missing { background: rgba(244, 63, 94, 0.16); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.35); }
+  .target-count {
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 10.5px;
+    color: var(--dim);
+  }
+
+  /* Progress Card */
+  .prog-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    gap: 12px;
+  }
+  .prog-numbers { display: flex; align-items: baseline; gap: 8px; }
+  .prog-big {
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 18px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #f8fafc;
+  }
+  .prog-of { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .prog-pct {
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--cyan);
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: rgba(56, 189, 248, 0.12);
+  }
+  .prog-stage {
+    font-size: 11.5px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bar-track {
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #0ea5e9, #38bdf8, #10b981);
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.45);
+    transition: width 0.18s ease-out;
+  }
+
+  /* Terminal Log */
+  .terminal {
+    flex: 1;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    background: var(--term-bg);
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    overflow: hidden;
+  }
+  .term-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 12px;
+    background: rgba(15, 23, 42, 0.85);
+    border-bottom: 1px solid var(--border);
+  }
+  .term-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.6px;
+  }
+  .term-dots { display: flex; gap: 5px; }
+  .term-dots span { width: 8px; height: 8px; border-radius: 50%; opacity: 0.75; }
+  .term-dots span:nth-child(1) { background: #ef4444; }
+  .term-dots span:nth-child(2) { background: #f59e0b; }
+  .term-dots span:nth-child(3) { background: #10b981; }
+  .term-actions { display: flex; gap: 6px; }
+  .btn-mini {
+    height: 22px;
+    padding: 0 8px;
+    font-size: 10.5px;
+    border-radius: 6px;
+    background: rgba(30, 41, 59, 0.65);
+    border-color: var(--border);
+    color: var(--muted);
+  }
+  .btn-mini:hover { color: var(--text); background: rgba(51, 65, 85, 0.8); }
+
+  .term-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 12px;
+    font-family: "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+    font-size: 11.8px;
+    line-height: 1.55;
+    user-select: text;
+  }
+  .term-body::-webkit-scrollbar { width: 7px; }
+  .term-body::-webkit-scrollbar-track { background: transparent; }
+  .term-body::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.35); border-radius: 999px; }
+  .term-body::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.55); }
+
+  .log-line { white-space: pre-wrap; word-break: break-word; }
+  .log-ts { color: #475569; margin-right: 6px; }
+  .log-tag { font-weight: 700; margin-right: 6px; }
+  .log-info .log-tag { color: #38bdf8; }
+  .log-info .log-msg { color: #cbd5e1; }
+  .log-ok .log-tag, .log-ok .log-msg { color: #34d399; }
+  .log-diff .log-tag { color: #a78bfa; }
+  .log-diff .log-msg { color: #7dd3fc; }
+  .log-warn .log-tag, .log-warn .log-msg { color: #fbbf24; }
+  .log-err .log-tag, .log-err .log-msg { color: #fb7185; }
+
+  /* Footer */
+  .footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .footer-left { display: flex; gap: 10px; }
+  .btn-primary {
+    height: 42px;
+    padding: 0 20px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #04131c;
+    background: linear-gradient(135deg, #38bdf8, #10b981);
+    box-shadow: 0 6px 22px rgba(16, 185, 129, 0.25);
+    border-radius: 11px;
+  }
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 26px rgba(56, 189, 248, 0.32);
+  }
+  .btn-rollback {
+    height: 42px;
+    padding: 0 18px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #fcd34d;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    border-radius: 11px;
+  }
+  .btn-rollback:hover:not(:disabled) { background: rgba(245, 158, 11, 0.22); }
+  .footer-note { font-size: 11px; color: var(--dim); text-align: right; }
+
+  /* Custom Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 6, 18, 0.72);
+    backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 99;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    width: 440px;
+    background: #11192b;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 15px;
+    padding: 18px 20px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+  }
+  .modal h3 { font-size: 15px; margin-bottom: 8px; }
+  .modal p { font-size: 12.5px; color: var(--muted); line-height: 1.55; white-space: pre-line; margin-bottom: 16px; }
+  .modal-btns { display: flex; justify-content: flex-end; gap: 8px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <div class="brand">
+      <div class="logo-badge">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L14.6 9.4L22 12L14.6 14.6L12 22L9.4 14.6L2 12L9.4 9.4L12 2Z" fill="url(#g1)"/>
+          <defs>
+            <linearGradient id="g1" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#38bdf8"/><stop offset="1" stop-color="#10b981"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div>
+        <h1 id="hdrTitle">RUZA-LANG TRANSLATION PATCHER</h1>
+        <div class="brand-meta">
+          <span class="chip">v0.1.0</span>
+          <span class="chip">EN / ID</span>
+          <span id="hdrSub">77,661 verified strings &middot; Educational localization project</span>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="lang-switch" title="Select target patch &amp; UI language">
+        <button id="langEn" class="lang-btn active">EN</button>
+        <button id="langId" class="lang-btn">ID</button>
+      </div>
+      <div id="procPill" class="proc-pill clear">
+        <span class="dot"></span>
+        <span id="procText">Checking...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Target Folder -->
+  <div class="card">
+    <div class="field-label">
+      <span id="lblFolder">Target Directory</span>
+      <span id="folderHint" style="font-weight:500;text-transform:none;letter-spacing:0">Auto-detects target installation</span>
+    </div>
+    <div class="folder-row">
+      <input id="folderInput" class="path-input" type="text" placeholder="Select target installation directory..." />
+      <button id="btnAuto" class="btn-ghost">Auto-Scan</button>
+      <button id="btnBrowse" class="btn-ghost">Browse...</button>
+      <button id="btnScan" class="btn-scan">Inspect</button>
+    </div>
+  </div>
+
+  <!-- 4 Asset Targets -->
+  <div class="targets-grid" id="targetsGrid"></div>
+
+  <!-- Rewrite Progress -->
+  <div class="card">
+    <div class="prog-top">
+      <div class="prog-numbers">
+        <span id="progBig" class="prog-big">0</span>
+        <span id="progOf" class="prog-of">/ 77,661 strings rewritten</span>
+        <span id="progPct" class="prog-pct">0.0%</span>
+      </div>
+      <div id="progStage" class="prog-stage">Ready &mdash; inspect game folder to verify status.</div>
+    </div>
+    <div class="bar-track"><div id="barFill" class="bar-fill"></div></div>
+  </div>
+
+  <!-- Terminal Log -->
+  <div class="terminal">
+    <div class="term-bar">
+      <div class="term-title">
+        <div class="term-dots"><span></span><span></span><span></span></div>
+        <span id="lblTerm">TERMINAL LOG</span>
+      </div>
+      <div class="term-actions">
+        <button id="btnCopyLog" class="btn-mini">Copy</button>
+        <button id="btnClearLog" class="btn-mini">Clear</button>
+      </div>
+    </div>
+    <div id="termBody" class="term-body"></div>
+  </div>
+
+  <!-- Footer Actions -->
+  <div class="footer">
+    <div class="footer-left">
+      <button id="btnPatch" class="btn-primary">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+        <span id="btnPatchText">Install English Patch (EN)</span>
+      </button>
+      <button id="btnRollback" class="btn-rollback">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 10h10a6 6 0 110 12H9M3 10l4-4M3 10l4 4"/></svg>
+        <span id="btnRollbackText">Rollback to Original JP</span>
+      </button>
+    </div>
+    <div id="footerNote" class="footer-note">
+      Auto-backup in <code>_ENPatchBackup\</code><br/>
+      Exact byte sizes &middot; SHA-256 verified
+    </div>
+  </div>
+</div>
+
+<!-- Custom Modal -->
+<div id="modalBackdrop" class="modal-backdrop">
+  <div class="modal">
+    <h3 id="modalTitle">Notice</h3>
+    <p id="modalBody"></p>
+    <div id="modalBtns" class="modal-btns"></div>
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let busy = false;
+  let runningProcs = [];
+  let selectedLang = 'en'; // 'en' | 'id'
+  let lastTargets = [];
+
+  const I18N = {
+    en: {
+      hdrSub: '77,661 verified strings · Educational localization project',
+      lblFolder: 'Target Directory',
+      btnAuto: 'Auto-Scan',
+      btnBrowse: 'Browse...',
+      btnScan: 'Inspect',
+      procClear: 'Process Check: Clear',
+      procRunPrefix: 'RUNNING: ',
+      procRunSuffix: ' — Close First!',
+      progOfStrings: '/ 77,661 strings rewritten',
+      progOfTargets: 'targets',
+      btnPatch: 'Install / Rewrite English (EN)',
+      btnRollback: 'Rollback to Original JP',
+      footerNote: 'Auto-backup in <code>_ENPatchBackup\\</code><br/>Exact byte sizes &middot; SHA-256 verified',
+      copyLog: 'Copy',
+      clearLog: 'Clear',
+      copied: 'Copied terminal log to clipboard.',
+      blockedTitle: 'Close Running Process First',
+      blockedPatch: 'Target process is currently running!\n\nPlease close these processes before patching:\n',
+      blockedRollback: 'Target process is currently running!\n\nPlease close these processes before rollback:\n',
+      rollbackTitle: 'Confirm Rollback to Original JP',
+      rollbackBody: 'Restore all 4 target files back to Original JP from _ENPatchBackup?\n\nSHA-256 hashes will be verified automatically after restore.',
+      cancel: 'Cancel',
+      confirmRollback: 'Yes, Rollback Now',
+      ok: 'OK',
+      validFolder: 'Valid target installation detected',
+      invalidFolder: 'Target executable not found in folder',
+      bakYes: 'Backup OK',
+      bakNo: 'No Backup',
+      badges: { patched_en: 'ENGLISH OK', patched_id: 'INDO OK', original: 'ORIGINAL JP', modified: 'MODIFIED', missing: 'MISSING' }
+    },
+    id: {
+      hdrSub: '77.661 string terverifikasi · Proyek edukasi lokalisasi',
+      lblFolder: 'Folder Target',
+      btnAuto: 'Scan Otomatis',
+      btnBrowse: 'Pilih Folder...',
+      btnScan: 'Cek Status',
+      procClear: 'Cek Proses: Aman',
+      procRunPrefix: 'BERJALAN: ',
+      procRunSuffix: ' — Tutup Dulu!',
+      progOfStrings: '/ 77.661 string di-rewrite',
+      progOfTargets: 'target',
+      btnPatch: 'Pasang / Rewrite Bahasa Indonesia (ID)',
+      btnRollback: 'Rollback ke Original JP',
+      footerNote: 'Backup otomatis di <code>_ENPatchBackup\\</code><br/>Ukuran file identik &middot; Verifikasi SHA-256',
+      copyLog: 'Salin',
+      clearLog: 'Bersihkan',
+      copied: 'Log terminal disalin ke clipboard.',
+      blockedTitle: 'Tutup Proses Target Dulu',
+      blockedPatch: 'Proses target masih berjalan!\n\nHarap tutup dulu proses berikut sebelum install patch:\n',
+      blockedRollback: 'Proses target masih berjalan!\n\nHarap tutup dulu proses berikut sebelum rollback:\n',
+      rollbackTitle: 'Konfirmasi Rollback ke Original JP',
+      rollbackBody: 'Kembalikan semua 4 file target ke Original JP dari folder _ENPatchBackup?\n\nHash SHA-256 tiap file akan diverifikasi otomatis setelah restore.',
+      cancel: 'Batal',
+      confirmRollback: 'Ya, Rollback Sekarang',
+      ok: 'Mengerti',
+      validFolder: 'Folder instalasi target valid',
+      invalidFolder: 'Executable target tidak ditemukan di folder',
+      bakYes: 'Backup Siap',
+      bakNo: 'Belum Ada Backup',
+      badges: { patched_en: 'ENGLISH OK', patched_id: 'INDO OK', original: 'ORIGINAL JP', modified: 'MODIFIKASI', missing: 'HILANG' }
+    }
+  };
+
+  function t() { return I18N[selectedLang]; }
+  function send(cmd, payload = {}) { window.ipc.postMessage(JSON.stringify({ cmd, lang: selectedLang, ...payload })); }
+  function fmt(n) { return Number(n).toLocaleString(selectedLang === 'id' ? 'id-ID' : 'en-US'); }
+  function nowTs() { const d = new Date(); return [d.getHours(), d.getMinutes(), d.getSeconds()].map(x => String(x).padStart(2, '0')).join(':'); }
+
+  function applyUiLanguage() {
+    const tr = t();
+    $('langEn').classList.toggle('active', selectedLang === 'en');
+    $('langId').classList.toggle('active', selectedLang === 'id');
+    $('hdrSub').textContent = tr.hdrSub;
+    $('lblFolder').textContent = tr.lblFolder;
+    $('btnAuto').textContent = tr.btnAuto;
+    $('btnBrowse').textContent = tr.btnBrowse;
+    $('btnScan').textContent = tr.btnScan;
+    $('btnPatchText').textContent = tr.btnPatch;
+    $('btnRollbackText').textContent = tr.btnRollback;
+    $('footerNote').innerHTML = tr.footerNote;
+    $('btnCopyLog').textContent = tr.copyLog;
+    $('btnClearLog').textContent = tr.clearLog;
+    renderProcessPill();
+    if (lastTargets.length) renderTargets(lastTargets);
+  }
+
+  function renderProcessPill() {
+    const tr = t();
+    const pill = $('procPill');
+    if (runningProcs.length > 0) {
+      pill.className = 'proc-pill running';
+      $('procText').textContent = tr.procRunPrefix + runningProcs.map(p => p.name).join(', ') + tr.procRunSuffix;
+    } else {
+      pill.className = 'proc-pill clear';
+      $('procText').textContent = tr.procClear;
+    }
+  }
+
+  function addLog(level, msg) {
+    const div = document.createElement('div');
+    const tags = { info: '[INFO]', ok: '[ OK ]', diff: '[DIFF]', warn: '[WARN]', err: '[ERR ]' };
+    div.className = 'log-line log-' + (level || 'info');
+    div.innerHTML = `<span class="log-ts">${nowTs()}</span><span class="log-tag">${tags[level] || '[INFO]'}</span><span class="log-msg"></span>`;
+    div.querySelector('.log-msg').textContent = msg;
+    const body = $('termBody');
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function setBusy(v) {
+    busy = v;
+    $('btnAuto').disabled = v;
+    $('btnBrowse').disabled = v;
+    $('btnScan').disabled = v;
+    $('btnPatch').disabled = v;
+    $('btnRollback').disabled = v;
+    $('langEn').disabled = v;
+    $('langId').disabled = v;
+    $('folderInput').disabled = v;
+  }
+
+  function openModal(title, body, buttons) {
+    $('modalTitle').textContent = title;
+    $('modalBody').textContent = body;
+    const box = $('modalBtns');
+    box.innerHTML = '';
+    for (const b of buttons) {
+      const el = document.createElement('button');
+      el.className = b.cls || 'btn-ghost';
+      el.style.height = '34px';
+      el.textContent = b.label;
+      el.onclick = () => { $('modalBackdrop').classList.remove('open'); if (b.onClick) b.onClick(); };
+      box.appendChild(el);
+    }
+    $('modalBackdrop').classList.add('open');
+  }
+
+  function renderTargets(list) {
+    lastTargets = list;
+    const tr = t();
+    const grid = $('targetsGrid');
+    grid.innerHTML = '';
+    for (const item of list) {
+      const card = document.createElement('div');
+      card.className = 'target-item';
+      const bak = item.has_backup ? tr.bakYes : tr.bakNo;
+      card.innerHTML = `
+        <div class="target-left">
+          <div class="target-name"></div>
+          <div class="target-sub"></div>
+        </div>
+        <div class="target-right">
+          <span class="badge ${item.state}">${tr.badges[item.state] || item.state}</span>
+          <span class="target-count">${fmt(item.string_count)} str &middot; ${bak}</span>
+        </div>`;
+      card.querySelector('.target-name').textContent = item.name;
+      card.querySelector('.target-sub').textContent = item.subtitle;
+      grid.appendChild(card);
+    }
+  }
+
+  window.__onPatcherEvent = function(ev) {
+    const tr = t();
+    switch (ev.type) {
+      case 'log':
+        addLog(ev.level, ev.message);
+        break;
+      case 'processes':
+        runningProcs = ev.processes || [];
+        renderProcessPill();
+        break;
+      case 'folder':
+        $('folderInput').value = ev.path || '';
+        $('folderHint').textContent = ev.valid ? tr.validFolder : tr.invalidFolder;
+        $('folderHint').style.color = ev.valid ? '#34d399' : '#fb7185';
+        break;
+      case 'scan_result': {
+        setBusy(false);
+        const list = ev.targets || [];
+        renderTargets(list);
+        const activeCount = list.filter(x => x.state === 'patched_en' || x.state === 'patched_id').reduce((s, x) => s + x.string_count, 0);
+        const allId = list.length > 0 && list.every(x => x.state === 'patched_id');
+        const allEn = list.length > 0 && list.every(x => x.state === 'patched_en');
+        const stg = allId ? 'Installed: Bahasa Indonesia (ID)' : (allEn ? 'Installed: English (EN)' : 'Scan complete.');
+        window.__onPatcherEvent({ type: 'progress', current: activeCount, total: 77661, stage: stg });
+        break;
+      }
+      case 'progress': {
+        const cur = ev.current || 0;
+        const tot = Math.max(1, ev.total || 77661);
+        const pct = Math.min(100, (cur * 100) / tot);
+        $('progBig').textContent = fmt(cur);
+        $('progOf').textContent = tot === 77661 ? tr.progOfStrings : `/ ${tot} ${tr.progOfTargets}`;
+        $('progPct').textContent = pct.toFixed(1) + '%';
+        $('barFill').style.width = pct.toFixed(2) + '%';
+        if (ev.stage) $('progStage').textContent = ev.stage;
+        break;
+      }
+      case 'busy':
+        setBusy(!!ev.value);
+        break;
+      case 'alert':
+        openModal(ev.title || 'Notice', ev.body || '', [{ label: tr.ok, cls: 'btn-scan' }]);
+        break;
+    }
+  };
+
+  $('langEn').onclick = () => {
+    if (busy || selectedLang === 'en') return;
+    selectedLang = 'en';
+    applyUiLanguage();
+    addLog('info', 'Target patch language set to English (EN).');
+  };
+  $('langId').onclick = () => {
+    if (busy || selectedLang === 'id') return;
+    selectedLang = 'id';
+    applyUiLanguage();
+    addLog('info', 'Bahasa target patch diatur ke Bahasa Indonesia (ID).');
+  };
+
+  $('btnAuto').onclick = () => send('auto_detect');
+  $('btnBrowse').onclick = () => send('browse', { path: $('folderInput').value.trim() });
+  $('btnScan').onclick = () => send('scan', { path: $('folderInput').value.trim() });
+  $('btnClearLog').onclick = () => { $('termBody').innerHTML = ''; };
+  $('btnCopyLog').onclick = () => {
+    const txt = Array.from($('termBody').children).map(el => el.innerText).join('\n');
+    navigator.clipboard?.writeText(txt).then(() => addLog('info', t().copied));
+  };
+
+  $('btnPatch').onclick = () => {
+    const tr = t();
+    if (runningProcs.length > 0) {
+      const list = runningProcs.map(p => `• ${p.name} (PID ${p.pid})`).join('\n');
+      addLog('err', 'BLOCKED: Close running game/launcher processes first!');
+      openModal(tr.blockedTitle, tr.blockedPatch + list, [{ label: tr.ok, cls: 'btn-scan' }]);
+      return;
+    }
+    send('patch', { path: $('folderInput').value.trim() });
+  };
+
+  $('btnRollback').onclick = () => {
+    const tr = t();
+    if (runningProcs.length > 0) {
+      const list = runningProcs.map(p => `• ${p.name} (PID ${p.pid})`).join('\n');
+      addLog('err', 'BLOCKED: Close running game/launcher processes before rollback!');
+      openModal(tr.blockedTitle, tr.blockedRollback + list, [{ label: tr.ok, cls: 'btn-scan' }]);
+      return;
+    }
+    openModal(tr.rollbackTitle, tr.rollbackBody, [
+      { label: tr.cancel, cls: 'btn-ghost' },
+      { label: tr.confirmRollback, cls: 'btn-rollback', onClick: () => send('rollback', { path: $('folderInput').value.trim() }) }
+    ]);
+  };
+
+  window.addEventListener('DOMContentLoaded', () => {
+    applyUiLanguage();
+    send('init');
+  });
+</script>
+</body>
+</html>

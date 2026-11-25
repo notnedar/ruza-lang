@@ -1,0 +1,18 @@
+# Build artifacts & compiled binaries (uploaded via GitHub Releases)
+/target/
+/dist/
+*.exe
+*.pdb
+*.WebView2/
+
+# Local game backups & working caches (never commit game assets)
+/backups/
+/work/
+*.original
+*.log
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
