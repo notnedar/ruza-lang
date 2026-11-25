@@ -23,6 +23,10 @@ An educational desktop localization & asset-repacking study project demonstratin
 | :---: | :---: |
 | ![English UI](docs/screenshot-en.png) | ![Indonesian UI](docs/screenshot-id.png) |
 
+### In-Game Sample (`EN`)
+
+![In-Game Translation Sample](docs/sample-ingame-en.jpg)
+
 ---
 
 ## Features / Fitur
