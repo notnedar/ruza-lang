@@ -1,0 +1,140 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build & publish (e.g. v0.1.0)"
+        required: true
+        default: "v0.1.0"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build-windows:
+    name: Build Windows x64 Binary
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release executable
+        shell: pwsh
+        run: cargo build --release --locked --target x86_64-pc-windows-msvc
+
+      - name: Prepare artifacts & SHA-256 checksum
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force release-dist | Out-Null
+          $src = "target/x86_64-pc-windows-msvc/release/RuzaLangPatcher.exe"
+          $dst = "release-dist/RuzaLangPatcher.exe"
+          Copy-Item $src $dst -Force
+
+          $sha = (Get-FileHash $dst -Algorithm SHA256).Hash
+          $mb = [math]::Round((Get-Item $dst).Length / 1MB, 2)
+          [System.IO.File]::WriteAllText(
+            (Join-Path (Get-Location) "release-dist/SHA256SUMS.txt"),
+            "$sha  RuzaLangPatcher.exe`n",
+            (New-Object System.Text.UTF8Encoding $false)
+          )
+
+          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            "${{ inputs.tag }}"
+          } else {
+            "${{ github.ref_name }}"
+          }
+
+          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "EXE_SHA256=$sha" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "EXE_MB=$mb" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Built RuzaLangPatcher.exe ($mb MB) SHA256=$sha for tag $tag"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: release-dist/RuzaLangPatcher.exe
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = $env:RELEASE_TAG
+          $sha = $env:EXE_SHA256
+          $mb  = $env:EXE_MB
+          $runUrl = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          $template = @'
+          > [!IMPORTANT]
+          > **Untested / Vibe-Coded Educational Project**
+          > - This release has **not been live-tested end-to-end in-game** because the target game has **not been officially released yet**.
+          > - This is a **vibe-coded educational project** — use at your own risk and always rely on the automatic `_ENPatchBackup\` rollback if anything breaks.
+
+          ## Ruza-Lang __TAG__ (EN / ID)
+
+          Educational standalone bilingual localization & asset-repacking tool (**English** & **Bahasa Indonesia**).
+
+          ### Usage Walkthrough
+          ![Ruza-Lang Usage Demo](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/usage.webp)
+
+          ### In-Game Sample (`EN`)
+          ![In-Game Sample](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-en.jpg)
+
+          ### Highlights / Fitur Utama
+          - **Bilingual Toggle (`EN` / `ID`):** Switch between English and Bahasa Indonesia anytime right inside the GUI.
+          - **4-Store Localization Pipeline (`77,661` strings):**
+            - `VStringPool` — `74,055` strings
+            - `Static UI KeyConfig` — `3,135` strings
+            - `StaticPackage CSV` — `113` strings
+            - `resources.assets` — `358` strings
+          - **Safety & Verification:** Live process guard, exact byte-size preservation across all 4 targets, automatic backups in `_ENPatchBackup\`, SHA-256 verification, and one-click **Rollback to Original JP**.
+
+          ### Verified GitHub Actions Build & Provenance
+          This executable was compiled directly on GitHub's hosted `windows-latest` runner from the public source tree in this commit (not uploaded from a personal machine):
+          - **Workflow Run:** [View full build log](__RUN_URL__)
+          - **File:** `RuzaLangPatcher.exe` (__MB__ MB, Windows x64)
+          - **SHA-256:** `__SHA__`
+          - **Verify build attestation locally:**
+            ```bash
+            gh attestation verify RuzaLangPatcher.exe --owner notnedar
+            ```
+
+          > *Educational localization & binary serialization study project. No proprietary assets are included.*
+          '@
+
+          $lines = $template -split "`r?`n" | ForEach-Object { $_ -replace '^          ', '' }
+          $notes = ($lines -join "`n")
+          $notes = $notes.Replace('__TAG__', $tag).Replace('__SHA__', $sha).Replace('__MB__', $mb).Replace('__RUN_URL__', $runUrl)
+          $notesFile = Join-Path $env:RUNNER_TEMP "release_notes.md"
+          [System.IO.File]::WriteAllText($notesFile, $notes, (New-Object System.Text.UTF8Encoding $false))
+
+          $ErrorActionPreference = "Continue"
+          gh release view $tag --repo "${{ github.repository }}" 2>$null | Out-Null
+          $exists = ($LASTEXITCODE -eq 0)
+          $ErrorActionPreference = "Stop"
+
+          if ($exists) {
+            gh release upload $tag "release-dist/RuzaLangPatcher.exe" "release-dist/SHA256SUMS.txt" --clobber --repo "${{ github.repository }}"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            gh release edit $tag --title "$tag — Ruza-Lang Bilingual Patcher (EN / ID)" --notes-file $notesFile --repo "${{ github.repository }}"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } else {
+            gh release create $tag "release-dist/RuzaLangPatcher.exe" "release-dist/SHA256SUMS.txt" --title "$tag — Ruza-Lang Bilingual Patcher (EN / ID)" --notes-file $notesFile --repo "${{ github.repository }}"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }

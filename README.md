@@ -1,5 +1,7 @@
 # Ruza-Lang (`v0.1.0`)
 
+[![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
+
 > [!IMPORTANT]
 > **Untested / Vibe-Coded Educational Project**
 > - This project has **not been live-tested end-to-end in-game** because the target game has **not been officially released yet**.
@@ -61,6 +63,18 @@ An educational desktop localization & asset-repacking study project demonstratin
 - `resources/` — Compressed bilingual localization payloads (`EN` + `ID`)
 - `patches/` — Human-readable JSON translation dictionaries (`EN` + `ID`)
 - `tools/` — Node.js scripts for payload packing and asset repacking research
+
+---
+
+## Build Transparency & Verification
+
+Official release binaries are compiled directly on **GitHub Actions** (`windows-latest`) from this public source tree via [`.github/workflows/release.yml`](.github/workflows/release.yml) and signed with **GitHub Artifact Build Provenance Attestation**.
+
+You can verify that a downloaded `RuzaLangPatcher.exe` was built directly by GitHub Actions from this repository:
+
+```powershell
+gh attestation verify RuzaLangPatcher.exe --owner notnedar
+```
 
 ---
 
