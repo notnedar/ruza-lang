@@ -13,6 +13,15 @@ An educational desktop localization & asset-repacking study project demonstratin
 
 ---
 
+## What's New in `v0.2.0`
+
+- **New Dedicated `Translate News (EN / ID)` Button:** Separate button in the GUI footer that translates **16 cached in-game announcement HTML pages** (`AppData\LocalLow\...\HTTPCache`) into **English** or **Bahasa Indonesia** following the `EN | ID` toggle.
+- **Smart HTTP Cache Sync:** Preserves original `ETag` and `Last-Modified` headers while syncing BestHTTP `Library` body lengths so the client continues receiving `304 Not Modified` and renders the translated announcement body locally.
+- **Automatic News Backup & Rollback:** Original announcement cache files are backed up automatically to `_NewsPatchBackup\` and restored alongside the 4 core client files when clicking **Rollback Original JP**.
+- **Quick Tip:** Open the in-game Announcements window once so the cache is created, close the client, then click **`Translate News (EN / ID)`**. *(Banner PNG images and sidebar tab titles are still served live; all announcement body text is translated.)*
+
+---
+
 ## Preview & Usage Demo
 
 ### Live Usage Walkthrough (`EN` ↔ `ID` + Rewrite Progress)
