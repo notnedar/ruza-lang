@@ -82,9 +82,9 @@ jobs:
 
           $template = @'
           > [!IMPORTANT]
-          > **Untested / Vibe-Coded Educational Project**
-          > - This release has **not been live-tested end-to-end in-game** because the target game has **not been officially released yet**.
-          > - This is a **vibe-coded educational project** — use at your own risk and always rely on the automatic `_ENPatchBackup\` rollback if anything breaks.
+          > **Tested & Working In-Game · Vibe-Coded Educational Project**
+          > - Confirmed **tested and working in-game** on the current build.
+          > - This is a **vibe-coded educational project** — use at your own risk and always rely on the automatic `_ENPatchBackup\` rollback if a future client update changes asset layouts.
 
           ## Ruza-Lang __TAG__ (EN / ID)
 

@@ -3,9 +3,9 @@
 [![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
 
 > [!IMPORTANT]
-> **Untested / Vibe-Coded Educational Project**
-> - This project has **not been live-tested end-to-end in-game** because the target game has **not been officially released yet**.
-> - This is a **vibe-coded educational project** — expect quirks, rough edges, or breaking changes when the actual release drops. Always keep backups and use at your own risk.
+> **Tested & Working In-Game · Vibe-Coded Educational Project**
+> - Confirmed **tested and working in-game** on the current build.
+> - This is a **vibe-coded educational project** — future client updates or hotfixes may still cause quirks or breaking changes. Always keep backups (`_ENPatchBackup\`) and use at your own risk.
 
 An educational desktop localization & asset-repacking study project demonstrating bilingual string patching (**English** & **Bahasa Indonesia**), exact-size compressed bundle repacking, SHA-256 verification, and safe one-click rollback.
 
