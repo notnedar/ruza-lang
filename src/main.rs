@@ -105,6 +105,7 @@ fn run_selftest(mock_dir: &str) -> i32 {
         // 5. Rollback to Original JP
         let restored = patch_engine::rollback_to_original(
             &dir,
+            None,
             |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
             |_, _, _| {},
         )?;
@@ -114,6 +115,35 @@ fn run_selftest(mock_dir: &str) -> i32 {
         if restored != 4 || !s4.iter().all(|x| x.state == "original") {
             return Err("Rollback did not restore all 4 targets to exact original SHA-256!".into());
         }
+        // 6. Optional News cache self-test if _MockNewsCache/Library is present
+        let mock_news = dir.join("_MockNewsCache");
+        if mock_news.join("Library").is_file() {
+            let orig_lib_sha = crypto_lz4::sha256_file(&mock_news.join("Library"))?;
+            let (en_n, en_tot) = patch_engine::patch_news_cache(
+                &mock_news,
+                PatchLang::En,
+                |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
+                |_, _, _| {},
+            )?;
+            let (id_n, id_tot) = patch_engine::patch_news_cache(
+                &mock_news,
+                PatchLang::Id,
+                |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
+                |_, _, _| {},
+            )?;
+            if en_n == 0 || en_n != en_tot || id_n != id_tot {
+                return Err(format!("News self-test count mismatch: EN={}/{}, ID={}/{}", en_n, en_tot, id_n, id_tot));
+            }
+            let rb_n = patch_engine::rollback_news_cache(&mock_news, &mut |m, l| {
+                lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m));
+            })?;
+            let post_lib_sha = crypto_lz4::sha256_file(&mock_news.join("Library"))?;
+            if rb_n != en_n || !post_lib_sha.eq_ignore_ascii_case(&orig_lib_sha) {
+                return Err("News rollback did not restore exact original Library SHA-256!".into());
+            }
+            lines.push(format!("[OK] NEWS SELFTEST PASSED 100%! ({} announcements EN -> ID -> Rollback JP)", en_n));
+        }
+
         lines.push("[OK] BILINGUAL SELFTEST PASSED 100%! (Original -> EN -> ID -> EN -> Rollback JP)".into());
         Ok(())
     })();
@@ -184,7 +214,7 @@ fn main() {
     let proxy = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
-        .with_title("Ruza-Lang Patcher v0.1.0 — EN / ID")
+        .with_title("Ruza-Lang Patcher v0.2.0 — EN / ID")
         .with_inner_size(LogicalSize::new(920.0, 740.0))
         .with_min_inner_size(LogicalSize::new(820.0, 640.0))
         .build(&event_loop)
@@ -216,7 +246,7 @@ fn main() {
                 "init" | "auto_detect" => {
                     thread::spawn(move || {
                         if parsed.cmd == "init" {
-                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.1.0 (EN / ID) initialized.");
+                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.2.0 (EN / ID) initialized.");
                             push_log(&p, LogLevel::Info, "Safety: Exact byte sizes preserved with SHA-256 verification.");
                         }
                         let procs = patch_engine::find_running_game_processes();
@@ -323,6 +353,64 @@ fn main() {
                         do_scan(&p, &dir);
                     });
                 }
+                "patch_news" => {
+                    thread::spawn(move || {
+                        let procs = patch_engine::find_running_game_processes();
+                        push_event(&p, json!({ "type": "processes", "processes": procs }));
+                        if !procs.is_empty() {
+                            let list = procs.iter().map(|x| format!("• {} (PID {})", x.name, x.pid)).collect::<Vec<_>>().join("\n");
+                            push_log(&p, LogLevel::Error, "BLOCKED: Target process is running!");
+                            let (title, body) = match lang {
+                                PatchLang::Id => (
+                                    "Tutup Proses Target Dulu",
+                                    format!("Harap tutup dulu proses berikut sebelum translate news:\n{}", list),
+                                ),
+                                PatchLang::En => (
+                                    "Close Running Process First",
+                                    format!("Please close these processes before translating news:\n{}", list),
+                                ),
+                            };
+                            push_event(&p, json!({ "type": "alert", "title": title, "body": body }));
+                            return;
+                        }
+                        let cache_dir = match patch_engine::default_news_cache_dir() {
+                            Ok(d) => d,
+                            Err(e) => {
+                                push_log(&p, LogLevel::Error, &e);
+                                push_event(&p, json!({ "type": "alert", "title": "News Cache Error", "body": e }));
+                                return;
+                            }
+                        };
+                        push_event(&p, json!({ "type": "busy", "value": true }));
+                        match patch_engine::patch_news_cache(
+                            &cache_dir,
+                            lang,
+                            |m, l| push_log(&p, l, m),
+                            |cur, tot, st| {
+                                push_event(&p, json!({ "type": "progress", "current": cur, "total": tot, "stage": st }));
+                            },
+                        ) {
+                            Ok((patched, total)) => {
+                                let (title, body) = match lang {
+                                    PatchLang::Id => (
+                                        "News Bahasa Indonesia Selesai!",
+                                        format!("Berhasil menerjemahkan {}/{} pengumuman cache in-game ke Bahasa Indonesia (ID).\nBackup asli disimpan di _NewsPatchBackup\\.", patched, total),
+                                    ),
+                                    PatchLang::En => (
+                                        "News Translation Complete!",
+                                        format!("Successfully translated {}/{} cached in-game announcements to English (EN).\nOriginal backup saved in _NewsPatchBackup\\.", patched, total),
+                                    ),
+                                };
+                                push_event(&p, json!({ "type": "alert", "title": title, "body": body }));
+                            }
+                            Err(e) => {
+                                push_log(&p, LogLevel::Error, &format!("NEWS PATCH FAILED: {}", e));
+                                push_event(&p, json!({ "type": "alert", "title": "Translate News Failed", "body": e }));
+                            }
+                        }
+                        push_event(&p, json!({ "type": "busy", "value": false }));
+                    });
+                }
                 "rollback" => {
                     let dir = parsed.path.unwrap_or_default();
                     thread::spawn(move || {
@@ -350,8 +438,10 @@ fn main() {
                             return;
                         }
                         push_event(&p, json!({ "type": "busy", "value": true }));
+                        let news_dir = patch_engine::default_news_cache_dir().ok();
                         match patch_engine::rollback_to_original(
                             &path,
+                            news_dir.as_deref(),
                             |m, l| push_log(&p, l, m),
                             |cur, tot, st| {
                                 push_event(&p, json!({ "type": "progress", "current": cur, "total": tot, "stage": st }));

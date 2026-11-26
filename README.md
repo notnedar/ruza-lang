@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.1.0`)
+# Ruza-Lang (`v0.2.0`)
 
 [![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
 
@@ -39,8 +39,9 @@ An educational desktop localization & asset-repacking study project demonstratin
   - `Static UI KeyConfig` — `3,135` strings (prefab labels, buttons, headers, notices)
   - `StaticPackage CSV` — `113` strings (startup & updater messages)
   - `resources.assets` — `358` strings (fallback startup & SDK UI)
-- **Process Guard:** Checks whether target client/launcher processes are running and blocks patching or rollback until they are closed.
-- **One-Click Rollback:** Saves verified original backups to `_ENPatchBackup\` before patching and restores exact original SHA-256 hashes anytime.
+- **Dedicated Translate News (`EN` / `ID`) Button:** Translates cached in-game announcement HTML pages (`16` pages in `AppData\LocalLow\...\HTTPCache`) with automatic backup in `_NewsPatchBackup\` while preserving HTTP `ETag`/`Last-Modified` headers and syncing BestHTTP `Library` body lengths.
+- **Process Guard:** Checks whether target client/launcher processes are running and blocks patching, news translation, or rollback until they are closed.
+- **One-Click Rollback:** Saves verified original backups to `_ENPatchBackup\` (and `_NewsPatchBackup\` for cached announcements) before patching and restores exact original SHA-256 hashes anytime.
 - **Exact-Size Asset Repacking:** Preserves identical file byte sizes across all 4 targets using exact-size LZ4HC tuning and round-trip integrity checks.
 - **Live Terminal Log & Progress Counter:** Real-time rewrite counter (`0 → 77,661`) and per-target SHA-256 status badges.
 
@@ -52,8 +53,9 @@ An educational desktop localization & asset-repacking study project demonstratin
 2. Download and run `RuzaLangPatcher.exe` from [Releases](https://github.com/notnedar/ruza-lang/releases).
 3. Verify the auto-detected target directory (or click **Browse...** to select it manually).
 4. Choose **`EN`** (English) or **`ID`** (Bahasa Indonesia) in the top-right toggle.
-5. Click **Install / Rewrite** and wait ~2 seconds for verification to complete.
-6. Click **Rollback to Original JP** at any time to restore the original files from backup.
+5. Click **Install Patch** and wait ~2 seconds for verification to complete.
+6. *(Optional)* After opening the in-game News/Announcements screen at least once, close the client and click **Translate News (`EN` / `ID`)** to translate cached in-game announcements.
+7. Click **Rollback Original JP** at any time to restore original files (including cached News if backed up).
 
 ---
 

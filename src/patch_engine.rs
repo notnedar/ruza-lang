@@ -20,6 +20,9 @@ const EMBED_STATIC_UI_ID_GZ: &[u8] = include_bytes!("../resources/static_ui_id.b
 const EMBED_BUILTIN_ID_GZ: &[u8] = include_bytes!("../resources/builtin_id.bin.gz");
 const EMBED_RESOURCES_DIFF_ID_GZ: &[u8] = include_bytes!("../resources/resources_diff_id.bin.gz");
 
+const EMBED_NEWS_EN_GZ: &[u8] = include_bytes!("../resources/news_en.bin.gz");
+const EMBED_NEWS_ID_GZ: &[u8] = include_bytes!("../resources/news_id.bin.gz");
+
 pub const TOTAL_STRINGS: usize = 74055 + 3135 + 113 + 358; // 77,661
 
 pub const VSTRING_REL: &str = r"AzurPromiliaJP_Data\.res\raw_base_package\BundleFiles\z5xzl3cg6ao0ilpbzykexg.r";
@@ -1127,7 +1130,12 @@ where
     Ok(358)
 }
 
-pub fn rollback_to_original<L, P>(game_dir: &Path, mut log: L, mut on_progress: P) -> Result<usize, String>
+pub fn rollback_to_original<L, P>(
+    game_dir: &Path,
+    news_cache_dir: Option<&Path>,
+    mut log: L,
+    mut on_progress: P,
+) -> Result<usize, String>
 where
     L: FnMut(&str, LogLevel),
     P: FnMut(usize, usize, &str),
@@ -1181,7 +1189,351 @@ where
         restored += 1;
     }
 
+    if let Some(cache_dir) = news_cache_dir {
+        match rollback_news_cache(cache_dir, &mut log) {
+            Ok(n) if n > 0 => {
+                log(
+                    &format!("  [RESTORED] Cached News ({} announcements) -> Original JP", n),
+                    LogLevel::Ok,
+                );
+            }
+            Ok(_) => {}
+            Err(e) => {
+                log(&format!("  [WARN] News cache rollback skipped: {}", e), LogLevel::Warn);
+            }
+        }
+    }
+
     on_progress(total, total, &format!("Rollback complete ({}/{} restored).", restored, total));
     log(&format!("=== Rollback complete! Restored {}/{} targets to Original JP ===", restored, total), LogLevel::Ok);
+    Ok(restored)
+}
+
+// ---------- Cached In-Game News / Announcements (BestHTTP HTTPCache + Library v3) ----------
+
+pub fn default_news_cache_dir() -> Result<PathBuf, String> {
+    let home = std::env::var_os("USERPROFILE")
+        .ok_or_else(|| "USERPROFILE environment variable not found".to_string())?;
+    Ok(PathBuf::from(home)
+        .join("AppData")
+        .join("LocalLow")
+        .join("YostarJP")
+        .join("AzurPromiliaJP"))
+}
+
+struct NewsLibEntry {
+    hash: Option<String>,
+    hex_name: String,
+    body_len_off: usize,
+    body_len: usize,
+}
+
+fn read_7bit_str(buf: &[u8], p: &mut usize) -> Result<String, String> {
+    let mut len = 0usize;
+    let mut shift = 0u32;
+    loop {
+        if *p >= buf.len() {
+            return Err("Unexpected EOF while reading 7-bit string length".into());
+        }
+        let b = buf[*p];
+        *p += 1;
+        len |= ((b & 0x7F) as usize) << shift;
+        if (b & 0x80) == 0 {
+            break;
+        }
+        shift += 7;
+        if shift > 28 {
+            return Err("Corrupt 7-bit string length in Library".into());
+        }
+    }
+    if *p + len > buf.len() {
+        return Err("Unexpected EOF while reading 7-bit string payload".into());
+    }
+    let s = String::from_utf8_lossy(&buf[*p..*p + len]).into_owned();
+    *p += len;
+    Ok(s)
+}
+
+fn extract_announcement_hash(url: &str) -> Option<String> {
+    let lower = url.to_ascii_lowercase();
+    let marker = "announcement/prod/";
+    let idx = lower.find(marker)?;
+    let rest = &lower[idx + marker.len()..];
+    let suffix = "/index.html";
+    let end = rest.find(suffix)?;
+    let hash = &rest[..end];
+    if hash.len() == 32 && hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+        Some(hash.to_string())
+    } else {
+        None
+    }
+}
+
+fn parse_httpcache_library(buf: &[u8]) -> Result<Vec<NewsLibEntry>, String> {
+    if buf.len() < 16 {
+        return Err("Library file too small".into());
+    }
+    let ver = read_i32_le(buf, 0);
+    if ver != 3 {
+        return Err(format!("Unsupported HTTP cache Library version: {}", ver));
+    }
+    let cnt = read_i32_le(buf, 12) as usize;
+    let mut p = 16usize;
+    let mut out = Vec::with_capacity(cnt);
+    for _ in 0..cnt {
+        let url = read_7bit_str(buf, &mut p)?;
+        if p + 8 + 4 + 17 + 8 > buf.len() {
+            return Err("Library entry truncated before metadata".into());
+        }
+        p += 8; // LastAccess
+        let body_len_off = p;
+        let body_len = read_i32_le(buf, p) as usize;
+        p += 4;
+        p += 17; // ver3 reserved bytes
+        let mapped_idx = u64::from_le_bytes([
+            buf[p],
+            buf[p + 1],
+            buf[p + 2],
+            buf[p + 3],
+            buf[p + 4],
+            buf[p + 5],
+            buf[p + 6],
+            buf[p + 7],
+        ]);
+        p += 8;
+        let _etag = read_7bit_str(buf, &mut p)?;
+        let _last_mod = read_7bit_str(buf, &mut p)?;
+        if p + 41 > buf.len() {
+            return Err("Library entry truncated in footer timestamps".into());
+        }
+        p += 41; // Expires(8) + Age(8) + MaxAge(8) + Date(8) + MustRevalidate(1) + Received(8)
+        out.push(NewsLibEntry {
+            hash: extract_announcement_hash(&url),
+            hex_name: format!("{:X}", mapped_idx),
+            body_len_off,
+            body_len,
+        });
+    }
+    if p != buf.len() {
+        return Err(format!("Library parse length mismatch ({} != {})", p, buf.len()));
+    }
+    Ok(out)
+}
+
+fn find_http_header_end(buf: &[u8]) -> Option<usize> {
+    buf.windows(4).position(|w| w == b"\r\n\r\n")
+}
+
+fn update_http_content_length(hdr_bytes: &[u8], new_len: usize) -> Vec<u8> {
+    let hdr_str = String::from_utf8_lossy(hdr_bytes);
+    let is_gzip = hdr_str
+        .lines()
+        .any(|l| l.to_ascii_lowercase().starts_with("content-encoding:") && l.to_ascii_lowercase().contains("gzip"));
+    if is_gzip {
+        return hdr_bytes.to_vec();
+    }
+    let mut lines: Vec<String> = hdr_str.split("\r\n").map(|s| s.to_string()).collect();
+    for line in &mut lines {
+        if line.to_ascii_lowercase().starts_with("content-length:") {
+            *line = format!("Content-Length: {}", new_len);
+        }
+    }
+    lines.join("\r\n").into_bytes()
+}
+
+pub fn patch_news_cache<L, P>(
+    cache_base: &Path,
+    lang: PatchLang,
+    mut log: L,
+    mut on_progress: P,
+) -> Result<(usize, usize), String>
+where
+    L: FnMut(&str, LogLevel),
+    P: FnMut(usize, usize, &str),
+{
+    let procs = find_running_game_processes();
+    if !procs.is_empty() {
+        let s = procs
+            .iter()
+            .map(|p| format!("{} (PID {})", p.name, p.pid))
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(format!("Blocked: {} is currently running. Close it first!", s));
+    }
+
+    let lib_path = cache_base.join("Library");
+    let hc_dir = cache_base.join("HTTPCache");
+    if !lib_path.is_file() || !hc_dir.is_dir() {
+        return Err(
+            "News cache not found in AppData\\LocalLow. Open the in-game News/Announcements screen once, close the client, then click Translate News again."
+                .into(),
+        );
+    }
+
+    let dict = match lang {
+        PatchLang::En => load_string_dict(EMBED_NEWS_EN_GZ)?,
+        PatchLang::Id => load_string_dict(EMBED_NEWS_ID_GZ)?,
+    };
+
+    log(
+        &format!("=== Starting Cached News Translation ({}) ===", lang.label()),
+        LogLevel::Info,
+    );
+    let live_lib = fs::read(&lib_path).map_err(|e| format!("Read Library failed: {}", e))?;
+    let entries = parse_httpcache_library(&live_lib)?;
+
+    let matched_total = entries
+        .iter()
+        .filter(|e| e.hash.as_ref().map(|h| dict.contains_key(h)).unwrap_or(false))
+        .count();
+    if matched_total == 0 {
+        return Err(
+            "No matching cached announcement HTML pages found yet. Open the in-game Announcements once, close the client, and try again."
+                .into(),
+        );
+    }
+
+    // Save verified original backups before first patch (never overwrite existing backup)
+    let bak_dir = cache_base.join("_NewsPatchBackup");
+    let bak_hc = bak_dir.join("HTTPCache");
+    let bak_lib = bak_dir.join("Library");
+    if !bak_lib.is_file() {
+        let any_jp = entries.iter().any(|e| {
+            if e.hash.is_none() {
+                return false;
+            }
+            if let Ok(raw) = fs::read(hc_dir.join(&e.hex_name)) {
+                if let Some(he) = find_http_header_end(&raw) {
+                    return has_cjk(&String::from_utf8_lossy(&raw[he + 4..]));
+                }
+            }
+            false
+        });
+        if any_jp {
+            fs::create_dir_all(&bak_hc).map_err(|e| format!("Create news backup dir failed: {}", e))?;
+            fs::copy(&lib_path, &bak_lib).map_err(|e| format!("Backup Library failed: {}", e))?;
+            for e in &entries {
+                if e.hash.is_some() {
+                    let src = hc_dir.join(&e.hex_name);
+                    let dst = bak_hc.join(&e.hex_name);
+                    if src.is_file() && !dst.is_file() {
+                        let _ = fs::copy(&src, &dst);
+                    }
+                }
+            }
+            log("  Saved verified original news cache backup in _NewsPatchBackup\\.", LogLevel::Ok);
+        }
+    }
+
+    let mut new_lib = live_lib.clone();
+    let mut patched = 0usize;
+    for e in &entries {
+        let Some(hash) = e.hash.as_ref() else { continue };
+        let Some(html) = dict.get(hash) else { continue };
+
+        let bak_file = bak_hc.join(&e.hex_name);
+        let live_file = hc_dir.join(&e.hex_name);
+        let src_file = if bak_file.is_file() { &bak_file } else { &live_file };
+        if !src_file.is_file() {
+            continue;
+        }
+        let raw = fs::read(src_file).map_err(|err| format!("Read HC/{} failed: {}", e.hex_name, err))?;
+        let hdr_end = find_http_header_end(&raw)
+            .ok_or_else(|| format!("Missing HTTP header terminator in HC/{}", e.hex_name))?;
+
+        let new_body = html.as_bytes();
+        let new_hdr = update_http_content_length(&raw[..hdr_end], new_body.len());
+        let mut out_buf = Vec::with_capacity(new_hdr.len() + 4 + new_body.len());
+        out_buf.extend_from_slice(&new_hdr);
+        out_buf.extend_from_slice(b"\r\n\r\n");
+        out_buf.extend_from_slice(new_body);
+
+        fs::write(&live_file, &out_buf)
+            .map_err(|err| format!("Write HC/{} failed: {}", e.hex_name, err))?;
+        write_i32_le(&mut new_lib, e.body_len_off, new_body.len() as i32);
+        patched += 1;
+        log(
+            &format!(
+                "  [{}] HC/{} ({}): {} B -> {} B",
+                lang.short_code(),
+                e.hex_name,
+                &hash[..8],
+                e.body_len,
+                new_body.len()
+            ),
+            LogLevel::Diff,
+        );
+        on_progress(
+            patched,
+            matched_total,
+            &format!("Translating News [{}]: {} / {}", lang.short_code(), patched, matched_total),
+        );
+    }
+
+    fs::write(&lib_path, &new_lib).map_err(|e| format!("Write Library failed: {}", e))?;
+
+    // Round-trip verify updated Library + HTTPCache body lengths
+    let v_lib = fs::read(&lib_path).map_err(|e| format!("Verify read Library failed: {}", e))?;
+    let v_entries = parse_httpcache_library(&v_lib)?;
+    for e in &v_entries {
+        if e.hash.is_some() {
+            let raw = fs::read(hc_dir.join(&e.hex_name))
+                .map_err(|err| format!("Verify read HC/{} failed: {}", e.hex_name, err))?;
+            let he = find_http_header_end(&raw).ok_or("Verify header end missing")?;
+            let actual = raw.len() - (he + 4);
+            if actual != e.body_len {
+                return Err(format!(
+                    "News cache verification mismatch on HC/{}: {} != {}",
+                    e.hex_name, actual, e.body_len
+                ));
+            }
+        }
+    }
+
+    on_progress(
+        patched,
+        matched_total,
+        &format!("News translated & verified ({}/{} in {})!", patched, matched_total, lang.short_code()),
+    );
+    log(
+        &format!(
+            "=== COMPLETE [News {}]! Patched & verified: {}/{} cached announcements ===",
+            lang.label(),
+            patched,
+            matched_total
+        ),
+        LogLevel::Ok,
+    );
+    Ok((patched, matched_total))
+}
+
+pub fn rollback_news_cache<L>(cache_base: &Path, log: &mut L) -> Result<usize, String>
+where
+    L: FnMut(&str, LogLevel),
+{
+    let bak_dir = cache_base.join("_NewsPatchBackup");
+    let bak_lib = bak_dir.join("Library");
+    let bak_hc = bak_dir.join("HTTPCache");
+    if !bak_lib.is_file() {
+        return Ok(0);
+    }
+    let lib_path = cache_base.join("Library");
+    let hc_dir = cache_base.join("HTTPCache");
+    let orig_lib = fs::read(&bak_lib).map_err(|e| format!("Read news Library backup failed: {}", e))?;
+    let entries = parse_httpcache_library(&orig_lib)?;
+    let mut restored = 0usize;
+    for e in &entries {
+        let src = bak_hc.join(&e.hex_name);
+        if src.is_file() {
+            fs::copy(&src, hc_dir.join(&e.hex_name))
+                .map_err(|err| format!("Restore HC/{} failed: {}", e.hex_name, err))?;
+            restored += 1;
+        }
+    }
+    fs::write(&lib_path, &orig_lib).map_err(|e| format!("Restore Library failed: {}", e))?;
+    log(
+        &format!("  Restored news Library + {} original HTML announcements.", restored),
+        LogLevel::Info,
+    );
     Ok(restored)
 }

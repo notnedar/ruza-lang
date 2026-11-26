@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Ruza-Lang Patcher v0.1.0 — EN / ID</title>
+<title>Ruza-Lang Patcher v0.2.0 — EN / ID</title>
 <style>
   :root {
     --bg: #080c15;
@@ -422,8 +422,8 @@
   .footer-left { display: flex; gap: 10px; }
   .btn-primary {
     height: 42px;
-    padding: 0 20px;
-    font-size: 13px;
+    padding: 0 18px;
+    font-size: 12.5px;
     font-weight: 700;
     color: #04131c;
     background: linear-gradient(135deg, #38bdf8, #10b981);
@@ -435,9 +435,23 @@
     transform: translateY(-1px);
     box-shadow: 0 8px 26px rgba(56, 189, 248, 0.32);
   }
+  .btn-news {
+    height: 42px;
+    padding: 0 16px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #c7d2fe;
+    background: rgba(99, 102, 241, 0.16);
+    border: 1px solid rgba(129, 140, 248, 0.42);
+    border-radius: 11px;
+  }
+  .btn-news:hover:not(:disabled) {
+    background: rgba(99, 102, 241, 0.28);
+    transform: translateY(-1px);
+  }
   .btn-rollback {
     height: 42px;
-    padding: 0 18px;
+    padding: 0 16px;
     font-size: 12.5px;
     font-weight: 700;
     color: #fcd34d;
@@ -491,7 +505,7 @@
       <div>
         <h1 id="hdrTitle">RUZA-LANG TRANSLATION PATCHER</h1>
         <div class="brand-meta">
-          <span class="chip">v0.1.0</span>
+          <span class="chip">v0.2.0</span>
           <span class="chip">EN / ID</span>
           <span id="hdrSub">77,661 verified strings &middot; Educational localization project</span>
         </div>
@@ -559,11 +573,15 @@
     <div class="footer-left">
       <button id="btnPatch" class="btn-primary">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
-        <span id="btnPatchText">Install English Patch (EN)</span>
+        <span id="btnPatchText">Install Patch (EN)</span>
+      </button>
+      <button id="btnNews" class="btn-news" title="Translate cached in-game announcements in AppData">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 5h16a1 1 0 011 1v12a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm4 4h8M8 13h8M8 17h5"/></svg>
+        <span id="btnNewsText">Translate News (EN)</span>
       </button>
       <button id="btnRollback" class="btn-rollback">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 10h10a6 6 0 110 12H9M3 10l4-4M3 10l4 4"/></svg>
-        <span id="btnRollbackText">Rollback to Original JP</span>
+        <span id="btnRollbackText">Rollback Original JP</span>
       </button>
     </div>
     <div id="footerNote" class="footer-note">
@@ -601,17 +619,20 @@
       procRunSuffix: ' — Close First!',
       progOfStrings: '/ 77,661 strings rewritten',
       progOfTargets: 'targets',
-      btnPatch: 'Install / Rewrite English (EN)',
-      btnRollback: 'Rollback to Original JP',
+      progOfNews: 'announcements',
+      btnPatch: 'Install Patch (EN)',
+      btnNews: 'Translate News (EN)',
+      btnRollback: 'Rollback Original JP',
       footerNote: 'Auto-backup in <code>_ENPatchBackup\\</code><br/>Exact byte sizes &middot; SHA-256 verified',
       copyLog: 'Copy',
       clearLog: 'Clear',
       copied: 'Copied terminal log to clipboard.',
       blockedTitle: 'Close Running Process First',
       blockedPatch: 'Target process is currently running!\n\nPlease close these processes before patching:\n',
+      blockedNews: 'Target process is currently running!\n\nPlease close these processes before translating news:\n',
       blockedRollback: 'Target process is currently running!\n\nPlease close these processes before rollback:\n',
       rollbackTitle: 'Confirm Rollback to Original JP',
-      rollbackBody: 'Restore all 4 target files back to Original JP from _ENPatchBackup?\n\nSHA-256 hashes will be verified automatically after restore.',
+      rollbackBody: 'Restore all 4 target files (and cached News if backed up) back to Original JP?\n\nSHA-256 hashes will be verified automatically after restore.',
       cancel: 'Cancel',
       confirmRollback: 'Yes, Rollback Now',
       ok: 'OK',
@@ -632,17 +653,20 @@
       procRunSuffix: ' — Tutup Dulu!',
       progOfStrings: '/ 77.661 string di-rewrite',
       progOfTargets: 'target',
-      btnPatch: 'Pasang / Rewrite Bahasa Indonesia (ID)',
-      btnRollback: 'Rollback ke Original JP',
+      progOfNews: 'pengumuman',
+      btnPatch: 'Pasang Patch (ID)',
+      btnNews: 'Translate News (ID)',
+      btnRollback: 'Rollback Original JP',
       footerNote: 'Backup otomatis di <code>_ENPatchBackup\\</code><br/>Ukuran file identik &middot; Verifikasi SHA-256',
       copyLog: 'Salin',
       clearLog: 'Bersihkan',
       copied: 'Log terminal disalin ke clipboard.',
       blockedTitle: 'Tutup Proses Target Dulu',
       blockedPatch: 'Proses target masih berjalan!\n\nHarap tutup dulu proses berikut sebelum install patch:\n',
+      blockedNews: 'Proses target masih berjalan!\n\nHarap tutup dulu proses berikut sebelum translate news:\n',
       blockedRollback: 'Proses target masih berjalan!\n\nHarap tutup dulu proses berikut sebelum rollback:\n',
       rollbackTitle: 'Konfirmasi Rollback ke Original JP',
-      rollbackBody: 'Kembalikan semua 4 file target ke Original JP dari folder _ENPatchBackup?\n\nHash SHA-256 tiap file akan diverifikasi otomatis setelah restore.',
+      rollbackBody: 'Kembalikan semua 4 file target (dan cache News jika ada backup) ke Original JP?\n\nHash SHA-256 tiap file akan diverifikasi otomatis setelah restore.',
       cancel: 'Batal',
       confirmRollback: 'Ya, Rollback Sekarang',
       ok: 'Mengerti',
@@ -669,6 +693,7 @@
     $('btnBrowse').textContent = tr.btnBrowse;
     $('btnScan').textContent = tr.btnScan;
     $('btnPatchText').textContent = tr.btnPatch;
+    $('btnNewsText').textContent = tr.btnNews;
     $('btnRollbackText').textContent = tr.btnRollback;
     $('footerNote').innerHTML = tr.footerNote;
     $('btnCopyLog').textContent = tr.copyLog;
@@ -706,6 +731,7 @@
     $('btnBrowse').disabled = v;
     $('btnScan').disabled = v;
     $('btnPatch').disabled = v;
+    $('btnNews').disabled = v;
     $('btnRollback').disabled = v;
     $('langEn').disabled = v;
     $('langId').disabled = v;
@@ -783,7 +809,9 @@
         const tot = Math.max(1, ev.total || 77661);
         const pct = Math.min(100, (cur * 100) / tot);
         $('progBig').textContent = fmt(cur);
-        $('progOf').textContent = tot === 77661 ? tr.progOfStrings : `/ ${tot} ${tr.progOfTargets}`;
+        $('progOf').textContent = tot === 77661
+          ? tr.progOfStrings
+          : (tot === 4 ? `/ ${tot} ${tr.progOfTargets}` : `/ ${tot} ${tr.progOfNews}`);
         $('progPct').textContent = pct.toFixed(1) + '%';
         $('barFill').style.width = pct.toFixed(2) + '%';
         if (ev.stage) $('progStage').textContent = ev.stage;
@@ -829,6 +857,17 @@
       return;
     }
     send('patch', { path: $('folderInput').value.trim() });
+  };
+
+  $('btnNews').onclick = () => {
+    const tr = t();
+    if (runningProcs.length > 0) {
+      const list = runningProcs.map(p => `• ${p.name} (PID ${p.pid})`).join('\n');
+      addLog('err', 'BLOCKED: Close running target processes before translating news!');
+      openModal(tr.blockedTitle, tr.blockedNews + list, [{ label: tr.ok, cls: 'btn-scan' }]);
+      return;
+    }
+    send('patch_news');
   };
 
   $('btnRollback').onclick = () => {
