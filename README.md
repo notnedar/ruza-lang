@@ -1,5 +1,7 @@
 # Ruza-Lang (`v0.9.0`)
 
+🌐 **Language:** **English** | [Bahasa Indonesia (`README_ID.md`)](README_ID.md)
+
 [![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
 
 > [!IMPORTANT]
@@ -88,7 +90,10 @@ An educational localization & asset-repacking suite demonstrating exact-size str
      2. Enable **Developer Options → Wireless Debugging** on your phone.
      3. Open Shizuku → tap **Pairing** → enter the 6-digit code in the notification → tap **Start**.
      4. Open **Ruza-Lang** → tap **Setup Access** → tap **Authorize Shizuku** → choose **Allow all the time**.
-   - **Alternative — Folder Picker (SAF) / Direct Storage:** Works directly on Android 8–12 or compatible emulators without Shizuku (100% non-root).
+   - **Alternative — Folder Picker (SAF) / Direct Storage:** Works directly on Android 8–12 or compatible emulators without Shizuku (100% non-root). *(Note: Android 13–17 blocks SAF from accessing `Android/data`, so use Shizuku or Option C below.)*
+   - **Xiaomi / POCO / Redmi (HyperOS) & OPPO / Realme Shizuku Tip:** If Shizuku is running but Ruza-Lang still shows *Authorize Storage Access First*:
+     - **Xiaomi / POCO (HyperOS):** Enable **USB debugging (Security settings)** in Developer Options, set **Battery → No restrictions** + **Autostart ON** for both **Shizuku** and **Ruza-Lang**, and lock Shizuku in Recent Apps.
+     - **OPPO / OnePlus / Realme:** Enable **Disable permission monitoring** near the bottom of Developer Options.
 4. Choose **`EN`** (English) or **`ID`** (Bahasa Indonesia) in the top bar (or left rail on tablets/landscape).
 5. Tap **Install Patch (`EN` / `ID`)** — takes ~3 seconds with automatic local backups and full SHA-256 verification.
 6. Tap **Rollback JP** anytime to restore original files (including cached News if backed up).
