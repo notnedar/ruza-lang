@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Ruza-Lang Patcher v0.5.0 — EN / ID</title>
+<title>Ruza-Lang Patcher v0.6.0 — EN / ID</title>
 <style>
   :root {
     --rail-w: 68px;
@@ -964,6 +964,57 @@
     color: var(--ink-soft);
   }
 
+  /* Compact inline progress strip for Android ADB operations */
+  .an-prog-box {
+    margin-top: 6px;
+    padding: 8px 12px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.56);
+    border: 1px solid rgba(48, 58, 72, 0.11);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .an-prog-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .an-prog-stage {
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .an-prog-count {
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+  .an-prog-track {
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(48, 58, 72, 0.12);
+    overflow: hidden;
+  }
+  .an-prog-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--sky-deep) 0%, var(--sky) 65%, var(--jade) 100%);
+    transition: width 0.18s ease-out;
+  }
+  .btn-white.danger-text { color: var(--rose); border-color: rgba(184, 60, 66, 0.24); }
+  .btn-white.danger-text:hover:not(:disabled) { background: rgba(184, 60, 66, 0.08); border-color: rgba(184, 60, 66, 0.45); }
+  select.path-field { cursor: pointer; }
+  #androidTargetsList .pkg-state { min-width: 118px; }
+
   /* Light Frosted Execution Ledger (NO black hacker box) */
   .log-ledger {
     flex: 1;
@@ -1050,14 +1101,14 @@
 <div class="shell">
   <!-- LEFT SLIM LAUNCHER RAIL -->
   <aside class="rail">
-    <div class="rail-brand" data-drag="1" title="Ruza-Lang v0.5.0">
+    <div class="rail-brand" data-drag="1" title="Ruza-Lang v0.6.0">
       <div class="mark-box">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <path d="M6.5 4.5H13.8C16.4 4.5 18 6 18 8.3C18 10.3 16.7 11.7 14.5 12L18.5 19.5H15.4L11.8 12.4H9V19.5H6.5V4.5ZM9 6.8V10.3H13.4C14.7 10.3 15.5 9.6 15.5 8.5C15.5 7.4 14.7 6.8 13.4 6.8H9Z" fill="#f3eee2"/>
           <path d="M16.5 4.5L19.5 4.5L19.5 7.5" stroke="#e8d2a0" stroke-width="1.3"/>
         </svg>
       </div>
-      <span class="rail-ver">0.5.0</span>
+      <span class="rail-ver">0.6.0</span>
     </div>
 
     <nav class="rail-nav">
@@ -1068,6 +1119,10 @@
       <button id="navPackages" class="nav-btn" data-tab="packages" title="Packages & Folder">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8.5 4.8v8.4L12 21l-8.5-4.8V7.8L12 3z"/><path d="M12 12l8.5-4.2M12 12v9M12 12L3.5 7.8"/></svg>
         <span id="navLblPackages" class="nav-lbl">Files</span>
+      </button>
+      <button id="navAndroid" class="nav-btn" data-tab="android" title="Android (ADB)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2.2"/><path d="M10.5 18h3"/></svg>
+        <span id="navLblAndroid" class="nav-lbl">Android</span>
       </button>
       <button id="navNews" class="nav-btn" data-tab="news" title="In-Game News Cache">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
@@ -1250,6 +1305,70 @@
       </div>
     </section>
 
+    <!-- ========== VIEW 2B: ANDROID ADB (AP SETTINGS FROSTED GLASS) ========== -->
+    <section id="viewAndroid" class="view">
+      <div class="sub-wrap">
+        <div class="glass-sheet">
+          <div class="sec-bar">
+            <span id="lblAnDeviceSec">Android Device (ADB)</span>
+            <span id="anAdbHint" class="sec-bar-right">Auto-detects ADB / Emulator</span>
+          </div>
+          <div class="rows-block">
+            <div class="set-row">
+              <div>
+                <div id="lblAnDevRow" class="set-label">Connected Device</div>
+                <div id="lblAnDevSub" class="set-sub">USB Debugging phone or BlueStacks emulator (no root required)</div>
+              </div>
+              <div class="set-right" style="gap: 7px;">
+                <select id="androidDeviceSelect" class="path-field" style="width: 316px;">
+                  <option value="">No device detected</option>
+                </select>
+                <button id="btnAnScan" class="btn-white" type="button">Scan</button>
+                <button id="btnAnBrowseAdb" class="btn-white" type="button">ADB</button>
+              </div>
+            </div>
+            <div class="set-row">
+              <div>
+                <div id="lblAnVerRow" class="set-label">Android Client Sync</div>
+                <div id="lblAnVerSub" class="set-sub">Verified for Android v1.0.0 (r3219596) &middot; Exact-size &middot; No APK re-sign</div>
+              </div>
+              <div class="set-right">
+                <span id="anVerDetected" class="pkg-count">&mdash;</span>
+                <span id="anVerState" class="pkg-state original"><span class="pkg-dot"></span>&mdash;</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="sec-bar">
+            <span id="lblAnPkgSec">Android Localization Packages</span>
+            <span id="anPkgSummaryRight" class="sec-bar-right">77,190 verified strings (99.4%)</span>
+          </div>
+          <div class="rows-block" id="androidTargetsList" style="margin-bottom: 6px;"></div>
+
+          <div class="an-prog-box">
+            <div class="an-prog-top">
+              <span id="anProgStage" class="an-prog-stage">Click Scan to inspect connected Android device via ADB.</span>
+              <span id="anProgCount" class="an-prog-count">0 / 77,190</span>
+            </div>
+            <div class="an-prog-track"><div id="anBarFill" class="an-prog-fill"></div></div>
+          </div>
+
+          <div class="sheet-footer">
+            <div id="anSheetNote" class="sheet-note">
+              Original backups saved in <code>%LOCALAPPDATA%\RuzaLang\AndroidBackups\</code>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button id="btnAnRollback" class="btn-white danger-text" type="button">Rollback JP</button>
+              <button id="btnAnNews" class="btn-white" type="button">News (EN)</button>
+              <button id="btnAnPatch" class="btn-charcoal" type="button">
+                <span id="btnAnPatchText">Install Patch (EN)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ========== VIEW 3: NEWS CACHE (AP SETTINGS FROSTED GLASS) ========== -->
     <section id="viewNews" class="view">
       <div class="sub-wrap">
@@ -1341,17 +1460,23 @@
   let busy = false;
   let runningProcs = [];
   let selectedLang = 'en'; // 'en' | 'id'
-  let activeTab = 'home';  // 'home' | 'packages' | 'news' | 'log'
+  let activeTab = 'home';  // 'home' | 'packages' | 'android' | 'news' | 'log'
   let lastTargets = [];
   let clientVersion = null;
   let updateInfo = null;
   let lastProgress = { current: 0, total: 77661, stage: '' };
+  let androidAdbPath = '';
+  let androidDevices = [];
+  let androidScan = null;
+  let androidInited = false;
+  let lastAnProgress = { current: 0, total: 77190, stage: '' };
 
   const I18N = {
     en: {
-      navHome: 'Home', navPackages: 'Files', navNews: 'News', navLog: 'Log',
+      navHome: 'Home', navPackages: 'Files', navAndroid: 'Android', navNews: 'News', navLog: 'Log',
       crumbs: {
         packages: 'Packages',
+        android: 'Android (ADB)',
         news: 'News Cache',
         log: 'Execution Log'
       },
@@ -1435,12 +1560,43 @@
       invalidFolder: 'Target executable not found',
       bakYes: 'Backup OK',
       bakNo: 'No Backup',
-      badges: { patched_en: 'English OK', patched_id: 'Indo OK', original: 'Original JP', modified: 'Modified', missing: 'Missing' }
+      badges: { patched_en: 'English OK', patched_id: 'Indo OK', original: 'Original JP', modified: 'Modified', missing: 'Missing' },
+      lblAnDeviceSec: 'Android Device (ADB)',
+      anAdbNotFound: 'ADB not found — click ADB',
+      lblAnDevRow: 'Connected Device',
+      lblAnDevSub: 'USB Debugging phone or BlueStacks emulator (no root required)',
+      anNoDevice: 'No device detected',
+      btnAnScan: 'Scan',
+      btnAnBrowseAdb: 'ADB',
+      lblAnVerRow: 'Android Client Sync',
+      lblAnVerSubSynced: (exp) => `Verified for Android ${exp} · Exact-size · No APK re-sign`,
+      lblAnVerSubMismatch: (reasons) => `${reasons}`,
+      anRunningBadge: 'App Running',
+      anNotInstalled: 'Not Installed',
+      lblAnPkgSec: 'Android Localization Packages',
+      anPkgSummaryRight: '77,190 verified strings (99.4%)',
+      anNewsRowName: 'Cached News',
+      anNewsRowSub: 'BestHTTP HTTPCache & Library v3 (open in-game News once)',
+      anNewsReady: 'Cache Ready',
+      anNewsEmpty: 'Open News Once',
+      anSheetNote: 'Original backups saved in <code>%LOCALAPPDATA%\\RuzaLang\\AndroidBackups\\</code>',
+      btnAnRollback: 'Rollback JP',
+      btnAnNews: 'News (EN)',
+      btnAnPatch: 'Install Patch (EN)',
+      anIdleStage: 'Click Scan to inspect connected Android device via ADB.',
+      anReadyOrig: 'Android Original JP — ready to patch via ADB.',
+      anInstalledEn: 'Android Installed: English (EN)',
+      anInstalledId: 'Android Installed: Bahasa Indonesia (ID)',
+      anBlockedTitle: 'Close Android Client First',
+      anBlockedBody: (pids) => `The Android client is currently running on the device (PID ${pids}).\n\nPlease force-close or swipe away the app on Android/BlueStacks before patching or rollback.`,
+      anRollbackTitle: 'Confirm Android Rollback to Original JP',
+      anRollbackBody: (serial) => `Restore Android bundles (and cached News if backed up) on ${serial} back to Original JP?\n\nRemote SHA-256 hashes will be verified automatically after transfer.`
     },
     id: {
-      navHome: 'Utama', navPackages: 'Paket', navNews: 'Berita', navLog: 'Log',
+      navHome: 'Utama', navPackages: 'Paket', navAndroid: 'Android', navNews: 'Berita', navLog: 'Log',
       crumbs: {
         packages: 'Paket Klien',
+        android: 'Android (ADB)',
         news: 'Cache Berita',
         log: 'Log Eksekusi'
       },
@@ -1524,7 +1680,37 @@
       invalidFolder: 'Executable target tidak ditemukan',
       bakYes: 'Backup Siap',
       bakNo: 'Belum Backup',
-      badges: { patched_en: 'English OK', patched_id: 'Indo OK', original: 'Original JP', modified: 'Modifikasi', missing: 'Hilang' }
+      badges: { patched_en: 'English OK', patched_id: 'Indo OK', original: 'Original JP', modified: 'Modifikasi', missing: 'Hilang' },
+      lblAnDeviceSec: 'Perangkat Android (ADB)',
+      anAdbNotFound: 'ADB tidak ditemukan — klik ADB',
+      lblAnDevRow: 'Perangkat Terhubung',
+      lblAnDevSub: 'HP USB Debugging atau emulator BlueStacks (tanpa root)',
+      anNoDevice: 'Perangkat belum terdeteksi',
+      btnAnScan: 'Scan',
+      btnAnBrowseAdb: 'ADB',
+      lblAnVerRow: 'Sinkronisasi Klien Android',
+      lblAnVerSubSynced: (exp) => `Terverifikasi untuk Android ${exp} · Ukuran identik · Tanpa re-sign APK`,
+      lblAnVerSubMismatch: (reasons) => `${reasons}`,
+      anRunningBadge: 'Game Berjalan',
+      anNotInstalled: 'Belum Terpasang',
+      lblAnPkgSec: 'Paket Lokalisasi Android',
+      anPkgSummaryRight: '77.190 string terverifikasi (99,4%)',
+      anNewsRowName: 'Cache Berita',
+      anNewsRowSub: 'BestHTTP HTTPCache & Library v3 (buka menu Berita di game dulu)',
+      anNewsReady: 'Cache Siap',
+      anNewsEmpty: 'Buka Berita Dulu',
+      anSheetNote: 'Backup asli tersimpan di <code>%LOCALAPPDATA%\\RuzaLang\\AndroidBackups\\</code>',
+      btnAnRollback: 'Rollback JP',
+      btnAnNews: 'Berita (ID)',
+      btnAnPatch: 'Pasang Patch (ID)',
+      anIdleStage: 'Klik Scan untuk memeriksa perangkat Android lewat ADB.',
+      anReadyOrig: 'Android Original JP — siap dipasang via ADB.',
+      anInstalledEn: 'Android Terpasang: Bahasa Inggris (EN)',
+      anInstalledId: 'Android Terpasang: Bahasa Indonesia (ID)',
+      anBlockedTitle: 'Tutup Game di Android Dulu',
+      anBlockedBody: (pids) => `Aplikasi klien masih berjalan di perangkat Android (PID ${pids}).\n\nHarap tutup dulu game di Android/BlueStacks sebelum patch atau rollback.`,
+      anRollbackTitle: 'Konfirmasi Rollback Android ke Original JP',
+      anRollbackBody: (serial) => `Kembalikan semua bundle Android (dan cache News jika ada backup) di ${serial} ke Original JP?\n\nHash SHA-256 di perangkat akan diverifikasi otomatis setelah transfer.`
     }
   };
 
@@ -1540,12 +1726,16 @@
   function switchTab(tab) {
     activeTab = tab;
     document.body.classList.toggle('subview', tab !== 'home');
-    for (const id of ['home', 'packages', 'news', 'log']) {
+    for (const id of ['home', 'packages', 'android', 'news', 'log']) {
       const cap = id.charAt(0).toUpperCase() + id.slice(1);
       $('nav' + cap).classList.toggle('active', id === tab);
       $('view' + cap).classList.toggle('active', id === tab);
     }
     if (tab === 'log') $('logDot').classList.remove('show');
+    if (tab === 'android' && !androidInited && !busy) {
+      androidInited = true;
+      send('android_detect', { adb_path: androidAdbPath || undefined });
+    }
     updateCrumb();
   }
 
@@ -1676,6 +1866,7 @@
     $('langId').classList.toggle('active', selectedLang === 'id');
     $('navLblHome').textContent = tr.navHome;
     $('navLblPackages').textContent = tr.navPackages;
+    $('navLblAndroid').textContent = tr.navAndroid;
     $('navLblNews').textContent = tr.navNews;
     $('navLblLog').textContent = tr.navLog;
     $('heroDesc').textContent = tr.heroDesc;
@@ -1712,6 +1903,19 @@
     $('sheetNote').innerHTML = tr.sheetNote;
     $('btnCopyLog').textContent = tr.copyLog;
     $('btnClearLog').textContent = tr.clearLog;
+    $('lblAnDeviceSec').textContent = tr.lblAnDeviceSec;
+    $('lblAnDevRow').textContent = tr.lblAnDevRow;
+    $('lblAnDevSub').textContent = tr.lblAnDevSub;
+    $('btnAnScan').textContent = tr.btnAnScan;
+    $('btnAnBrowseAdb').textContent = tr.btnAnBrowseAdb;
+    $('lblAnVerRow').textContent = tr.lblAnVerRow;
+    $('lblAnPkgSec').textContent = tr.lblAnPkgSec;
+    $('anPkgSummaryRight').textContent = tr.anPkgSummaryRight;
+    $('anSheetNote').innerHTML = tr.anSheetNote;
+    $('btnAnRollback').textContent = tr.btnAnRollback;
+    $('btnAnNews').textContent = tr.btnAnNews;
+    $('btnAnPatchText').textContent = tr.btnAnPatch;
+    renderAndroidView();
     updateCrumb();
     renderProcessAlert();
     updateHeroState();
@@ -1763,8 +1967,8 @@
 
   function setBusy(v) {
     busy = v;
-    for (const id of ['btnAuto', 'btnBrowse', 'btnScan', 'btnAutoQuick', 'btnScanQuick', 'btnPatch', 'btnNews', 'btnNewsPage', 'btnRollback', 'btnRollbackPkg', 'btnCheckUpdate', 'langEn', 'langId', 'folderInput']) {
-      $(id).disabled = v;
+    for (const id of ['btnAuto', 'btnBrowse', 'btnScan', 'btnAutoQuick', 'btnScanQuick', 'btnPatch', 'btnNews', 'btnNewsPage', 'btnRollback', 'btnRollbackPkg', 'btnCheckUpdate', 'langEn', 'langId', 'folderInput', 'androidDeviceSelect', 'btnAnScan', 'btnAnBrowseAdb', 'btnAnPatch', 'btnAnNews', 'btnAnRollback']) {
+      if ($(id)) $(id).disabled = v;
     }
   }
 
@@ -1807,6 +2011,144 @@
       box.appendChild(row);
     }
     updateHeroState();
+  }
+
+  function renderAndroidProgress(cur, tot, stage) {
+    lastAnProgress = { current: cur, total: tot, stage: stage || lastAnProgress.stage };
+    const safeTot = Math.max(1, tot || 77190);
+    const pct = Math.min(100, (cur * 100) / safeTot);
+    $('anBarFill').style.width = pct.toFixed(2) + '%';
+    $('anProgCount').textContent = `${fmt(cur)} / ${fmt(safeTot)} · ${pct.toFixed(0)}%`;
+    if (stage) $('anProgStage').textContent = stage;
+  }
+
+  function renderAndroidView() {
+    const tr = t();
+    const adbHint = $('anAdbHint');
+    if (androidAdbPath) {
+      const base = androidAdbPath.split(/[\\/]/).pop() || androidAdbPath;
+      adbHint.textContent = base;
+      adbHint.style.color = '#a7e3c7';
+    } else {
+      adbHint.textContent = tr.anAdbNotFound;
+      adbHint.style.color = '#f7a5a7';
+    }
+
+    const sel = $('androidDeviceSelect');
+    const prev = sel.value;
+    sel.innerHTML = '';
+    if (!androidDevices.length) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = tr.anNoDevice;
+      sel.appendChild(opt);
+    } else {
+      for (const d of androidDevices) {
+        const opt = document.createElement('option');
+        opt.value = d.serial;
+        const verStr = d.android_ver ? ` · Android ${d.android_ver}` : '';
+        const stStr = d.state !== 'device' ? ` [${d.state}]` : '';
+        opt.textContent = `${d.model} (${d.serial}${verStr})${stStr}`;
+        sel.appendChild(opt);
+      }
+      if (androidScan && androidDevices.some(d => d.serial === androidScan.serial)) {
+        sel.value = androidScan.serial;
+      } else if (prev && androidDevices.some(d => d.serial === prev)) {
+        sel.value = prev;
+      }
+    }
+
+    const verDet = $('anVerDetected');
+    const verSt = $('anVerState');
+    const verSub = $('lblAnVerSub');
+    const listBox = $('androidTargetsList');
+    listBox.innerHTML = '';
+
+    if (!androidScan) {
+      verDet.textContent = '—';
+      verSt.className = 'pkg-state original';
+      verSt.innerHTML = '<span class="pkg-dot"></span>—';
+      verSub.textContent = tr.lblAnVerSubSynced('v1.0.0 (r3219596)');
+      for (const [name, sub, cnt] of [
+        ['VStringPool', 'Story, Quests, Skills, Kibo, Settings', 74055],
+        ['Static UI KeyConfig', 'Prefab Buttons, Headers, Notices', 3135]
+      ]) {
+        const row = document.createElement('div');
+        row.className = 'set-row';
+        row.innerHTML = `<div><div class="set-label">${name}</div><div class="set-sub">${sub}</div></div><div class="set-right"><span class="pkg-count">${fmt(cnt)} str</span><span class="pkg-bak">—</span><span class="pkg-state original"><span class="pkg-dot"></span>—</span></div>`;
+        listBox.appendChild(row);
+      }
+      const nRow = document.createElement('div');
+      nRow.className = 'set-row';
+      nRow.innerHTML = `<div><div class="set-label">${tr.anNewsRowName}</div><div class="set-sub">${tr.anNewsRowSub}</div></div><div class="set-right"><span class="pkg-count">16 pages</span><span class="pkg-bak">—</span><span class="pkg-state original"><span class="pkg-dot"></span>—</span></div>`;
+      listBox.appendChild(nRow);
+      if (!busy) renderAndroidProgress(0, 77190, tr.anIdleStage);
+      return;
+    }
+
+    const v = androidScan.version;
+    const det = formatClientVer(v);
+    const exp = `v${v.expected_version} (r${v.expected_res_rev})`;
+    verDet.textContent = androidScan.installed ? det : '—';
+    if (!androidScan.installed) {
+      verSt.className = 'pkg-state missing';
+      verSt.innerHTML = `<span class="pkg-dot"></span>${tr.anNotInstalled}`;
+      verSub.textContent = (v.reasons || []).join('; ');
+    } else if (androidScan.running_pids && androidScan.running_pids.length > 0) {
+      verSt.className = 'pkg-state missing';
+      verSt.innerHTML = `<span class="pkg-dot"></span>${tr.anRunningBadge}`;
+      verSub.textContent = `PID ${androidScan.running_pids.join(', ')} — ${tr.procRunSuffix.replace(/^ — /, '')}`;
+    } else if (v.status === 'mismatch') {
+      verSt.className = 'pkg-state modified';
+      verSt.innerHTML = `<span class="pkg-dot"></span>${tr.verBadgeMismatch}`;
+      verSub.textContent = tr.lblAnVerSubMismatch((v.reasons || []).join('; '));
+    } else {
+      verSt.className = 'pkg-state patched_id';
+      verSt.innerHTML = `<span class="pkg-dot"></span>${tr.verBadgeSynced}`;
+      verSub.textContent = tr.lblAnVerSubSynced(exp);
+    }
+
+    const targets = androidScan.targets || [];
+    for (const item of targets) {
+      const row = document.createElement('div');
+      row.className = 'set-row';
+      const bak = item.has_backup ? tr.bakYes : tr.bakNo;
+      row.innerHTML = `
+        <div>
+          <div class="set-label"></div>
+          <div class="set-sub"></div>
+        </div>
+        <div class="set-right">
+          <span class="pkg-count">${fmt(item.string_count)} str</span>
+          <span class="pkg-bak">${bak}</span>
+          <span class="pkg-state ${item.state}"><span class="pkg-dot"></span>${tr.badges[item.state] || item.state}</span>
+        </div>`;
+      row.querySelector('.set-label').textContent = item.name;
+      row.querySelector('.set-sub').textContent = item.subtitle;
+      listBox.appendChild(row);
+    }
+    const newsReady = (androidScan.news_cache_bytes || 0) > 16;
+    const nRow = document.createElement('div');
+    nRow.className = 'set-row';
+    nRow.innerHTML = `
+      <div>
+        <div class="set-label">${tr.anNewsRowName}</div>
+        <div class="set-sub">${tr.anNewsRowSub}</div>
+      </div>
+      <div class="set-right">
+        <span class="pkg-count">16 pages</span>
+        <span class="pkg-bak">${androidScan.has_news_backup ? tr.bakYes : tr.bakNo}</span>
+        <span class="pkg-state ${newsReady ? 'patched_en' : 'original'}"><span class="pkg-dot"></span>${newsReady ? tr.anNewsReady : tr.anNewsEmpty}</span>
+      </div>`;
+    listBox.appendChild(nRow);
+
+    if (!busy) {
+      const activeCount = targets.filter(x => x.state === 'patched_en' || x.state === 'patched_id').reduce((s, x) => s + x.string_count, 0);
+      const allId = targets.length > 0 && targets.every(x => x.state === 'patched_id');
+      const allEn = targets.length > 0 && targets.every(x => x.state === 'patched_en');
+      const stg = allId ? tr.anInstalledId : (allEn ? tr.anInstalledEn : tr.anReadyOrig);
+      renderAndroidProgress(activeCount, 77190, stg);
+    }
   }
 
   function renderProgress(cur, tot, stage) {
@@ -1858,6 +2200,20 @@
       }
       case 'progress':
         renderProgress(ev.current || 0, ev.total || 77661, ev.stage);
+        break;
+      case 'android_devices':
+        androidAdbPath = ev.adb_path || '';
+        androidDevices = ev.devices || [];
+        if (!androidDevices.length) androidScan = null;
+        renderAndroidView();
+        break;
+      case 'android_scan_result':
+        androidScan = ev.result || null;
+        if (androidScan && androidScan.adb_path) androidAdbPath = androidScan.adb_path;
+        renderAndroidView();
+        break;
+      case 'android_progress':
+        renderAndroidProgress(ev.current || 0, ev.total || 77190, ev.stage);
         break;
       case 'busy':
         setBusy(!!ev.value);
@@ -2000,6 +2356,66 @@
   };
   $('btnRollback').onclick = triggerRollback;
   $('btnRollbackPkg').onclick = triggerRollback;
+
+  // Android ADB actions
+  $('androidDeviceSelect').onchange = () => {
+    const serial = $('androidDeviceSelect').value;
+    if (serial) send('android_scan', { adb_path: androidAdbPath || undefined, serial });
+  };
+  $('btnAnScan').onclick = () => {
+    const serial = $('androidDeviceSelect').value;
+    send('android_detect', { adb_path: androidAdbPath || undefined, serial: serial || undefined });
+  };
+  $('btnAnBrowseAdb').onclick = () => {
+    send('android_browse_adb', { adb_path: androidAdbPath || undefined });
+  };
+  $('btnAnPatch').onclick = () => {
+    const tr = t();
+    const serial = $('androidDeviceSelect').value;
+    if (!serial) {
+      send('android_detect', { adb_path: androidAdbPath || undefined });
+      return;
+    }
+    if (androidScan && androidScan.running_pids && androidScan.running_pids.length > 0) {
+      openModal(tr.anBlockedTitle, tr.anBlockedBody(androidScan.running_pids.join(', ')), [{ label: tr.ok, cls: 'btn-charcoal' }]);
+      return;
+    }
+    const runAnPatch = () => send('android_patch', { adb_path: androidAdbPath || undefined, serial });
+    if (androidScan && androidScan.version && androidScan.version.status === 'mismatch') {
+      const det = formatClientVer(androidScan.version);
+      const exp = `v${androidScan.version.expected_version} (r${androidScan.version.expected_res_rev})`;
+      const reasons = (androidScan.version.reasons || []).join('; ');
+      openModal(tr.mismatchTitle, tr.mismatchBody(det, exp, reasons), [
+        { label: tr.waitUpdate, cls: 'btn-white' },
+        { label: tr.installAnyway, cls: 'btn-charcoal', onClick: runAnPatch }
+      ]);
+      return;
+    }
+    runAnPatch();
+  };
+  $('btnAnNews').onclick = () => {
+    const tr = t();
+    const serial = $('androidDeviceSelect').value;
+    if (!serial) return;
+    if (androidScan && androidScan.running_pids && androidScan.running_pids.length > 0) {
+      openModal(tr.anBlockedTitle, tr.anBlockedBody(androidScan.running_pids.join(', ')), [{ label: tr.ok, cls: 'btn-charcoal' }]);
+      return;
+    }
+    send('android_patch_news', { adb_path: androidAdbPath || undefined, serial });
+  };
+  $('btnAnRollback').onclick = () => {
+    const tr = t();
+    const serial = $('androidDeviceSelect').value;
+    if (!serial) return;
+    if (androidScan && androidScan.running_pids && androidScan.running_pids.length > 0) {
+      openModal(tr.anBlockedTitle, tr.anBlockedBody(androidScan.running_pids.join(', ')), [{ label: tr.ok, cls: 'btn-charcoal' }]);
+      return;
+    }
+    openModal(tr.anRollbackTitle, tr.anRollbackBody(serial), [
+      { label: tr.cancel, cls: 'btn-white' },
+      { label: tr.confirmRollback, cls: 'btn-danger-pill', onClick: () => send('android_rollback', { adb_path: androidAdbPath || undefined, serial }) }
+    ]);
+  };
 
   window.addEventListener('DOMContentLoaded', () => {
     applyUiLanguage();

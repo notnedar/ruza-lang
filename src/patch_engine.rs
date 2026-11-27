@@ -22,13 +22,27 @@ const EMBED_RESOURCES_DIFF_ID_GZ: &[u8] = include_bytes!("../resources/resources
 
 const EMBED_NEWS_EN_GZ: &[u8] = include_bytes!("../resources/news_en.bin.gz");
 const EMBED_NEWS_ID_GZ: &[u8] = include_bytes!("../resources/news_id.bin.gz");
+const EMBED_VSTRING_ANDROID_MAP_GZ: &[u8] = include_bytes!("../resources/vstring_android_map.bin.gz");
 
 pub const TOTAL_STRINGS: usize = 74055 + 3135 + 113 + 358; // 77,661
+pub const ANDROID_TOTAL_STRINGS: usize = 74055 + 3135; // 77,190 (writable external .res bundles; zero APK re-signing)
 
 // Verified client build metadata for version sync checks
 pub const EXPECTED_CLIENT_VERSION: &str = "1.0.2";
 pub const EXPECTED_RES_REVISION: &str = "3219598";
 pub const EXPECTED_BUILD_GUID: &str = "6310abcfe75841bcac713c29234fe986";
+
+// Verified Android client metadata (r3219596, v1.0.0)
+pub const ANDROID_PACKAGE_ID: &str = "com.Yostar.AzurpromiliaJP";
+pub const ANDROID_EXPECTED_VERSION: &str = "1.0.0";
+pub const ANDROID_EXPECTED_RES_REV: &str = "3219596";
+pub const ANDROID_STATIC_UI_SUB_OFFSET: usize = 4200075;
+pub const ANDROID_VSTRING_ORIG_SHA: &str = "C6BA69F2403102A9D4DBF2B3AB079ABBE7DE25896ABDB3969DD5B7988A2DB013";
+pub const ANDROID_STATIC_UI_ORIG_SHA: &str = "53A36C59B4ABABF9457ED37B195092DCAFD491C2D95D9BA75A61998C0138D22A";
+pub const ANDROID_VSTRING_EN_SHA: &str = "A2CA49E7A11A9E7246EDF684196A98073046BDBBDB4EE13CE2D0219D3AA0748F";
+pub const ANDROID_STATIC_UI_EN_SHA: &str = "B4566920EC26694F36A422E343C085D86617F8F5172BCE61CF513CA5DDAB53A5";
+pub const ANDROID_VSTRING_ID_SHA: &str = "388A8FB2D8A34C49F0710D0BDFC2A8A5AE5F753DF2646E336C4948874B96054A";
+pub const ANDROID_STATIC_UI_ID_SHA: &str = "6F025078A5B81C60D14FDAB1ED958399E513A643125076E56224465B80FCD1F4";
 
 pub const VSTRING_REL: &str = r"AzurPromiliaJP_Data\.res\raw_base_package\BundleFiles\z5xzl3cg6ao0ilpbzykexg.r";
 pub const STATIC_UI_REL: &str = r"AzurPromiliaJP_Data\.res\default_package\BundleFiles\yr49bxop0f3reujfsmyfca.r";
@@ -705,50 +719,57 @@ where
     Ok(rewritten)
 }
 
-fn patch_vstring_pool<L, P>(
-    game_dir: &Path,
-    bak_dir: &Path,
-    lang: PatchLang,
-    log: &mut L,
-    on_sub: &mut P,
-) -> Result<usize, String>
-where
-    L: FnMut(&str, LogLevel),
-    P: FnMut(usize, &str),
-{
-    let target = game_dir.join(VSTRING_REL);
-    let bak = bak_dir.join("z5xzl3cg6ao0ilpbzykexg.r.original");
-    if !target.is_file() {
-        return Err(format!("VStringPool not found: {:?}", target));
-    }
-    ensure_backup(&target, &bak, VSTRING_EN_SHA, "", VSTRING_ID_SHA, log)?;
-    if check_no_backup_switch_guard(&target, &bak, lang, VSTRING_EN_SHA, "", VSTRING_ID_SHA)? {
-        log(
-            &format!("  VStringPool already matches {} (74,055 strings).", lang.short_code()),
-            LogLevel::Ok,
-        );
-        on_sub(74055, "VStringPool already up-to-date");
-        return Ok(74055);
-    }
-    let src_path = if bak.is_file() { &bak } else { &target };
-
-    on_sub(0, &format!("Loading 74,055 VStringPool ({}) entries...", lang.short_code()));
+pub fn load_android_vstring_map(lang: PatchLang) -> Result<HashMap<usize, Vec<u8>>, String> {
     let gz = match lang {
         PatchLang::En => EMBED_VSTRING_EN_GZ,
         PatchLang::Id => EMBED_VSTRING_ID_GZ,
     };
-    let translations = load_vstring_map(gz)?;
-    log(
-        &format!(
-            "  Loaded {} embedded {} VStringPool translations.",
-            translations.len(),
-            lang.short_code()
-        ),
-        LogLevel::Info,
-    );
+    let pc_map = load_vstring_map(gz)?;
+    let raw_runs = gunzip(EMBED_VSTRING_ANDROID_MAP_GZ)?;
+    if raw_runs.len() < 4 {
+        return Err("Corrupt Android VStringPool remap table".into());
+    }
+    let run_count = read_u32_le(&raw_runs, 0) as usize;
+    if raw_runs.len() != 4 + run_count * 12 {
+        return Err("Android VStringPool remap table length mismatch".into());
+    }
+    let mut an_map = HashMap::with_capacity(pc_map.len());
+    for i in 0..run_count {
+        let base = 4 + i * 12;
+        let pc_start = read_u32_le(&raw_runs, base) as usize;
+        let an_start = read_u32_le(&raw_runs, base + 4) as usize;
+        let len = read_u32_le(&raw_runs, base + 8) as usize;
+        for k in 0..len {
+            if let Some(tr) = pc_map.get(&(pc_start + k)) {
+                an_map.insert(an_start + k, tr.clone());
+            }
+        }
+    }
+    if an_map.len() != pc_map.len() {
+        return Err(format!(
+            "Android VStringPool remap incomplete ({} != {})",
+            an_map.len(),
+            pc_map.len()
+        ));
+    }
+    Ok(an_map)
+}
 
-    on_sub(0, "Decrypting VStringPool (133 MB MMap)...");
-    let orig_buf = fs::read(src_path).map_err(|e| format!("Read VStringPool failed: {}", e))?;
+pub fn patch_vstring_pool_bytes<L, P>(
+    orig_buf: &[u8],
+    translations: &HashMap<usize, Vec<u8>>,
+    spans: &[(&str, usize, usize)],
+    lang: PatchLang,
+    log: &mut L,
+    on_sub: &mut P,
+) -> Result<(Vec<u8>, usize), String>
+where
+    L: FnMut(&str, LogLevel),
+    P: FnMut(usize, &str),
+{
+    if orig_buf.len() < 4144 {
+        return Err("VStringPool file too small".into());
+    }
     let mut h1 = orig_buf[4120..4144].to_vec();
     xor_mmap_in_place(&mut h1, 4120, EMBED_MMAP_KEY);
     let hash_bytes = read_u32_le(&h1, 0) as usize;
@@ -758,24 +779,37 @@ where
     }
 
     let str_sec_off = 4120 + hash_bytes;
+    if str_sec_off + 20 > orig_buf.len() {
+        return Err("VStringPool string section offset out of bounds".into());
+    }
     let mut str_buf = orig_buf[str_sec_off..].to_vec();
     xor_mmap_in_place(&mut str_buf, str_sec_off, EMBED_MMAP_KEY);
     let count = read_u32_le(&str_buf, 16) as usize;
     log(&format!("  Decrypted VStringPool: {} total strings.", count), LogLevel::Info);
 
     let mut new_str_buf = str_buf.clone();
-    let spans = [("base_jp", 1495181usize, 1563711usize), ("hotfix_jp", 1658279usize, count - 1)];
+    let resolved_spans: Vec<(&str, usize, usize)> = spans
+        .iter()
+        .map(|&(name, s, e)| (name, s, if e == usize::MAX { count - 1 } else { e }))
+        .collect();
 
     let mut rewritten = 0usize;
     let mut inplace_ids = Vec::new();
     for &id in translations.keys() {
-        let in_span = (id >= 1495181 && id <= 1563711) || (id >= 1658279 && id < count);
+        if id >= count {
+            return Err(format!("VStringPool ID #{} out of range (count={})", id, count));
+        }
+        let in_span = resolved_spans.iter().any(|&(_, s, e)| id >= s && id <= e);
         if !in_span {
             inplace_ids.push(id);
         }
     }
 
-    for (name, start, end) in spans {
+    let total_tr = translations.len();
+    for (name, start, end) in resolved_spans {
+        if end >= count || start > end {
+            return Err(format!("Invalid VStringPool span {} [{}..{}] for count={}", name, start, end, count));
+        }
         let span_start_abs = read_u32_le(&str_buf, 20 + start * 4) as usize;
         let span_end_abs = if end + 1 < count {
             read_u32_le(&str_buf, 20 + (end + 1) * 4) as usize
@@ -792,7 +826,13 @@ where
                 if rewritten % 2500 == 0 {
                     on_sub(
                         rewritten,
-                        &format!("Rewriting VStringPool [{} / {}]: {} / 74,055", lang.short_code(), name, rewritten),
+                        &format!(
+                            "Rewriting VStringPool [{} / {}]: {} / {}",
+                            lang.short_code(),
+                            name,
+                            rewritten,
+                            total_tr
+                        ),
                     );
                 }
                 tr.as_slice()
@@ -842,14 +882,14 @@ where
     }
 
     on_sub(rewritten, "Re-encrypting & verifying 74,055 VStringPool strings...");
-    let mut out_buf = orig_buf.clone();
+    let mut out_buf = orig_buf.to_vec();
     out_buf[str_sec_off..].copy_from_slice(&new_str_buf);
     xor_mmap_in_place(&mut out_buf[str_sec_off..], str_sec_off, EMBED_MMAP_KEY);
 
     // Round-trip verification
     let mut v_sec = out_buf[str_sec_off..].to_vec();
     xor_mmap_in_place(&mut v_sec, str_sec_off, EMBED_MMAP_KEY);
-    for (&id, expected) in &translations {
+    for (&id, expected) in translations {
         let a = read_u32_le(&v_sec, 20 + id * 4) as usize;
         let rel = a - str_sec_off;
         let l = read_i32_le(&v_sec, rel) as usize;
@@ -857,6 +897,87 @@ where
             return Err(format!("VStringPool round-trip mismatch on #{}", id));
         }
     }
+    if out_buf.len() != orig_buf.len() {
+        return Err(format!("VStringPool output size mismatch ({} != {})", out_buf.len(), orig_buf.len()));
+    }
+    Ok((out_buf, rewritten))
+}
+
+pub fn patch_android_vstring_bytes<L, P>(
+    orig_buf: &[u8],
+    lang: PatchLang,
+    log: &mut L,
+    on_sub: &mut P,
+) -> Result<(Vec<u8>, usize), String>
+where
+    L: FnMut(&str, LogLevel),
+    P: FnMut(usize, &str),
+{
+    on_sub(0, &format!("Remapping 74,055 Android VStringPool ({}) entries...", lang.short_code()));
+    let translations = load_android_vstring_map(lang)?;
+    log(
+        &format!(
+            "  Remapped {} embedded {} VStringPool translations for Android.",
+            translations.len(),
+            lang.short_code()
+        ),
+        LogLevel::Info,
+    );
+    on_sub(0, "Decrypting Android VStringPool (130 MB MMap)...");
+    let spans = [
+        ("base_jp_1", 1473040usize, 1541595usize),
+        ("base_jp_2", 1613715usize, 1616061usize),
+        ("hotfix_jp", 1642789usize, usize::MAX),
+    ];
+    patch_vstring_pool_bytes(orig_buf, &translations, &spans, lang, log, on_sub)
+}
+
+fn patch_vstring_pool<L, P>(
+    game_dir: &Path,
+    bak_dir: &Path,
+    lang: PatchLang,
+    log: &mut L,
+    on_sub: &mut P,
+) -> Result<usize, String>
+where
+    L: FnMut(&str, LogLevel),
+    P: FnMut(usize, &str),
+{
+    let target = game_dir.join(VSTRING_REL);
+    let bak = bak_dir.join("z5xzl3cg6ao0ilpbzykexg.r.original");
+    if !target.is_file() {
+        return Err(format!("VStringPool not found: {:?}", target));
+    }
+    ensure_backup(&target, &bak, VSTRING_EN_SHA, "", VSTRING_ID_SHA, log)?;
+    if check_no_backup_switch_guard(&target, &bak, lang, VSTRING_EN_SHA, "", VSTRING_ID_SHA)? {
+        log(
+            &format!("  VStringPool already matches {} (74,055 strings).", lang.short_code()),
+            LogLevel::Ok,
+        );
+        on_sub(74055, "VStringPool already up-to-date");
+        return Ok(74055);
+    }
+    let src_path = if bak.is_file() { &bak } else { &target };
+
+    on_sub(0, &format!("Loading 74,055 VStringPool ({}) entries...", lang.short_code()));
+    let gz = match lang {
+        PatchLang::En => EMBED_VSTRING_EN_GZ,
+        PatchLang::Id => EMBED_VSTRING_ID_GZ,
+    };
+    let translations = load_vstring_map(gz)?;
+    log(
+        &format!(
+            "  Loaded {} embedded {} VStringPool translations.",
+            translations.len(),
+            lang.short_code()
+        ),
+        LogLevel::Info,
+    );
+
+    on_sub(0, "Decrypting VStringPool (133 MB MMap)...");
+    let orig_buf = fs::read(src_path).map_err(|e| format!("Read VStringPool failed: {}", e))?;
+    let spans = [("base_jp", 1495181usize, 1563711usize), ("hotfix_jp", 1658279usize, usize::MAX)];
+    let (out_buf, rewritten) = patch_vstring_pool_bytes(&orig_buf, &translations, &spans, lang, log, on_sub)?;
 
     write_exclusive_verified(&target, &out_buf, &bak)?;
     let post_sha = sha256_file(&target)?;
@@ -878,48 +999,39 @@ fn align4(n: usize) -> usize {
     (n + 3) & !3
 }
 
-fn patch_static_ui<L, P>(
-    game_dir: &Path,
-    bak_dir: &Path,
+pub fn patch_static_ui_bytes<L, P>(
+    orig_buf: &[u8],
+    sub_offset: usize,
     lang: PatchLang,
-    log: &mut L,
+    _log: &mut L,
     on_sub: &mut P,
-) -> Result<usize, String>
+) -> Result<(Vec<u8>, usize), String>
 where
     L: FnMut(&str, LogLevel),
     P: FnMut(usize, &str),
 {
-    const SUB_OFFSET: usize = 420062;
     const SUB_SIZE: usize = 83151;
     const DATA_OFF: usize = 3392;
     const MB_NAME_OFF: usize = 3420;
     const OBJ0_SIZE_OFF: usize = 3220;
     const ORIG_MB_SIZE: usize = 161392;
 
-    let target = game_dir.join(STATIC_UI_REL);
-    let bak = bak_dir.join("yr49bxop0f3reujfsmyfca.r.original");
-    if !target.is_file() {
-        return Err(format!("Static UI bundle not found: {:?}", target));
+    if sub_offset + SUB_SIZE > orig_buf.len() {
+        return Err(format!(
+            "Static UI sub-bundle offset out of range ({} + {} > {})",
+            sub_offset,
+            SUB_SIZE,
+            orig_buf.len()
+        ));
     }
-    ensure_backup(&target, &bak, STATIC_UI_EN_SHA, STATIC_UI_EN_SHA_ALT, STATIC_UI_ID_SHA, log)?;
-    if check_no_backup_switch_guard(&target, &bak, lang, STATIC_UI_EN_SHA, STATIC_UI_EN_SHA_ALT, STATIC_UI_ID_SHA)? {
-        log(
-            &format!("  Static UI KeyConfig already matches {} (3,135 strings).", lang.short_code()),
-            LogLevel::Ok,
-        );
-        on_sub(3135, "Static UI already up-to-date");
-        return Ok(3135);
-    }
-    let src_path = if bak.is_file() { &bak } else { &target };
 
     let gz = match lang {
         PatchLang::En => EMBED_STATIC_UI_EN_GZ,
         PatchLang::Id => EMBED_STATIC_UI_ID_GZ,
     };
     let tr_map = load_string_dict(gz)?;
-    let orig_buf = fs::read(src_path).map_err(|e| format!("Read Static UI failed: {}", e))?;
     on_sub(0, "Decrypting UnityCN ast_staticTextKeyConfig.asset...");
-    let bundle = UnityCnBundle::parse(&orig_buf, SUB_OFFSET)?;
+    let bundle = UnityCnBundle::parse(orig_buf, sub_offset)?;
     let orig_sf = bundle.read_all()?;
 
     let mut cur = MB_NAME_OFF + 28;
@@ -1022,15 +1134,48 @@ where
     new_sub[bundle.data_start..bundle.data_start + c0.len()].copy_from_slice(&c0);
     new_sub[bundle.data_start + c0.len()..bundle.data_start + c0.len() + c1.len()].copy_from_slice(&c1);
 
-    let mut out_buf = orig_buf.clone();
-    out_buf[SUB_OFFSET..SUB_OFFSET + SUB_SIZE].copy_from_slice(&new_sub);
+    let mut out_buf = orig_buf.to_vec();
+    out_buf[sub_offset..sub_offset + SUB_SIZE].copy_from_slice(&new_sub);
 
     // Round-trip verify decrypted SerializedFile
-    let v_bundle = UnityCnBundle::parse(&out_buf, SUB_OFFSET)?;
+    let v_bundle = UnityCnBundle::parse(&out_buf, sub_offset)?;
     let v_sf = v_bundle.read_all()?;
     if v_sf != new_sf {
         return Err("Static UI round-trip verification failed".into());
     }
+    Ok((out_buf, replaced))
+}
+
+fn patch_static_ui<L, P>(
+    game_dir: &Path,
+    bak_dir: &Path,
+    lang: PatchLang,
+    log: &mut L,
+    on_sub: &mut P,
+) -> Result<usize, String>
+where
+    L: FnMut(&str, LogLevel),
+    P: FnMut(usize, &str),
+{
+    const SUB_OFFSET: usize = 420062;
+
+    let target = game_dir.join(STATIC_UI_REL);
+    let bak = bak_dir.join("yr49bxop0f3reujfsmyfca.r.original");
+    if !target.is_file() {
+        return Err(format!("Static UI bundle not found: {:?}", target));
+    }
+    ensure_backup(&target, &bak, STATIC_UI_EN_SHA, STATIC_UI_EN_SHA_ALT, STATIC_UI_ID_SHA, log)?;
+    if check_no_backup_switch_guard(&target, &bak, lang, STATIC_UI_EN_SHA, STATIC_UI_EN_SHA_ALT, STATIC_UI_ID_SHA)? {
+        log(
+            &format!("  Static UI KeyConfig already matches {} (3,135 strings).", lang.short_code()),
+            LogLevel::Ok,
+        );
+        on_sub(3135, "Static UI already up-to-date");
+        return Ok(3135);
+    }
+    let src_path = if bak.is_file() { &bak } else { &target };
+    let orig_buf = fs::read(src_path).map_err(|e| format!("Read Static UI failed: {}", e))?;
+    let (out_buf, replaced) = patch_static_ui_bytes(&orig_buf, SUB_OFFSET, lang, log, on_sub)?;
 
     write_exclusive_verified(&target, &out_buf, &bak)?;
     let post_sha = sha256_file(&target)?;

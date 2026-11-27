@@ -1,28 +1,29 @@
-# Ruza-Lang (`v0.5.0`)
+# Ruza-Lang (`v0.6.0`)
 
 [![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
 
 > [!IMPORTANT]
-> **Tested & Working In-Game · Vibe-Coded Educational Project**
-> - Confirmed **tested and working in-game** on the current build.
-> - This is a **vibe-coded educational project** — future client updates or hotfixes may still cause quirks or breaking changes. Always keep backups (`_ENPatchBackup\`) and use at your own risk.
+> **Tested & Working In-Game (PC & Android) · Vibe-Coded Educational Project**
+> - Confirmed **tested and working in-game** on both PC and Android clients.
+> - This is a **vibe-coded educational project** — future client updates or hotfixes may still cause quirks or breaking changes. Always keep automatic backups (`_ENPatchBackup\` / `%LOCALAPPDATA%\RuzaLang\AndroidBackups\`) and use at your own risk.
 
-An educational desktop localization & asset-repacking study project demonstrating bilingual string patching (**English** & **Bahasa Indonesia**), exact-size compressed bundle repacking, SHA-256 verification, and safe one-click rollback.
+An educational desktop localization & asset-repacking study project demonstrating bilingual string patching (**English** & **Bahasa Indonesia**) for **PC and Android (ADB)**, exact-size compressed bundle repacking, SHA-256 verification, and safe one-click rollback.
 
 > **Pre-built Windows binary:** download `RuzaLangPatcher.exe` from [Releases](https://github.com/notnedar/ruza-lang/releases).
 
 ---
 
-## What's New in `v0.5.0`
+## What's New in `v0.6.0`
 
-- **Built-In Auto-Updater (SHA-256 Verified):** Automatically checks [GitHub Releases](https://github.com/notnedar/ruza-lang/releases/latest) in the background on startup (plus a manual **Check Updates** button in **Files**). When a newer release is available, displays a clean one-click update banner on Home, downloads directly over native Windows HTTPS from allowlisted GitHub hosts, verifies the binary against official `SHA256SUMS.txt`, atomically swaps the executable in-place, cleans up the old binary, and relaunches automatically.
-- **Cleaner Launcher Typography & Zero `.WebView2` Clutter (`v0.4.2`–`v0.4.3`):** Removed all uppercase UI eyebrows and Activity Log header dot; WebView2 cache stays cleanly inside `%LOCALAPPDATA%\RuzaLang\WebView2`.
-- **Always-Visible Home Live Activity Log (Collapsible):** Live scan, **Install Patch**, **Translate News**, and **Rollback JP** logs now appear directly in the lower-left Home launcher canvas from launch (with one-click hide `×` / `Show Log` & `Full Log`).
-- **Client Version Sync Check (Non-Blocking):** Automatically reads the installed client version, resource manifest revision, and build GUID (`v1.0.2 · r3219598`) alongside package SHA-256 verification. Displays a clean sync status on Home & **Files**; if a future game update introduces a version mismatch, it recommends waiting for a patcher update via a soft confirmation dialog while still letting you choose **Install Anyway**.
-- **Frameless PC Game Launcher UI (`v0.4.0`):** `960×580` frameless desktop launcher with Windows 11 native rounded corners, custom draggable top bar (`—` / geometric `✕`), slim frosted left rail (`Home` · `Files` · `News` · `Log` + `EN`/`ID`), original painted scenic hero canvas, bottom action dock, and frosted-glass sub-pages.
+- **Android (ADB) Patching Mode — No Root, No APK Re-Signing:** New dedicated **Android** tab inside the desktop launcher that patches Android devices (USB Debugging phones) and Windows Android emulators (BlueStacks, LDPlayer, MuMu, MEmu, Nox) directly over ADB:
+  - **77,190 verified strings (`99.4%` coverage):** Exact-size repacking for Android `VStringPool` (`74,055` strings via embedded remap table) and Android `Static UI KeyConfig` (`3,135` strings), plus **Android Cached News (`EN` / `ID`)** translation (`HTTPCache` + `Library v3`).
+  - **Zero APK Modification:** Patches only writable external `.res` asset bundles — keeps official APK signatures 100% intact with zero root or Shizuku required.
+  - **Full Safety Guarantees:** Auto-detects `adb.exe` / `HD-Adb.exe` (or custom browse), checks Android client version/revision sync (`v1.0.0 · r3219596`), enforces **Android Process Guard** (`pidof`), saves verified original backups to `%LOCALAPPDATA%\RuzaLang\AndroidBackups\`, uses atomic remote staging + `sha256sum` verification before swapping, and supports one-click **Rollback JP**.
+- **Built-In Auto-Updater (`v0.5.0`):** Checks [GitHub Releases](https://github.com/notnedar/ruza-lang/releases/latest) automatically on startup (plus manual **Check Updates** in **Files**), verifies downloaded binaries against official `SHA256SUMS.txt` over allowlisted HTTPS, atomically swaps the executable in-place, and relaunches automatically.
+- **Frameless PC Game Launcher UI (`v0.4.0`–`v0.4.3`):** `960×580` frameless desktop launcher with Windows 11 rounded corners, slim frosted left rail (`Home` · `Files` · `Android` · `News` · `Log` + `EN`/`ID`), always-live Home Activity Log, non-blocking Client Version Sync (`v1.0.2 · r3219598`), and clean WebView2 data isolation in `%LOCALAPPDATA%\RuzaLang\WebView2`.
 - **Includes all `v0.2.1` & `v0.2.0` upgrades:**
-  - **UI Fit Pass (`EN` & `ID`):** Tightened quick-menu labels, event sidebar tabs, chapter headers, and banner descriptions + conservative TextMeshPro `<size=80%>` scaling on ultra-wide short prefab labels (`116` EN / `50` ID) to prevent overlap and `...` truncation.
-  - **Dedicated `Translate News (EN / ID)` Button:** Translates **16 cached in-game announcement HTML pages** (`AppData\LocalLow\...\HTTPCache`) with automatic `_NewsPatchBackup\` rollback and `ETag`/`Last-Modified` preservation.
+  - **UI Fit Pass (`EN` & `ID`):** Tightened quick-menu labels, event sidebar tabs, chapter headers, and banner descriptions + conservative TextMeshPro `<size=80%>` scaling on ultra-wide short prefab labels (`116` EN / `50` ID).
+  - **Dedicated `Translate News (EN / ID)` Button:** Translates **16 cached in-game announcement HTML pages** (`HTTPCache` + `Library v3`) with automatic backup & `ETag`/`Last-Modified` preservation.
 
 ---
 
@@ -37,6 +38,10 @@ An educational desktop localization & asset-repacking study project demonstratin
 | English (`EN`) | Bahasa Indonesia (`ID`) |
 | :---: | :---: |
 | ![English UI](docs/screenshot-en.png) | ![Indonesian UI](docs/screenshot-id.png) |
+
+### Android (ADB) Mode
+
+![Android ADB Tab](docs/screenshot-android.png)
 
 ### In-Game Samples (`EN`)
 
@@ -66,6 +71,7 @@ An educational desktop localization & asset-repacking study project demonstratin
 
 ## Usage / Cara Pakai
 
+### PC Client
 1. Make sure the target client and launcher are completely closed.
 2. Download and run `RuzaLangPatcher.exe` from [Releases](https://github.com/notnedar/ruza-lang/releases).
 3. Check the auto-detected target folder in the bottom dock (or click the path / open **Files** to browse manually).
@@ -73,6 +79,14 @@ An educational desktop localization & asset-repacking study project demonstratin
 5. Click **Install Patch** in the bottom-right dock and wait ~2 seconds for verification to complete.
 6. *(Optional)* After opening the in-game News/Announcements screen at least once, close the client and click **Translate News (`EN` / `ID`)** to translate cached in-game announcements.
 7. Click **Rollback JP** at any time to restore original files (including cached News if backed up).
+
+### Android (Phone via USB Debugging or BlueStacks / Emulator)
+1. Finish downloading the in-game additional data on Android, then **completely close the game** on your phone/emulator.
+2. Connect your Android phone with **USB Debugging** enabled (or enable **Android Debug Bridge (ADB)** in BlueStacks Settings → Advanced).
+3. Open `RuzaLangPatcher.exe`, pick **`EN`** or **`ID`** on the left rail, and open the **Android** tab.
+4. Confirm your device is listed (click **Scan**, or click **ADB** to select `adb.exe` / `HD-Adb.exe` if needed).
+5. Click **Install Patch (`EN` / `ID`)** — original bundles are backed up to `%LOCALAPPDATA%\RuzaLang\AndroidBackups\`, patched exact-size, pushed atomically, and verified via remote `sha256sum`.
+6. Click **Rollback JP** anytime to restore Android back to Original JP.
 
 ---
 

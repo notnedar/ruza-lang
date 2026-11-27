@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build & publish (e.g. v0.5.0)"
+        description: "Release tag to build & publish (e.g. v0.6.0)"
         required: true
-        default: "v0.5.0"
+        default: "v0.6.0"
 
 permissions:
   contents: write
@@ -101,19 +101,20 @@ jobs:
           ![Settings Menu](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-en.jpg)
 
           ### Highlights / Fitur Utama
+          - **Android (ADB) Patching Mode (`v0.6.0`):** New **Android** tab inside the launcher to patch USB-Debugging Android phones & Windows Android emulators (BlueStacks, LDPlayer, MuMu, MEmu, Nox) with **zero root and zero APK re-signing** — covers **77,190 strings (`99.4%`: `VStringPool` + `Static UI KeyConfig`)** plus **Android Cached News (`EN` / `ID`)**, Android Process Guard (`pidof`), PC backup (`%LOCALAPPDATA%\RuzaLang\AndroidBackups\`), atomic transfer + remote `sha256sum` verification, and one-click **Rollback JP**.
           - **Built-In SHA-256 Auto-Updater (`v0.5.0`):** Checks GitHub Releases automatically on launch (plus manual **Check Updates** in **Files**), verifies downloaded binaries against official `SHA256SUMS.txt` over strict allowlisted HTTPS, swaps the `.exe` atomically in-place, and auto-relaunches.
           - **Cleaner Launcher Polish & Portable Execution (`v0.4.2`–`v0.4.3`):** Removed all uppercase UI eyebrows and Activity Log dot; WebView2 profile stored cleanly in `%LOCALAPPDATA%\RuzaLang\WebView2` (zero `*.exe.WebView2` folder clutter).
-          - **Client Version Sync Check (`v0.4.1`):** Checks client version + resource revision sync (`v1.0.2 · r3219598`) with a non-blocking update recommendation if a newer client build is detected.
-          - **Frameless PC Game Launcher UI (`v0.4.0`):** Rebuilt from scratch as a clean `960×580` frameless desktop launcher with Windows 11 native rounded corners, custom draggable top bar (`—` / geometric `✕`), slim frosted left rail (`Home` · `Files` · `News` · `Log` + `EN`/`ID`), original painted scenic hero canvas, bottom action dock with prominent **Install Patch** CTA + **Translate News**, and frosted-glass sub-pages.
+          - **Client Version Sync Check (`v0.4.1`):** Checks client version + resource revision sync (PC `v1.0.2 · r3219598`, Android `v1.0.0 · r3219596`) with a non-blocking update recommendation if a newer client build is detected.
+          - **Frameless PC Game Launcher UI (`v0.4.0`):** Clean `960×580` frameless desktop launcher with Windows 11 native rounded corners, custom draggable top bar (`—` / geometric `✕`), slim frosted left rail (`Home` · `Files` · `Android` · `News` · `Log` + `EN`/`ID`), original painted scenic hero canvas, bottom action dock with prominent **Install Patch** CTA + **Translate News**, and frosted-glass sub-pages.
           - **UI Fit Pass (`v0.2.1`):** Tightened quick-menu labels, event sidebar tabs, chapter headers, and banner descriptions + conservative TextMeshPro `<size=80%>` scaling on ultra-wide short prefab labels (`EN` & `ID`) to prevent overlap and `...` truncation.
           - **Bilingual Toggle (`EN` / `ID`):** Switch between English and Bahasa Indonesia anytime right inside the GUI.
-          - **Dedicated `Translate News (EN / ID)` Button:** Translates cached in-game announcement HTML pages (`AppData\LocalLow\...\HTTPCache`) with automatic `_NewsPatchBackup\` restore on Rollback.
-          - **4-Store Localization Pipeline (`77,661` strings):**
+          - **Dedicated `Translate News (EN / ID)` Button:** Translates cached in-game announcement HTML pages (`HTTPCache` + `Library v3`) with automatic backup restore on Rollback.
+          - **PC 4-Store Localization Pipeline (`77,661` strings):**
             - `VStringPool` — `74,055` strings
             - `Static UI KeyConfig` — `3,135` strings
             - `StaticPackage CSV` — `113` strings
             - `resources.assets` — `358` strings
-          - **Safety & Verification:** Live process guard, exact byte-size preservation across all 4 targets, automatic backups in `_ENPatchBackup\`, SHA-256 verification, and one-click **Rollback to Original JP**.
+          - **Safety & Verification:** Live process guard (PC & Android), exact byte-size preservation, automatic backups, SHA-256 verification, and one-click **Rollback to Original JP**.
 
           ### Verified GitHub Actions Build & Provenance
           This executable was compiled directly on GitHub's hosted `windows-latest` runner from the public source tree in this commit (not uploaded from a personal machine):

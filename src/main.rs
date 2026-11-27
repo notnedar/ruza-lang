@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod adb;
 mod crypto_lz4;
 mod patch_engine;
 mod updater;
@@ -44,6 +45,8 @@ struct IpcCommand {
     lang: Option<String>,
     url: Option<String>,
     update: Option<updater::UpdateInfo>,
+    serial: Option<String>,
+    adb_path: Option<String>,
 }
 
 enum UserEvent {
@@ -226,6 +229,167 @@ fn run_selftest(mock_dir: &str) -> i32 {
     if res.is_ok() { 0 } else { 1 }
 }
 
+fn run_selftest_android(mock_dir: &str) -> i32 {
+    let dir = PathBuf::from(mock_dir);
+    let log_path = dir.join("selftest_android.log");
+    let mut lines: Vec<String> = Vec::new();
+    let res = (|| -> Result<(), String> {
+        lines.push(format!("[INFO] Android bundle bilingual self-test in: {}", mock_dir));
+        let vs_path = dir.join("android_vstring.r");
+        let ui_path = dir.join("android_static_ui.r");
+        if !vs_path.is_file() || !ui_path.is_file() {
+            return Err("Missing android_vstring.r or android_static_ui.r in selftest dir".into());
+        }
+        let vs_orig = std::fs::read(&vs_path).map_err(|e| e.to_string())?;
+        let ui_orig = std::fs::read(&ui_path).map_err(|e| e.to_string())?;
+        let vs_orig_sha = crypto_lz4::sha256_bytes(&vs_orig);
+        let ui_orig_sha = crypto_lz4::sha256_bytes(&ui_orig);
+        lines.push(format!("[ORIG_SHA] vstring = {}", vs_orig_sha));
+        lines.push(format!("[ORIG_SHA] static_ui = {}", ui_orig_sha));
+        if !vs_orig_sha.eq_ignore_ascii_case(patch_engine::ANDROID_VSTRING_ORIG_SHA)
+            || !ui_orig_sha.eq_ignore_ascii_case(patch_engine::ANDROID_STATIC_UI_ORIG_SHA)
+        {
+            return Err("Android original SHA-256 mismatch!".into());
+        }
+
+        for (lang, exp_vs, exp_ui, tag) in [
+            (
+                PatchLang::En,
+                patch_engine::ANDROID_VSTRING_EN_SHA,
+                patch_engine::ANDROID_STATIC_UI_EN_SHA,
+                "EN",
+            ),
+            (
+                PatchLang::Id,
+                patch_engine::ANDROID_VSTRING_ID_SHA,
+                patch_engine::ANDROID_STATIC_UI_ID_SHA,
+                "ID",
+            ),
+        ] {
+            let (vs_out, vs_cnt) = patch_engine::patch_android_vstring_bytes(
+                &vs_orig,
+                lang,
+                &mut |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
+                &mut |_, _| {},
+            )?;
+            let (ui_out, ui_cnt) = patch_engine::patch_static_ui_bytes(
+                &ui_orig,
+                patch_engine::ANDROID_STATIC_UI_SUB_OFFSET,
+                lang,
+                &mut |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
+                &mut |_, _| {},
+            )?;
+            if vs_out.len() != vs_orig.len() || ui_out.len() != ui_orig.len() {
+                return Err(format!("Android {} output byte size mismatch!", tag));
+            }
+            if vs_cnt != 74055 || ui_cnt != 3135 {
+                return Err(format!("Android {} count mismatch: vs={}, ui={}", tag, vs_cnt, ui_cnt));
+            }
+            let vs_sha = crypto_lz4::sha256_bytes(&vs_out);
+            let ui_sha = crypto_lz4::sha256_bytes(&ui_out);
+            lines.push(format!("[AN_{}_SHA] vstring = {}", tag, vs_sha));
+            lines.push(format!("[AN_{}_SHA] static_ui = {}", tag, ui_sha));
+            if !exp_vs.is_empty() && !vs_sha.eq_ignore_ascii_case(exp_vs) {
+                return Err(format!("Android {} VStringPool SHA mismatch: {}", tag, vs_sha));
+            }
+            if !exp_ui.is_empty() && !ui_sha.eq_ignore_ascii_case(exp_ui) {
+                return Err(format!("Android {} Static UI SHA mismatch: {}", tag, ui_sha));
+            }
+        }
+        lines.push("[OK] ANDROID BILINGUAL SELFTEST PASSED 100%! (74,055 + 3,135 strings EN & ID)".into());
+        Ok(())
+    })();
+    if let Err(e) = &res {
+        lines.push(format!("[ERR] ANDROID SELFTEST FAILED: {}", e));
+    }
+    let _ = std::fs::write(&log_path, lines.join("\n"));
+    if res.is_ok() { 0 } else { 1 }
+}
+
+fn run_cli_android_scan(out_log: &str) -> i32 {
+    let mut lines: Vec<String> = Vec::new();
+    let res = (|| -> Result<(), String> {
+        let adb_bin = adb::detect_adb_binary(None).ok_or("ADB binary not found")?;
+        lines.push(format!("[INFO] ADB: {}", adb_bin.display()));
+        let devs = adb::list_devices(&adb_bin)?;
+        lines.push(format!("[INFO] Devices found: {}", devs.len()));
+        for d in &devs {
+            lines.push(format!(
+                "  - {} ({}, Android {}, state={})",
+                d.serial, d.model, d.android_ver, d.state
+            ));
+        }
+        if let Some(dev) = devs
+            .iter()
+            .find(|d| d.state == "device" && d.has_game)
+            .or_else(|| devs.iter().find(|d| d.state == "device"))
+        {
+            let scan = adb::scan_android_device(&adb_bin, &dev.serial, |m, l| {
+                lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m));
+            })?;
+            lines.push(format!(
+                "[OK] Installed={}, RunningPIDs={:?}, Ver={} (r{}), Status={}",
+                scan.installed,
+                scan.running_pids,
+                scan.version.detected_version,
+                scan.version.detected_res_rev,
+                scan.version.status
+            ));
+        }
+        Ok(())
+    })();
+    if let Err(e) = &res {
+        lines.push(format!("[ERR] {}", e));
+    }
+    let _ = std::fs::write(out_log, lines.join("\n"));
+    if res.is_ok() { 0 } else { 1 }
+}
+
+fn run_cli_android_patch(mode: &str, out_log: &str) -> i32 {
+    let mut lines: Vec<String> = Vec::new();
+    let res = (|| -> Result<(), String> {
+        let adb_bin = adb::detect_adb_binary(None).ok_or("ADB binary not found")?;
+        let devs = adb::list_devices(&adb_bin)?;
+        let dev = devs
+            .iter()
+            .find(|d| d.state == "device" && d.has_game)
+            .or_else(|| devs.iter().find(|d| d.state == "device"))
+            .ok_or("No ready Android device found")?;
+        lines.push(format!("[INFO] Target Android device: {} ({})", dev.serial, dev.model));
+        if mode.eq_ignore_ascii_case("rollback") {
+            let n = adb::rollback_android_device(
+                &adb_bin,
+                &dev.serial,
+                |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
+                |_, _, _| {},
+            )?;
+            lines.push(format!("[OK] Rollback restored {} targets", n));
+        } else {
+            let lang = PatchLang::from_opt(Some(mode));
+            let n = adb::apply_android_patch(
+                &adb_bin,
+                &dev.serial,
+                lang,
+                |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
+                |_, _, _| {},
+            )?;
+            lines.push(format!("[OK] Patched {} strings ({})", n, lang.short_code()));
+        }
+        let scan = adb::scan_android_device(&adb_bin, &dev.serial, |m, l| {
+            lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m));
+        })?;
+        for t in &scan.targets {
+            lines.push(format!("[POST] {} state={} bak={} sha={}", t.id, t.state, t.has_backup, t.sha256));
+        }
+        Ok(())
+    })();
+    if let Err(e) = &res {
+        lines.push(format!("[ERR] {}", e));
+    }
+    let _ = std::fs::write(out_log, lines.join("\n"));
+    if res.is_ok() { 0 } else { 1 }
+}
+
 fn run_cli_scan(game_dir: &str, out_log: &str) -> i32 {
     let dir = PathBuf::from(game_dir);
     let mut lines: Vec<String> = Vec::new();
@@ -287,6 +451,17 @@ fn main() {
     if args.len() >= 3 && args[1].eq_ignore_ascii_case("--selftest") {
         std::process::exit(run_selftest(&args[2]));
     }
+    if args.len() >= 3 && args[1].eq_ignore_ascii_case("--selftest-android") {
+        std::process::exit(run_selftest_android(&args[2]));
+    }
+    if args.len() >= 2 && args[1].eq_ignore_ascii_case("--android-scan") {
+        let out = args.get(2).map(|s| s.as_str()).unwrap_or("android_scan.log");
+        std::process::exit(run_cli_android_scan(out));
+    }
+    if args.len() >= 3 && args[1].eq_ignore_ascii_case("--android-patch") {
+        let out = args.get(3).map(|s| s.as_str()).unwrap_or("android_patch.log");
+        std::process::exit(run_cli_android_patch(&args[2], out));
+    }
     if args.len() >= 3 && args[1].eq_ignore_ascii_case("--scan") {
         let out = args.get(3).map(|s| s.as_str()).unwrap_or("scan.log");
         std::process::exit(run_cli_scan(&args[2], out));
@@ -314,7 +489,7 @@ fn main() {
     let proxy = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
-        .with_title("Ruza-Lang Patcher v0.5.0 — EN / ID")
+        .with_title("Ruza-Lang Patcher v0.6.0 — EN / ID")
         .with_inner_size(LogicalSize::new(960.0, 580.0))
         .with_decorations(false)
         .with_resizable(false)
@@ -384,7 +559,7 @@ fn main() {
                     }
                     thread::spawn(move || {
                         if is_init {
-                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.5.0 (EN / ID) initialized.");
+                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.6.0 (EN / ID · PC + Android ADB) initialized.");
                             push_log(&p, LogLevel::Info, "Safety: Exact byte sizes preserved with SHA-256 verification.");
                         }
                         let procs = patch_engine::find_running_game_processes();
@@ -690,6 +865,178 @@ fn main() {
                         let _ = updater::open_safe_release_url(&u);
                     }
                 }
+                "android_detect" => {
+                    let custom_adb = parsed.adb_path;
+                    let preferred_serial = parsed.serial;
+                    thread::spawn(move || {
+                        do_android_detect(&p, custom_adb.as_deref(), preferred_serial.as_deref());
+                    });
+                }
+                "android_browse_adb" => {
+                    let cur_adb = parsed.adb_path.unwrap_or_default();
+                    thread::spawn(move || {
+                        let mut dlg = rfd::FileDialog::new()
+                            .set_title("Select ADB Executable (adb.exe / HD-Adb.exe)")
+                            .add_filter("ADB Executable", &["exe"]);
+                        if !cur_adb.is_empty() {
+                            if let Some(parent) = PathBuf::from(&cur_adb).parent() {
+                                if parent.is_dir() {
+                                    dlg = dlg.set_directory(parent);
+                                }
+                            }
+                        }
+                        if let Some(file) = dlg.pick_file() {
+                            let s = file.to_string_lossy().to_string();
+                            push_log(&p, LogLevel::Info, &format!("Selected ADB binary: {}", s));
+                            do_android_detect(&p, Some(&s), None);
+                        }
+                    });
+                }
+                "android_scan" => {
+                    let custom_adb = parsed.adb_path;
+                    let serial = parsed.serial.unwrap_or_default();
+                    thread::spawn(move || {
+                        let Some(adb_bin) = adb::detect_adb_binary(custom_adb.as_deref()) else {
+                            push_log(&p, LogLevel::Warn, "ADB executable not found. Install Android Platform-Tools or click 'ADB' to select adb.exe / HD-Adb.exe.");
+                            push_event(&p, json!({ "type": "android_devices", "adb_path": "", "devices": [] }));
+                            return;
+                        };
+                        if serial.is_empty() {
+                            do_android_detect(&p, Some(&adb_bin.to_string_lossy()), None);
+                        } else {
+                            do_android_scan(&p, &adb_bin, &serial);
+                        }
+                    });
+                }
+                "android_patch" => {
+                    let custom_adb = parsed.adb_path;
+                    let serial = parsed.serial.unwrap_or_default();
+                    thread::spawn(move || {
+                        let Some(adb_bin) = adb::detect_adb_binary(custom_adb.as_deref()) else {
+                            push_event(&p, json!({ "type": "alert", "title": "ADB Not Found", "body": "Could not locate adb.exe or HD-Adb.exe. Click 'ADB' to pick it manually." }));
+                            return;
+                        };
+                        if serial.is_empty() {
+                            push_event(&p, json!({ "type": "alert", "title": "No Android Device", "body": "Connect an Android device with USB Debugging or start BlueStacks, then click Scan." }));
+                            return;
+                        }
+                        push_event(&p, json!({ "type": "busy", "value": true }));
+                        match adb::apply_android_patch(
+                            &adb_bin,
+                            &serial,
+                            lang,
+                            |m, l| push_log(&p, l, m),
+                            |cur, tot, st| {
+                                push_event(&p, json!({ "type": "android_progress", "current": cur, "total": tot, "stage": st }));
+                                push_event(&p, json!({ "type": "progress", "current": cur, "total": tot, "stage": st }));
+                            },
+                        ) {
+                            Ok(n) => {
+                                let (title, body) = match lang {
+                                    PatchLang::Id => (
+                                        "Patch Android (ID) Selesai!",
+                                        format!("Patch Bahasa Indonesia (ID) berhasil dipasang & diverifikasi 100% di {}!\nTotal string di-rewrite: {} strings (VStringPool + Static UI).", serial, n),
+                                    ),
+                                    PatchLang::En => (
+                                        "Android English Patch Complete!",
+                                        format!("English (EN) patch installed & verified 100% on {}!\nTotal strings rewritten: {} strings (VStringPool + Static UI).", serial, n),
+                                    ),
+                                };
+                                push_event(&p, json!({ "type": "alert", "title": title, "body": body }));
+                            }
+                            Err(e) => {
+                                push_log(&p, LogLevel::Error, &format!("ANDROID PATCH FAILED: {}", e));
+                                push_event(&p, json!({ "type": "alert", "title": "Android Patch Failed", "body": e }));
+                            }
+                        }
+                        do_android_scan(&p, &adb_bin, &serial);
+                    });
+                }
+                "android_patch_news" => {
+                    let custom_adb = parsed.adb_path;
+                    let serial = parsed.serial.unwrap_or_default();
+                    thread::spawn(move || {
+                        let Some(adb_bin) = adb::detect_adb_binary(custom_adb.as_deref()) else {
+                            push_event(&p, json!({ "type": "alert", "title": "ADB Not Found", "body": "Could not locate adb.exe or HD-Adb.exe." }));
+                            return;
+                        };
+                        if serial.is_empty() {
+                            return;
+                        }
+                        push_event(&p, json!({ "type": "busy", "value": true }));
+                        match adb::patch_android_news(
+                            &adb_bin,
+                            &serial,
+                            lang,
+                            |m, l| push_log(&p, l, m),
+                            |cur, tot, st| {
+                                push_event(&p, json!({ "type": "android_progress", "current": cur, "total": tot, "stage": st }));
+                                push_event(&p, json!({ "type": "progress", "current": cur, "total": tot, "stage": st }));
+                            },
+                        ) {
+                            Ok((patched, total)) => {
+                                let (title, body) = match lang {
+                                    PatchLang::Id => (
+                                        "News Android (ID) Selesai!",
+                                        format!("Berhasil menerjemahkan {}/{} pengumuman cache di Android ({}) ke Bahasa Indonesia (ID).", patched, total, serial),
+                                    ),
+                                    PatchLang::En => (
+                                        "Android News Translation Complete!",
+                                        format!("Successfully translated {}/{} cached Android announcements on {} to English (EN).", patched, total, serial),
+                                    ),
+                                };
+                                push_event(&p, json!({ "type": "alert", "title": title, "body": body }));
+                            }
+                            Err(e) => {
+                                push_log(&p, LogLevel::Error, &format!("ANDROID NEWS FAILED: {}", e));
+                                push_event(&p, json!({ "type": "alert", "title": "Android News Failed", "body": e }));
+                            }
+                        }
+                        do_android_scan(&p, &adb_bin, &serial);
+                    });
+                }
+                "android_rollback" => {
+                    let custom_adb = parsed.adb_path;
+                    let serial = parsed.serial.unwrap_or_default();
+                    thread::spawn(move || {
+                        let Some(adb_bin) = adb::detect_adb_binary(custom_adb.as_deref()) else {
+                            push_event(&p, json!({ "type": "alert", "title": "ADB Not Found", "body": "Could not locate adb.exe or HD-Adb.exe." }));
+                            return;
+                        };
+                        if serial.is_empty() {
+                            return;
+                        }
+                        push_event(&p, json!({ "type": "busy", "value": true }));
+                        match adb::rollback_android_device(
+                            &adb_bin,
+                            &serial,
+                            |m, l| push_log(&p, l, m),
+                            |cur, tot, st| {
+                                push_event(&p, json!({ "type": "android_progress", "current": cur, "total": tot, "stage": st }));
+                                push_event(&p, json!({ "type": "progress", "current": cur, "total": tot, "stage": st }));
+                            },
+                        ) {
+                            Ok(n) => {
+                                let (title, body) = match lang {
+                                    PatchLang::Id => (
+                                        "Rollback Android Selesai",
+                                        format!("Berhasil mengembalikan {}/2 bundle Android ({}) ke Original JP dengan SHA-256 terverifikasi.", n, serial),
+                                    ),
+                                    PatchLang::En => (
+                                        "Android Rollback Complete",
+                                        format!("Successfully restored {}/2 Android bundles on {} to Original JP with verified SHA-256 hashes.", n, serial),
+                                    ),
+                                };
+                                push_event(&p, json!({ "type": "alert", "title": title, "body": body }));
+                            }
+                            Err(e) => {
+                                push_log(&p, LogLevel::Error, &format!("ANDROID ROLLBACK FAILED: {}", e));
+                                push_event(&p, json!({ "type": "alert", "title": "Android Rollback Failed", "body": e }));
+                            }
+                        }
+                        do_android_scan(&p, &adb_bin, &serial);
+                    });
+                }
                 _ => {}
             }
         })
@@ -771,4 +1118,87 @@ fn do_scan(proxy: &tao::event_loop::EventLoopProxy<UserEvent>, dir_str: &str) {
     };
     push_log(proxy, LogLevel::Ok, &summary);
     push_event(proxy, json!({ "type": "scan_result", "targets": targets, "version": ver }));
+}
+
+fn do_android_detect(
+    proxy: &tao::event_loop::EventLoopProxy<UserEvent>,
+    custom_adb: Option<&str>,
+    preferred_serial: Option<&str>,
+) {
+    push_event(proxy, json!({ "type": "busy", "value": true }));
+    let Some(adb_bin) = adb::detect_adb_binary(custom_adb) else {
+        push_log(
+            proxy,
+            LogLevel::Warn,
+            "Android ADB binary not found. Install Android Platform-Tools or select adb.exe / HD-Adb.exe.",
+        );
+        push_event(proxy, json!({ "type": "android_devices", "adb_path": "", "devices": [] }));
+        push_event(proxy, json!({ "type": "busy", "value": false }));
+        return;
+    };
+    let adb_str = adb_bin.to_string_lossy().to_string();
+    push_log(proxy, LogLevel::Info, &format!("Scanning Android devices via {}...", adb_str));
+    match adb::list_devices(&adb_bin) {
+        Ok(devices) => {
+            push_event(
+                proxy,
+                json!({ "type": "android_devices", "adb_path": adb_str, "devices": devices }),
+            );
+            let chosen = preferred_serial
+                .and_then(|s| devices.iter().find(|d| d.serial == s && d.state == "device"))
+                .or_else(|| devices.iter().find(|d| d.state == "device" && d.has_game))
+                .or_else(|| devices.iter().find(|d| d.state == "device"));
+            if let Some(dev) = chosen {
+                do_android_scan(proxy, &adb_bin, &dev.serial);
+            } else {
+                if devices.is_empty() {
+                    push_log(
+                        proxy,
+                        LogLevel::Warn,
+                        "No Android device detected. Enable USB Debugging or open BlueStacks (ADB enabled), then click Scan.",
+                    );
+                } else {
+                    push_log(
+                        proxy,
+                        LogLevel::Warn,
+                        "Android device found but unauthorized/offline. Accept the USB Debugging prompt on the device.",
+                    );
+                }
+                push_event(proxy, json!({ "type": "busy", "value": false }));
+            }
+        }
+        Err(e) => {
+            push_log(proxy, LogLevel::Error, &format!("ADB device scan failed: {}", e));
+            push_event(proxy, json!({ "type": "android_devices", "adb_path": adb_str, "devices": [] }));
+            push_event(proxy, json!({ "type": "busy", "value": false }));
+        }
+    }
+}
+
+fn do_android_scan(
+    proxy: &tao::event_loop::EventLoopProxy<UserEvent>,
+    adb_bin: &std::path::Path,
+    serial: &str,
+) {
+    push_event(proxy, json!({ "type": "busy", "value": true }));
+    push_log(proxy, LogLevel::Info, &format!("Inspecting Android device {}...", serial));
+    match adb::scan_android_device(adb_bin, serial, |m, l| push_log(proxy, l, m)) {
+        Ok(res) => {
+            if !res.running_pids.is_empty() {
+                push_log(
+                    proxy,
+                    LogLevel::Warn,
+                    &format!(
+                        "Android client is currently running on {} (PID {:?}) — close it before patching.",
+                        serial, res.running_pids
+                    ),
+                );
+            }
+            push_event(proxy, json!({ "type": "android_scan_result", "result": res }));
+        }
+        Err(e) => {
+            push_log(proxy, LogLevel::Error, &format!("Android scan failed: {}", e));
+        }
+    }
+    push_event(proxy, json!({ "type": "busy", "value": false }));
 }
