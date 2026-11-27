@@ -15,7 +15,7 @@ use tao::event_loop::{ControlFlow, EventLoopBuilder};
 use tao::platform::windows::WindowExtWindows;
 use tao::window::WindowBuilder;
 use windows_sys::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE};
-use wry::WebViewBuilder;
+use wry::{WebContext, WebViewBuilder};
 
 const INDEX_HTML: &str = include_str!("ui/index.html");
 const HERO_WEBP: &[u8] = include_bytes!("ui/hero.webp");
@@ -248,6 +248,15 @@ fn enable_frameless_dwm_corners(hwnd: isize) {
     }
 }
 
+fn webview_data_dir() -> PathBuf {
+    let base = std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir);
+    let dir = base.join("RuzaLang").join("WebView2");
+    let _ = std::fs::create_dir_all(&dir);
+    dir
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() >= 3 && args[1].eq_ignore_ascii_case("--selftest") {
@@ -262,7 +271,7 @@ fn main() {
     let proxy = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
-        .with_title("Ruza-Lang Patcher v0.4.1 — EN / ID")
+        .with_title("Ruza-Lang Patcher v0.4.2 — EN / ID")
         .with_inner_size(LogicalSize::new(960.0, 580.0))
         .with_decorations(false)
         .with_resizable(false)
@@ -283,8 +292,10 @@ fn main() {
         thread::sleep(Duration::from_secs(2));
     });
 
+    // Store WebView2 profile in %LOCALAPPDATA%\RuzaLang\WebView2 so no *.exe.WebView2 folder is dropped next to the executable
+    let mut web_context = WebContext::new(Some(webview_data_dir()));
     let ipc_proxy = proxy.clone();
-    let webview = WebViewBuilder::new()
+    let webview = WebViewBuilder::with_web_context(&mut web_context)
         .with_html(html_with_art)
         .with_background_color((20, 27, 38, 255))
         .with_ipc_handler(move |req| {
@@ -308,7 +319,7 @@ fn main() {
                 "init" | "auto_detect" => {
                     thread::spawn(move || {
                         if parsed.cmd == "init" {
-                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.4.1 (EN / ID) initialized.");
+                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.4.2 (EN / ID) initialized.");
                             push_log(&p, LogLevel::Info, "Safety: Exact byte sizes preserved with SHA-256 verification.");
                         }
                         let procs = patch_engine::find_running_game_processes();
