@@ -1,0 +1,41 @@
+{
+  "_comment": "Ruza-Lang Bring-Your-Own Language Pack Template (PC & Android). Set meta.base to 'en', 'id', or 'jp' (untranslated keys inherit from base). Keys starting with '_' are ignored.",
+  "meta": {
+    "name": "My Custom Language",
+    "code": "CUSTOM",
+    "author": "YourName",
+    "base": "en"
+  },
+  "vstring": {
+    "_hint": "Canonical PC VStringPool numeric IDs (automatically remapped for Android!)",
+    "1504449": "Equip",
+    "1562150": "Skills",
+    "1496956": "Guard",
+    "1510370": "Perfect Dodge",
+    "1510372": "Dodge Counter",
+    "1510387": "Parry Window",
+    "1526899": "Perfect Guard: Counter"
+  },
+  "static_ui": {
+    "_hint": "Static UI KeyConfig prefab labels (works on both PC & Android)",
+    "15DC305A": "Equip",
+    "4C4E41E1": "Upgrade",
+    "5A304CCA": "Compare",
+    "106FC6A7": "Ascend",
+    "2F7A37CE": "Party",
+    "4EFE9AA0": "Bag",
+    "5F411223": "Back",
+    "38CF16F2": "Confirm",
+    "3186527E": "Cancel"
+  },
+  "builtin": {
+    "_hint": "PC startup & updater messages (optional, ignored on Android)",
+    "alert_title": "Alert",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "quit": "Quit",
+    "initializing": "Initializing…",
+    "checking_update": "Checking update…"
+  }
+}

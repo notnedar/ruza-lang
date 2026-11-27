@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build & publish (e.g. v0.7.1)"
+        description: "Release tag to build & publish (e.g. v0.8.0)"
         required: true
-        default: "v0.7.1"
+        default: "v0.8.0"
 
 permissions:
   contents: write
@@ -204,11 +204,12 @@ jobs:
           ![Settings Menu](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-en.jpg)
 
           ### Highlights / Fitur Utama
-          - **NEW — Contextual Localization, Official Glossary & UI Fit Overhaul (\`v0.7.1\`):**
-            - **Repaired 6 off-by-one chunk shifts (\`424\` entries):** Fixes misaligned Equipment/Anima/Material labels (including the bottom-right \`Equip\` button that previously showed \`"Item"\`) and 5 story dialogue segments across \`EN\` & \`ID\`.
-            - **Official Global Terminology & 9-Element Cleanup (\`3,362\` entries):** Aligned place/character names (\`Fleece\`, \`Sprout Valley\`, \`Jinghua Cape\`, \`Charlulu Village\`, \`Terara\`, \`Cathbelle\`, \`Cabbird\`), replaced \`900+\` non-native element names + \`11\` wrong-element skills with the 9 official elements (\`Fire\`, \`Water\`, \`Lightning\`, \`Wind\`, \`Earth\`, \`Ice\`, \`Wood\`, \`Light\`, \`Dark\`), and polished literal Indonesian skill wording.
-            - **Anti-Wrap UI Buttons & Pills (\`162\` overrides):** Tightened cramped buttons (\`Skill Comparison → Skills\`, \`Recommended → Rec. / Saran\`, \`Recommended Anima Sorting → Sort: Rec.\`, \`Matches character role → Matches Role\`, \`Breakthrough → Ascend\`, \`Lore → Legacy\`) so labels fit cleanly without mid-word wrapping.
-            - **Android APK Polish (\`100% Non-Root\`):** Fixed Android 15–17 Edge-to-Edge status bar/cutout/navigation bar insets (\`WindowInsetsCompat\`), added automatic **Download Shizuku** popup when Shizuku isn't installed yet, and removed all \`Root (su)\` code paths completely.
+          - **NEW — Bring Your Own Language Pack (BYOL), Contributor Kit & Combat Terminology Fix (\`v0.8.0\`):**
+            - **Bring Your Own Language Pack (\`PC\`, \`Android ADB\`, & \`Standalone APK\`):** Load any custom \`.json\` language pack right inside **Files → Custom Language Pack → Load JSON** (with base inheritance \`en\`/\`id\`/\`jp\`, flat dictionary drop-in support, one-click starter template export on PC, and automatic PC → Android ID remapping — 100% offline!).
+            - **Community Language Contribution Kit:** Added [\`CONTRIBUTING.md\`](https://github.com/notnedar/ruza-lang/blob/main/CONTRIBUTING.md), starter template [\`patches/custom-pack-template.json\`](https://github.com/notnedar/ruza-lang/blob/main/patches/custom-pack-template.json), and zero-dependency validator CLI \`node tools/validate-pack.mjs <pack.json>\` (checks placeholders, rich-text tags, UI wrap risks, and UTF-8 byte budget).
+            - **Combat Timing Terminology Pass (\`EN\` & \`ID\`):** Replaced all \`62 EN + 73 ID\` literal \`Just Block / Guard / Parry / Dodge / Evade\` entries with natural action-RPG timing terms (**\`Perfect Guard\`**, **\`Perfect Parry\`**, **\`Perfect Dodge\`**, **\`Parry Window / Celah Parry\`**, **\`Dodge Counter\`**, **\`Perfect Guard: Counter\`**) and fixed \`Guard\` (\`ID\` previously \`"Penjaga"\`).
+          - **Contextual Localization, Official Glossary & UI Fit Overhaul (\`v0.7.1\`):**
+            - Repaired \`6\` off-by-one chunk shifts (\`424\` entries including the \`Equip\` button), aligned \`3,362\` official global terms & 9 elements, applied \`162\` anti-wrap UI overrides, fixed Android 15–17 Edge-to-Edge insets, added automatic **Download Shizuku** popup, and made the APK \`100%\` non-root.
           - **Standalone Universal Android APK (\`RuzaLangPatcher.apk\`, \`v0.7.0\`):** Patch directly on your Android phone with **zero laptop, zero root, and zero APK re-signing** — responsive Portrait phone & Landscape tablet UI, **Shizuku** (Android 11–17 Wireless Debugging) + **SAF Folder Picker** + **Direct Storage**, **77,190 verified strings (\`99.4%\`)** + Cached News in ~3 seconds, automatic local backups, and one-click **Rollback JP**.
           - **Desktop Launcher Platform Selector (\`PC\` | \`Android\`) & Built-In ADB Connect Guide (\`v0.6.1\`):** Switch between **PC Client** and **Android (ADB)** right from Home, with smart setup prompts, Wireless ADB (\`IP:Port\`), and a bilingual USB/Wi-Fi/Emulator ADB guide.
           - **Built-In SHA-256 Auto-Updater (\`v0.5.0\`):** Automatic update check on launch (plus manual **Check Updates** in **Files**), verified against official \`SHA256SUMS.txt\`.

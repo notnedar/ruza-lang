@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Ruza-Lang Patcher v0.7.1 — EN / ID</title>
+<title>Ruza-Lang Patcher v0.8.0 — EN / ID + Custom Packs</title>
 <style>
   :root {
     --rail-w: 68px;
@@ -446,6 +446,31 @@
     background: #ffd479;
   }
 
+  /* Clean non-intrusive Custom Language Pack inline pill on Home (only shown when a custom JSON pack is loaded) */
+  .hero-custom-btn {
+    display: none;
+    align-items: center;
+    gap: 7px;
+    margin-top: 2px;
+    padding: 4px 11px;
+    border-radius: 5px;
+    background: rgba(25, 76, 62, 0.82);
+    border: 1px solid rgba(154, 234, 198, 0.50);
+    color: #edfff7;
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 14px rgba(10, 26, 22, 0.25);
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .hero-custom-btn.show { display: inline-flex; }
+  .hero-custom-btn:hover {
+    background: rgba(30, 96, 78, 0.90);
+    border-color: rgba(188, 246, 220, 0.75);
+  }
+
   /* Clean non-intrusive Update Available inline notice (only shown when a newer release exists) */
   .hero-update-btn {
     display: none;
@@ -802,6 +827,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    overflow-y: auto;
     background: var(--glass-sheet);
     backdrop-filter: blur(22px);
     border: 1px solid var(--glass-rim);
@@ -1193,14 +1219,14 @@
 <div class="shell">
   <!-- LEFT SLIM LAUNCHER RAIL -->
   <aside class="rail">
-    <div class="rail-brand" data-drag="1" title="Ruza-Lang v0.7.1">
+    <div class="rail-brand" data-drag="1" title="Ruza-Lang v0.8.0">
       <div class="mark-box">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <path d="M6.5 4.5H13.8C16.4 4.5 18 6 18 8.3C18 10.3 16.7 11.7 14.5 12L18.5 19.5H15.4L11.8 12.4H9V19.5H6.5V4.5ZM9 6.8V10.3H13.4C14.7 10.3 15.5 9.6 15.5 8.5C15.5 7.4 14.7 6.8 13.4 6.8H9Z" fill="#f3eee2"/>
           <path d="M16.5 4.5L19.5 4.5L19.5 7.5" stroke="#e8d2a0" stroke-width="1.3"/>
         </svg>
       </div>
-      <span class="rail-ver">0.7.1</span>
+      <span class="rail-ver">0.8.0</span>
     </div>
 
     <nav class="rail-nav">
@@ -1282,6 +1308,9 @@
                 <span id="btnShowHomeLogText">Show Activity Log</span>
               </button>
             </div>
+            <button id="heroCustomBtn" class="hero-custom-btn" type="button">
+              <span id="heroCustomText">Custom Pack active</span>
+            </button>
             <button id="heroUpdateBtn" class="hero-update-btn" type="button">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m0 0l-5 5m5-5l5 5"/></svg>
               <span id="heroUpdateText">Update available</span>
@@ -1357,7 +1386,10 @@
         <div class="glass-sheet">
           <div class="sec-bar">
             <span id="lblFolder">Target Directory</span>
-            <span id="folderHint" class="sec-bar-right">Auto-detects target installation</span>
+            <div class="sec-bar-right">
+              <span id="folderHint">Auto-detects target installation</span>
+              <button id="btnContribute" class="btn-bar-link" type="button">Contribute</button>
+            </div>
           </div>
           <div class="rows-block">
             <div class="set-row">
@@ -1380,6 +1412,18 @@
               <div class="set-right">
                 <span id="pkgVerDetected" class="pkg-count">v1.0.2 &middot; r3219598</span>
                 <span id="pkgVerState" class="pkg-state patched_id"><span class="pkg-dot"></span>Synced</span>
+              </div>
+            </div>
+            <div class="set-row">
+              <div>
+                <div id="lblCustomRow" class="set-label">Custom Language Pack (BYOL)</div>
+                <div id="lblCustomSub" class="set-sub">Load your own .json language pack (PC &amp; Android) or export starter template</div>
+              </div>
+              <div class="set-right" style="gap: 7px;">
+                <span id="customStateBadge" class="pkg-state original" style="min-width:auto;"><span class="pkg-dot"></span>Built-in</span>
+                <button id="btnExportTemplate" class="btn-white" type="button">Template</button>
+                <button id="btnLoadCustom" class="btn-white" type="button">Load JSON</button>
+                <button id="btnClearCustom" class="btn-white danger-text" type="button" style="display:none;">Clear</button>
               </div>
             </div>
           </div>
@@ -1588,6 +1632,7 @@
   let androidScan = null;
   let androidInited = false;
   let lastAnProgress = { current: 0, total: 77190, stage: '' };
+  let customPack = null;
 
   const I18N = {
     en: {
@@ -1658,6 +1703,16 @@
       procRunPrefix: 'Running: ',
       procRunSuffix: ' — Close before patching',
       btnPatch: 'Install Patch (EN)',
+      btnPatchCustom: (code) => `Install Patch (${code})`,
+      btnContribute: 'Contribute',
+      lblCustomRow: 'Custom Language Pack (BYOL)',
+      lblCustomSubDefault: 'Load your own .json language pack (PC & Android) or export starter template',
+      lblCustomSubLoaded: (p) => `${p.name} (${p.code}) · Base: ${p.base.toUpperCase()} · ${fmt(p.total_count)} overrides (${p.file_name})`,
+      customBuiltIn: 'Built-in',
+      btnTemplate: 'Template',
+      btnLoadCustom: 'Load JSON',
+      btnClearCustom: 'Clear',
+      heroCustomFmt: (p) => `Custom Pack: ${p.name} (${p.code}) · ${fmt(p.total_count)} overrides`,
       btnNews: 'Translate News (EN)',
       btnRollbackShort: 'Rollback JP',
       btnRollbackFull: 'Rollback Original JP',
@@ -1849,6 +1904,16 @@
       procRunPrefix: 'Berjalan: ',
       procRunSuffix: ' — Tutup dulu sebelum patch',
       btnPatch: 'Pasang Patch (ID)',
+      btnPatchCustom: (code) => `Pasang Patch (${code})`,
+      btnContribute: 'Kontribusi',
+      lblCustomRow: 'Paket Bahasa Kustom (BYOL)',
+      lblCustomSubDefault: 'Muat file bahasa .json sendiri (PC & Android) atau ekspor template awal',
+      lblCustomSubLoaded: (p) => `${p.name} (${p.code}) · Basis: ${p.base.toUpperCase()} · ${fmt(p.total_count)} string (${p.file_name})`,
+      customBuiltIn: 'Bawaan',
+      btnTemplate: 'Template',
+      btnLoadCustom: 'Muat JSON',
+      btnClearCustom: 'Hapus',
+      heroCustomFmt: (p) => `Paket Kustom: ${p.name} (${p.code}) · ${fmt(p.total_count)} string`,
       btnNews: 'Translate News (ID)',
       btnRollbackShort: 'Rollback JP',
       btnRollbackFull: 'Rollback Original JP',
@@ -2250,6 +2315,33 @@
     txt.textContent = isMismatch ? tr.verMismatchFmt(det, `v${clientVersion.expected_version}`) : tr.verSyncedFmt(det);
   }
 
+  function renderCustomPack() {
+    const tr = t();
+    $('btnContribute').textContent = tr.btnContribute;
+    $('lblCustomRow').textContent = tr.lblCustomRow;
+    $('btnExportTemplate').textContent = tr.btnTemplate;
+    $('btnLoadCustom').textContent = tr.btnLoadCustom;
+    $('btnClearCustom').textContent = tr.btnClearCustom;
+    if (customPack) {
+      $('lblCustomSub').textContent = tr.lblCustomSubLoaded(customPack);
+      $('customStateBadge').className = 'pkg-state patched_id';
+      $('customStateBadge').innerHTML = `<span class="pkg-dot"></span>${customPack.code}`;
+      $('btnClearCustom').style.display = '';
+      $('heroCustomBtn').classList.add('show');
+      $('heroCustomText').textContent = tr.heroCustomFmt(customPack);
+      $('btnPatchText').textContent = tr.btnPatchCustom(customPack.code);
+      $('btnAnPatchText').textContent = tr.btnPatchCustom(customPack.code);
+    } else {
+      $('lblCustomSub').textContent = tr.lblCustomSubDefault;
+      $('customStateBadge').className = 'pkg-state original';
+      $('customStateBadge').innerHTML = `<span class="pkg-dot"></span>${tr.customBuiltIn}`;
+      $('btnClearCustom').style.display = 'none';
+      $('heroCustomBtn').classList.remove('show');
+      $('btnPatchText').textContent = tr.btnPatch;
+      $('btnAnPatchText').textContent = tr.btnAnPatch;
+    }
+  }
+
   function renderUpdateBanner() {
     const tr = t();
     const btn = $('heroUpdateBtn');
@@ -2354,6 +2446,7 @@
     renderProcessAlert();
     updateHeroState();
     renderVersionSync();
+    renderCustomPack();
     renderUpdateBanner();
     if (lastTargets.length) renderTargets(lastTargets);
     if (!busy) { syncHomeProgress(); return; }
@@ -2398,7 +2491,7 @@
 
   function setBusy(v) {
     busy = v;
-    for (const id of ['btnAuto', 'btnBrowse', 'btnScan', 'btnAutoQuick', 'btnScanQuick', 'btnPatch', 'btnNews', 'btnNewsPage', 'btnRollback', 'btnRollbackPkg', 'btnCheckUpdate', 'langEn', 'langId', 'folderInput', 'androidDeviceSelect', 'btnAnScan', 'btnAnBrowseAdb', 'btnAnPatch', 'btnAnNews', 'btnAnRollback', 'modePc', 'modeAndroid']) {
+    for (const id of ['btnAuto', 'btnBrowse', 'btnScan', 'btnAutoQuick', 'btnScanQuick', 'btnPatch', 'btnNews', 'btnNewsPage', 'btnRollback', 'btnRollbackPkg', 'btnCheckUpdate', 'btnExportTemplate', 'btnLoadCustom', 'btnClearCustom', 'langEn', 'langId', 'folderInput', 'androidDeviceSelect', 'btnAnScan', 'btnAnBrowseAdb', 'btnAnPatch', 'btnAnNews', 'btnAnRollback', 'modePc', 'modeAndroid']) {
       if ($(id)) $(id).disabled = v;
     }
   }
@@ -2681,6 +2774,10 @@
       case 'update_error':
         openModal(tr.updateErrTitle, ev.message || 'Unknown error', [{ label: tr.ok, cls: 'btn-charcoal' }]);
         break;
+      case 'custom_pack':
+        customPack = ev.pack || null;
+        renderCustomPack();
+        break;
       case 'alert':
         openModal(ev.title || 'Notice', ev.body || '', [{ label: tr.ok, cls: 'btn-charcoal' }]);
         break;
@@ -2727,6 +2824,11 @@
   $('btnHomeLogHide').onclick = () => hideHomeLog();
   $('btnShowHomeLog').onclick = () => openHomeLog(false);
   $('heroUpdateBtn').onclick = () => { if (updateInfo && updateInfo.has_update) showUpdateModal(updateInfo); };
+  $('heroCustomBtn').onclick = () => switchTab('packages');
+  $('btnContribute').onclick = () => send('open_url', { url: 'https://github.com/notnedar/ruza-lang/blob/main/CONTRIBUTING.md' });
+  $('btnExportTemplate').onclick = () => send('export_pack_template');
+  $('btnLoadCustom').onclick = () => send('pick_custom_pack');
+  $('btnClearCustom').onclick = () => send('clear_custom_pack');
   $('btnCheckUpdate').onclick = () => send('check_update');
 
   // Language switcher
@@ -2850,7 +2952,10 @@
   function runPcPatchNow() {
     switchTab('home');
     openHomeLog(true);
-    send('patch', { path: $('folderInput').value.trim() });
+    send('patch', {
+      path: $('folderInput').value.trim(),
+      custom_pack_path: customPack ? customPack.path : undefined
+    });
   }
 
   function triggerPcPatch() {
@@ -2881,7 +2986,11 @@
     const serial = androidScan.serial;
     const runAnPatch = () => {
       if (openLogOnHome) openHomeLog(true);
-      send('android_patch', { adb_path: androidAdbPath || undefined, serial });
+      send('android_patch', {
+        adb_path: androidAdbPath || undefined,
+        serial,
+        custom_pack_path: customPack ? customPack.path : undefined
+      });
     };
     if (androidScan.version && androidScan.version.status === 'mismatch') {
       const det = formatClientVer(androidScan.version);

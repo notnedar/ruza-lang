@@ -39,9 +39,9 @@ pub const ANDROID_EXPECTED_RES_REV: &str = "3219596";
 pub const ANDROID_STATIC_UI_SUB_OFFSET: usize = 4200075;
 pub const ANDROID_VSTRING_ORIG_SHA: &str = "C6BA69F2403102A9D4DBF2B3AB079ABBE7DE25896ABDB3969DD5B7988A2DB013";
 pub const ANDROID_STATIC_UI_ORIG_SHA: &str = "53A36C59B4ABABF9457ED37B195092DCAFD491C2D95D9BA75A61998C0138D22A";
-pub const ANDROID_VSTRING_EN_SHA: &str = "0D11487EF462D2C7186EE654082BCA47D4E3AA2EC0F66E4A726728B2676932C7";
+pub const ANDROID_VSTRING_EN_SHA: &str = "0739151C287863A4CD45150CC85DE3DDFDD3A7587FB159437F3F5FEED513A4E5";
 pub const ANDROID_STATIC_UI_EN_SHA: &str = "2A4428AE21009DB19621A123B1A2561ED1F83A685B4C9160B94BA74CD50E8DAC";
-pub const ANDROID_VSTRING_ID_SHA: &str = "7DF4345957985A83A4EA37AA6DA480860534673DE1C138166FB20FA5EA718E17";
+pub const ANDROID_VSTRING_ID_SHA: &str = "BD9A20B6BE6F9228E12F435F72374386F8C15D270E30B442927401A2EB36A0AF";
 pub const ANDROID_STATIC_UI_ID_SHA: &str = "0017773EB20E5B56D3E02179A9F94A6FBC862B48CFD9FF7CF443CCAE9E6A64B2";
 
 pub const VSTRING_REL: &str = r"AzurPromiliaJP_Data\.res\raw_base_package\BundleFiles\z5xzl3cg6ao0ilpbzykexg.r";
@@ -55,15 +55,15 @@ pub const STATIC_UI_ORIG_SHA: &str = "701F04842F5156DA177BD4946A1CF9B7C055F2A614
 pub const STATIC_PKG_ORIG_SHA: &str = "C7C80B98B263F161583A2AB52A5B7039636ACBABCAC8C365F9F37224D11BC4B3";
 pub const RESOURCES_ORIG_SHA: &str = "DF93CE7192D6A46B33350204349E66A45E410124E3057224AD1A17E6F24B115B";
 
-// Verified English (EN) SHA-256 hashes (v0.7.1 Contextual Glossary & UI Fit Pass)
-pub const VSTRING_EN_SHA: &str = "7558163BCE0A53F9721FCE94CEDAA41255CBFDFADEAC511F022F31790DCF2150";
+// Verified English (EN) SHA-256 hashes (v0.8.0 Combat Timing & Glossary Pass)
+pub const VSTRING_EN_SHA: &str = "81B770280B2C8C307B7CD7A3CC038207B392A6256D34514FAB8ACE410A82F57B";
 pub const STATIC_UI_EN_SHA: &str = "8679E44FF0EA0493F464201DD26AC9D4185935CB3A98F99649559066C492BFDA";
 pub const STATIC_UI_EN_SHA_ALT: &str = "";
 pub const STATIC_PKG_EN_SHA: &str = "7FEB394BD2FEAC1F8FC862A1254CD954EDC1D49544DE285D3E6D9C914755F33E";
 pub const RESOURCES_EN_SHA: &str = "C95E1A2C5C5977E105022B49266D3E2E32173A0E1F4E75BD807C7A93A9299883";
 
-// Verified Bahasa Indonesia (ID) SHA-256 hashes (v0.7.1 Contextual Glossary & UI Fit Pass)
-pub const VSTRING_ID_SHA: &str = "A922DC099BDB817F8EF4CF27F26DAE0CFD9A1BBAF0F7C97B3F1A0253601D56CA";
+// Verified Bahasa Indonesia (ID) SHA-256 hashes (v0.8.0 Combat Timing & Glossary Pass)
+pub const VSTRING_ID_SHA: &str = "ED57A17D9C884CE436C81533D1A772C30AEE3FBCD85093C694B6973097BB904F";
 pub const STATIC_UI_ID_SHA: &str = "E1E6E9A015DCC4E70994D81E8F2FE3ED8437805F58F61455A470991FADC05772";
 pub const STATIC_PKG_ID_SHA: &str = "3EBE582B61D995108E1DA1F333D102B6218A5C9D33E03C931CB7EEEE585DC1FC";
 pub const RESOURCES_ID_SHA: &str = "85FADFAAC9708C845803FA438C5C2AA634A798FAE48405C9FC40953B4A7772A2";
@@ -95,6 +95,270 @@ impl PatchLang {
             PatchLang::Id => "ID",
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CustomBase {
+    En,
+    Id,
+    Jp,
+}
+
+impl CustomBase {
+    pub fn from_str_opt(s: Option<&str>) -> Self {
+        match s.map(|v| v.trim().to_ascii_lowercase()).as_deref() {
+            Some("id") => CustomBase::Id,
+            Some("jp") | Some("none") | Some("orig") | Some("original") => CustomBase::Jp,
+            _ => CustomBase::En,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CustomBase::En => "en",
+            CustomBase::Id => "id",
+            CustomBase::Jp => "jp",
+        }
+    }
+}
+
+#[derive(Clone, Serialize)]
+pub struct CustomPackMeta {
+    pub path: String,
+    pub file_name: String,
+    pub name: String,
+    pub code: String,
+    pub author: String,
+    pub base: String, // "en" | "id" | "jp"
+    pub vstring_count: usize,
+    pub static_ui_count: usize,
+    pub builtin_count: usize,
+    pub total_count: usize,
+}
+
+#[derive(Clone)]
+pub struct CustomPack {
+    pub meta: CustomPackMeta,
+    pub base: CustomBase,
+    pub vstring: HashMap<usize, Vec<u8>>,
+    pub static_ui: HashMap<String, String>,
+    pub builtin: HashMap<String, String>,
+}
+
+fn is_static_ui_key(k: &str) -> bool {
+    let mut parts = k.split('+');
+    let Some(hex_part) = parts.next() else {
+        return false;
+    };
+    if hex_part.len() != 8 || !hex_part.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return false;
+    }
+    match parts.next() {
+        None => true,
+        Some(suf) => parts.next().is_none() && !suf.is_empty() && suf.bytes().all(|b| b.is_ascii_digit()),
+    }
+}
+
+fn sanitize_pack_code(raw: &str) -> String {
+    let cleaned: String = raw
+        .trim()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .take(8)
+        .collect();
+    if cleaned.is_empty() {
+        "CUSTOM".to_string()
+    } else {
+        cleaned.to_ascii_uppercase()
+    }
+}
+
+pub fn parse_custom_pack_str(raw: &str, source_path: &str, file_name: &str) -> Result<CustomPack, String> {
+    let cleaned_raw = raw.strip_prefix('\u{FEFF}').unwrap_or(raw);
+    let root: serde_json::Value = serde_json::from_str(cleaned_raw)
+        .map_err(|e| format!("Invalid custom pack JSON: {}", e))?;
+    let obj = root
+        .as_object()
+        .ok_or_else(|| "Custom pack JSON root must be an object { ... }.".to_string())?;
+
+    let default_name = Path::new(file_name)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("Custom Pack")
+        .to_string();
+
+    let meta_obj = obj.get("meta").and_then(|v| v.as_object());
+    let name = meta_obj
+        .and_then(|m| m.get("name").and_then(|v| v.as_str()))
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(default_name);
+    let code = sanitize_pack_code(
+        meta_obj
+            .and_then(|m| m.get("code").and_then(|v| v.as_str()))
+            .unwrap_or("CUSTOM"),
+    );
+    let author = meta_obj
+        .and_then(|m| m.get("author").and_then(|v| v.as_str()))
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default();
+    let base = CustomBase::from_str_opt(
+        meta_obj.and_then(|m| m.get("base").and_then(|v| v.as_str())),
+    );
+
+    let mut vstring: HashMap<usize, Vec<u8>> = HashMap::new();
+    let mut static_ui: HashMap<String, String> = HashMap::new();
+    let mut builtin: HashMap<String, String> = HashMap::new();
+
+    let has_structured = obj.get("vstring").and_then(|v| v.as_object()).is_some()
+        || obj.get("static_ui").and_then(|v| v.as_object()).is_some()
+        || obj.get("builtin").and_then(|v| v.as_object()).is_some();
+
+    if has_structured {
+        if let Some(vs_obj) = obj.get("vstring").and_then(|v| v.as_object()) {
+            for (k, val) in vs_obj {
+                if k.starts_with('_') {
+                    continue;
+                }
+                let Some(s) = val.as_str() else {
+                    return Err(format!("Custom pack vstring[\"{}\"] must be a string.", k));
+                };
+                let id = k
+                    .parse::<usize>()
+                    .map_err(|_| format!("Custom pack vstring key \"{}\" must be a numeric ID.", k))?;
+                vstring.insert(id, s.as_bytes().to_vec());
+            }
+        }
+        if let Some(ui_obj) = obj.get("static_ui").and_then(|v| v.as_object()) {
+            for (k, val) in ui_obj {
+                if k.starts_with('_') {
+                    continue;
+                }
+                let Some(s) = val.as_str() else {
+                    return Err(format!("Custom pack static_ui[\"{}\"] must be a string.", k));
+                };
+                static_ui.insert(k.clone(), s.to_string());
+            }
+        }
+        if let Some(bi_obj) = obj.get("builtin").and_then(|v| v.as_object()) {
+            for (k, val) in bi_obj {
+                if k.starts_with('_') {
+                    continue;
+                }
+                let Some(s) = val.as_str() else {
+                    return Err(format!("Custom pack builtin[\"{}\"] must be a string.", k));
+                };
+                builtin.insert(k.clone(), s.to_string());
+            }
+        }
+    } else {
+        // Raw dictionary drop-in (e.g. direct copy/edit of patches/full-en-3219598.json or static-ui-en-3219598.json)
+        for (k, val) in obj {
+            if k == "meta" || k.starts_with('_') {
+                continue;
+            }
+            let Some(s) = val.as_str() else {
+                continue;
+            };
+            if is_static_ui_key(k) {
+                static_ui.insert(k.clone(), s.to_string());
+            } else if !k.is_empty() && k.bytes().all(|b| b.is_ascii_digit()) {
+                if let Ok(id) = k.parse::<usize>() {
+                    vstring.insert(id, s.as_bytes().to_vec());
+                }
+            } else {
+                builtin.insert(k.clone(), s.to_string());
+            }
+        }
+    }
+
+    let total_count = vstring.len() + static_ui.len() + builtin.len();
+    if total_count == 0 {
+        return Err(
+            "Custom pack contains 0 translation entries. Add entries under \"vstring\", \"static_ui\", or \"builtin\" (or provide a flat ID->text JSON dictionary)."
+                .to_string(),
+        );
+    }
+
+    let meta = CustomPackMeta {
+        path: source_path.to_string(),
+        file_name: file_name.to_string(),
+        name,
+        code,
+        author,
+        base: base.as_str().to_string(),
+        vstring_count: vstring.len(),
+        static_ui_count: static_ui.len(),
+        builtin_count: builtin.len(),
+        total_count,
+    };
+
+    Ok(CustomPack {
+        meta,
+        base,
+        vstring,
+        static_ui,
+        builtin,
+    })
+}
+
+pub fn load_custom_pack(path: &Path) -> Result<CustomPack, String> {
+    let raw = fs::read_to_string(path)
+        .map_err(|e| format!("Failed reading custom pack {:?}: {}", path, e))?;
+    let fname = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("custom-pack.json");
+    parse_custom_pack_str(&raw, &path.to_string_lossy(), fname)
+}
+
+pub const CUSTOM_PACK_TEMPLATE_JSON: &str = r#"{
+  "_comment": "Ruza-Lang Bring-Your-Own Language Pack Template (PC & Android). Set meta.base to 'en', 'id', or 'jp' (untranslated keys inherit from base). Keys starting with '_' are ignored.",
+  "meta": {
+    "name": "My Custom Language",
+    "code": "CUSTOM",
+    "author": "YourName",
+    "base": "en"
+  },
+  "vstring": {
+    "_hint": "Canonical PC VStringPool numeric IDs (auto-remapped for Android!)",
+    "1504449": "Equip",
+    "1562150": "Skills",
+    "1496956": "Guard",
+    "1510370": "Perfect Dodge",
+    "1510372": "Dodge Counter",
+    "1510387": "Parry Window",
+    "1526899": "Perfect Guard: Counter"
+  },
+  "static_ui": {
+    "_hint": "Static UI KeyConfig prefab labels (works on both PC & Android)",
+    "15DC305A": "Equip",
+    "4C4E41E1": "Upgrade",
+    "5A304CCA": "Compare",
+    "106FC6A7": "Ascend",
+    "2F7A37CE": "Party",
+    "4EFE9AA0": "Bag",
+    "5F411223": "Back",
+    "38CF16F2": "Confirm",
+    "3186527E": "Cancel"
+  },
+  "builtin": {
+    "_hint": "PC startup & updater messages (optional, ignored on Android)",
+    "alert_title": "Alert",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "quit": "Quit",
+    "initializing": "Initializing…",
+    "checking_update": "Checking update…"
+  }
+}
+"#;
+
+pub fn export_custom_pack_template(dst: &Path) -> Result<(), String> {
+    fs::write(dst, CUSTOM_PACK_TEMPLATE_JSON)
+        .map_err(|e| format!("Failed writing template to {:?}: {}", dst, e))
 }
 
 #[derive(Clone, Serialize)]
@@ -511,6 +775,7 @@ fn check_no_backup_switch_guard(
     target: &Path,
     bak: &Path,
     lang: PatchLang,
+    custom: Option<&CustomPack>,
     en_sha: &str,
     en_sha_alt: &str,
     id_sha: &str,
@@ -521,6 +786,15 @@ fn check_no_backup_switch_guard(
     let cur = sha256_file(target)?;
     let is_en = sha_matches(&cur, en_sha) || sha_matches(&cur, en_sha_alt);
     let is_id = sha_matches(&cur, id_sha);
+    if custom.is_some() {
+        if is_en || is_id {
+            return Err(
+                "Target is already patched and _ENPatchBackup is missing. Restore Original JP files before applying a Custom Language Pack."
+                    .into(),
+            );
+        }
+        return Ok(false);
+    }
     match lang {
         PatchLang::En if is_en => Ok(true),
         PatchLang::Id if is_id => Ok(true),
@@ -626,6 +900,7 @@ fn ensure_no_running_game_processes(action: &str) -> Result<(), String> {
 pub fn apply_patch<L, P>(
     game_dir: &Path,
     lang: PatchLang,
+    custom: Option<&CustomPack>,
     log: L,
     on_progress: P,
 ) -> Result<usize, String>
@@ -634,12 +909,13 @@ where
     P: FnMut(usize, usize, &str),
 {
     ensure_no_running_game_processes("patching")?;
-    apply_patch_inner(game_dir, lang, log, on_progress)
+    apply_patch_inner(game_dir, lang, custom, log, on_progress)
 }
 
 pub fn apply_patch_for_selftest<L, P>(
     game_dir: &Path,
     lang: PatchLang,
+    custom: Option<&CustomPack>,
     log: L,
     on_progress: P,
 ) -> Result<usize, String>
@@ -647,12 +923,13 @@ where
     L: FnMut(&str, LogLevel),
     P: FnMut(usize, usize, &str),
 {
-    apply_patch_inner(game_dir, lang, log, on_progress)
+    apply_patch_inner(game_dir, lang, custom, log, on_progress)
 }
 
 fn apply_patch_inner<L, P>(
     game_dir: &Path,
     lang: PatchLang,
+    custom: Option<&CustomPack>,
     mut log: L,
     mut on_progress: P,
 ) -> Result<usize, String>
@@ -663,58 +940,76 @@ where
     let bak_dir = game_dir.join("_ENPatchBackup");
     fs::create_dir_all(&bak_dir).map_err(|e| format!("Failed creating backup dir: {}", e))?;
 
+    let active_label = match custom {
+        Some(c) => format!("{} ({} · base={})", c.meta.name, c.meta.code, c.base.as_str().to_uppercase()),
+        None => lang.label().to_string(),
+    };
+    let active_code = match custom {
+        Some(c) => c.meta.code.as_str(),
+        None => lang.short_code(),
+    };
+
     let mut rewritten = 0usize;
     log(
-        &format!("=== Starting {} Patch Installation ===", lang.label()),
+        &format!("=== Starting {} Patch Installation ===", active_label),
         LogLevel::Info,
     );
-    on_progress(0, TOTAL_STRINGS, &format!("Unpacking embedded {} payloads...", lang.short_code()));
+    if let Some(c) = custom {
+        log(
+            &format!(
+                "  Custom Pack: {} ({} vstring + {} static_ui + {} builtin overrides)",
+                c.meta.file_name, c.meta.vstring_count, c.meta.static_ui_count, c.meta.builtin_count
+            ),
+            LogLevel::Info,
+        );
+    }
+    on_progress(0, TOTAL_STRINGS, &format!("Unpacking {} payloads...", active_code));
 
     // [1/4] VStringPool (74,055 strings)
     log(
-        &format!("=== [1/4] Patching VStringPool ({}) ===", lang.short_code()),
+        &format!("=== [1/4] Patching VStringPool ({}) ===", active_code),
         LogLevel::Info,
     );
-    rewritten += patch_vstring_pool(game_dir, &bak_dir, lang, &mut log, &mut |delta, stage| {
+    rewritten += patch_vstring_pool(game_dir, &bak_dir, lang, custom, &mut log, &mut |delta, stage| {
         on_progress(rewritten + delta, TOTAL_STRINGS, stage);
     })?;
 
     // [2/4] Static UI KeyConfig (3,135 strings)
     log(
-        &format!("=== [2/4] Patching Static UI KeyConfig ({}) ===", lang.short_code()),
+        &format!("=== [2/4] Patching Static UI KeyConfig ({}) ===", active_code),
         LogLevel::Info,
     );
-    rewritten += patch_static_ui(game_dir, &bak_dir, lang, &mut log, &mut |delta, stage| {
+    rewritten += patch_static_ui(game_dir, &bak_dir, lang, custom, &mut log, &mut |delta, stage| {
         on_progress(rewritten + delta, TOTAL_STRINGS, stage);
     })?;
 
     // [3/4] StaticPackage updatableBuiltInLangString (113 strings)
     log(
-        &format!("=== [3/4] Patching Startup/Updater StaticPackage ({}) ===", lang.short_code()),
+        &format!("=== [3/4] Patching Startup/Updater StaticPackage ({}) ===", active_code),
         LogLevel::Info,
     );
-    rewritten += patch_static_pkg(game_dir, &bak_dir, lang, &mut log, &mut |delta, stage| {
+    rewritten += patch_static_pkg(game_dir, &bak_dir, lang, custom, &mut log, &mut |delta, stage| {
         on_progress(rewritten + delta, TOTAL_STRINGS, stage);
     })?;
 
     // [4/4] resources.assets (358 strings)
     log(
-        &format!("=== [4/4] Patching Startup/SDK Resources ({}) ===", lang.short_code()),
+        &format!("=== [4/4] Patching Startup/SDK Resources ({}) ===", active_code),
         LogLevel::Info,
     );
-    rewritten += patch_resources_assets(game_dir, &bak_dir, lang, &mut log, &mut |delta, stage| {
+    rewritten += patch_resources_assets(game_dir, &bak_dir, lang, custom, &mut log, &mut |delta, stage| {
         on_progress(rewritten + delta, TOTAL_STRINGS, stage);
     })?;
 
     on_progress(
         rewritten,
         TOTAL_STRINGS,
-        &format!("All 4 targets verified 100% ({})!", lang.short_code()),
+        &format!("All 4 targets verified 100% ({})!", active_code),
     );
     log(
         &format!(
             "=== COMPLETE [{}]! Rewritten & verified: {} strings ===",
-            lang.label(),
+            active_label,
             rewritten
         ),
         LogLevel::Ok,
@@ -722,12 +1017,28 @@ where
     Ok(rewritten)
 }
 
-pub fn load_android_vstring_map(lang: PatchLang) -> Result<HashMap<usize, Vec<u8>>, String> {
-    let gz = match lang {
-        PatchLang::En => EMBED_VSTRING_EN_GZ,
-        PatchLang::Id => EMBED_VSTRING_ID_GZ,
+fn build_pc_vstring_map(lang: PatchLang, custom: Option<&CustomPack>) -> Result<HashMap<usize, Vec<u8>>, String> {
+    let mut map = match custom {
+        Some(c) => match c.base {
+            CustomBase::En => load_vstring_map(EMBED_VSTRING_EN_GZ)?,
+            CustomBase::Id => load_vstring_map(EMBED_VSTRING_ID_GZ)?,
+            CustomBase::Jp => HashMap::with_capacity(c.vstring.len()),
+        },
+        None => match lang {
+            PatchLang::En => load_vstring_map(EMBED_VSTRING_EN_GZ)?,
+            PatchLang::Id => load_vstring_map(EMBED_VSTRING_ID_GZ)?,
+        },
     };
-    let pc_map = load_vstring_map(gz)?;
+    if let Some(c) = custom {
+        for (&id, bytes) in &c.vstring {
+            map.insert(id, bytes.clone());
+        }
+    }
+    Ok(map)
+}
+
+pub fn load_android_vstring_map(lang: PatchLang, custom: Option<&CustomPack>) -> Result<HashMap<usize, Vec<u8>>, String> {
+    let pc_map = build_pc_vstring_map(lang, custom)?;
     let raw_runs = gunzip(EMBED_VSTRING_ANDROID_MAP_GZ)?;
     if raw_runs.len() < 4 {
         return Err("Corrupt Android VStringPool remap table".into());
@@ -748,7 +1059,7 @@ pub fn load_android_vstring_map(lang: PatchLang) -> Result<HashMap<usize, Vec<u8
             }
         }
     }
-    if an_map.len() != pc_map.len() {
+    if custom.is_none() && an_map.len() != pc_map.len() {
         return Err(format!(
             "Android VStringPool remap incomplete ({} != {})",
             an_map.len(),
@@ -909,6 +1220,7 @@ where
 pub fn patch_android_vstring_bytes<L, P>(
     orig_buf: &[u8],
     lang: PatchLang,
+    custom: Option<&CustomPack>,
     log: &mut L,
     on_sub: &mut P,
 ) -> Result<(Vec<u8>, usize), String>
@@ -916,13 +1228,14 @@ where
     L: FnMut(&str, LogLevel),
     P: FnMut(usize, &str),
 {
-    on_sub(0, &format!("Remapping 74,055 Android VStringPool ({}) entries...", lang.short_code()));
-    let translations = load_android_vstring_map(lang)?;
+    let code = custom.map(|c| c.meta.code.as_str()).unwrap_or_else(|| lang.short_code());
+    on_sub(0, &format!("Remapping Android VStringPool ({}) entries...", code));
+    let translations = load_android_vstring_map(lang, custom)?;
     log(
         &format!(
-            "  Remapped {} embedded {} VStringPool translations for Android.",
+            "  Remapped {} {} VStringPool translations for Android.",
             translations.len(),
-            lang.short_code()
+            code
         ),
         LogLevel::Info,
     );
@@ -939,6 +1252,7 @@ fn patch_vstring_pool<L, P>(
     game_dir: &Path,
     bak_dir: &Path,
     lang: PatchLang,
+    custom: Option<&CustomPack>,
     log: &mut L,
     on_sub: &mut P,
 ) -> Result<usize, String>
@@ -952,7 +1266,7 @@ where
         return Err(format!("VStringPool not found: {:?}", target));
     }
     ensure_backup(&target, &bak, VSTRING_EN_SHA, "", VSTRING_ID_SHA, log)?;
-    if check_no_backup_switch_guard(&target, &bak, lang, VSTRING_EN_SHA, "", VSTRING_ID_SHA)? {
+    if check_no_backup_switch_guard(&target, &bak, lang, custom, VSTRING_EN_SHA, "", VSTRING_ID_SHA)? {
         log(
             &format!("  VStringPool already matches {} (74,055 strings).", lang.short_code()),
             LogLevel::Ok,
@@ -961,18 +1275,15 @@ where
         return Ok(74055);
     }
     let src_path = if bak.is_file() { &bak } else { &target };
+    let code = custom.map(|c| c.meta.code.as_str()).unwrap_or_else(|| lang.short_code());
 
-    on_sub(0, &format!("Loading 74,055 VStringPool ({}) entries...", lang.short_code()));
-    let gz = match lang {
-        PatchLang::En => EMBED_VSTRING_EN_GZ,
-        PatchLang::Id => EMBED_VSTRING_ID_GZ,
-    };
-    let translations = load_vstring_map(gz)?;
+    on_sub(0, &format!("Loading VStringPool ({}) entries...", code));
+    let translations = build_pc_vstring_map(lang, custom)?;
     log(
         &format!(
-            "  Loaded {} embedded {} VStringPool translations.",
+            "  Loaded {} {} VStringPool translations.",
             translations.len(),
-            lang.short_code()
+            code
         ),
         LogLevel::Info,
     );
@@ -987,13 +1298,13 @@ where
     log(
         &format!(
             "  VStringPool [{}] installed & verified! Rewritten={}, SHA256={}",
-            lang.short_code(),
+            code,
             rewritten,
             post_sha
         ),
         LogLevel::Ok,
     );
-    on_sub(rewritten, "VStringPool verified (74,055 strings)");
+    on_sub(rewritten, &format!("VStringPool verified ({} strings)", rewritten));
     Ok(rewritten)
 }
 
@@ -1006,6 +1317,7 @@ pub fn patch_static_ui_bytes<L, P>(
     orig_buf: &[u8],
     sub_offset: usize,
     lang: PatchLang,
+    custom: Option<&CustomPack>,
     _log: &mut L,
     on_sub: &mut P,
 ) -> Result<(Vec<u8>, usize), String>
@@ -1028,11 +1340,23 @@ where
         ));
     }
 
-    let gz = match lang {
-        PatchLang::En => EMBED_STATIC_UI_EN_GZ,
-        PatchLang::Id => EMBED_STATIC_UI_ID_GZ,
+    let mut tr_map = match custom {
+        Some(c) => match c.base {
+            CustomBase::En => load_string_dict(EMBED_STATIC_UI_EN_GZ)?,
+            CustomBase::Id => load_string_dict(EMBED_STATIC_UI_ID_GZ)?,
+            CustomBase::Jp => HashMap::with_capacity(c.static_ui.len()),
+        },
+        None => match lang {
+            PatchLang::En => load_string_dict(EMBED_STATIC_UI_EN_GZ)?,
+            PatchLang::Id => load_string_dict(EMBED_STATIC_UI_ID_GZ)?,
+        },
     };
-    let tr_map = load_string_dict(gz)?;
+    if let Some(c) = custom {
+        for (k, v) in &c.static_ui {
+            tr_map.insert(k.clone(), v.clone());
+        }
+    }
+    let code = custom.map(|c| c.meta.code.as_str()).unwrap_or_else(|| lang.short_code());
     on_sub(0, "Decrypting UnityCN ast_staticTextKeyConfig.asset...");
     let bundle = UnityCnBundle::parse(orig_buf, sub_offset)?;
     let orig_sf = bundle.read_all()?;
@@ -1075,7 +1399,7 @@ where
             if replaced % 400 == 0 {
                 on_sub(
                     replaced,
-                    &format!("Rewriting Static UI KeyConfig [{}]: {} / 3,135", lang.short_code(), replaced),
+                    &format!("Rewriting Static UI KeyConfig [{}]: {} / 3,135", code, replaced),
                 );
             }
             tr.as_str()
@@ -1153,6 +1477,7 @@ fn patch_static_ui<L, P>(
     game_dir: &Path,
     bak_dir: &Path,
     lang: PatchLang,
+    custom: Option<&CustomPack>,
     log: &mut L,
     on_sub: &mut P,
 ) -> Result<usize, String>
@@ -1168,7 +1493,7 @@ where
         return Err(format!("Static UI bundle not found: {:?}", target));
     }
     ensure_backup(&target, &bak, STATIC_UI_EN_SHA, STATIC_UI_EN_SHA_ALT, STATIC_UI_ID_SHA, log)?;
-    if check_no_backup_switch_guard(&target, &bak, lang, STATIC_UI_EN_SHA, STATIC_UI_EN_SHA_ALT, STATIC_UI_ID_SHA)? {
+    if check_no_backup_switch_guard(&target, &bak, lang, custom, STATIC_UI_EN_SHA, STATIC_UI_EN_SHA_ALT, STATIC_UI_ID_SHA)? {
         log(
             &format!("  Static UI KeyConfig already matches {} (3,135 strings).", lang.short_code()),
             LogLevel::Ok,
@@ -1177,21 +1502,22 @@ where
         return Ok(3135);
     }
     let src_path = if bak.is_file() { &bak } else { &target };
+    let code = custom.map(|c| c.meta.code.as_str()).unwrap_or_else(|| lang.short_code());
     let orig_buf = fs::read(src_path).map_err(|e| format!("Read Static UI failed: {}", e))?;
-    let (out_buf, replaced) = patch_static_ui_bytes(&orig_buf, SUB_OFFSET, lang, log, on_sub)?;
+    let (out_buf, replaced) = patch_static_ui_bytes(&orig_buf, SUB_OFFSET, lang, custom, log, on_sub)?;
 
     write_exclusive_verified(&target, &out_buf, &bak)?;
     let post_sha = sha256_file(&target)?;
     log(
         &format!(
             "  Static UI KeyConfig [{}] installed & verified! Rewritten={}, SHA256={}",
-            lang.short_code(),
+            code,
             replaced,
             post_sha
         ),
         LogLevel::Ok,
     );
-    on_sub(replaced, "Static UI KeyConfig verified (3,135 strings)");
+    on_sub(replaced, &format!("Static UI KeyConfig verified ({} strings)", replaced));
     Ok(replaced)
 }
 
@@ -1253,6 +1579,7 @@ fn patch_static_pkg<L, P>(
     game_dir: &Path,
     bak_dir: &Path,
     lang: PatchLang,
+    custom: Option<&CustomPack>,
     log: &mut L,
     on_sub: &mut P,
 ) -> Result<usize, String>
@@ -1266,7 +1593,7 @@ where
         return Err(format!("StaticPackage bundle not found: {:?}", target));
     }
     ensure_backup(&target, &bak, STATIC_PKG_EN_SHA, "", STATIC_PKG_ID_SHA, log)?;
-    if check_no_backup_switch_guard(&target, &bak, lang, STATIC_PKG_EN_SHA, "", STATIC_PKG_ID_SHA)? {
+    if check_no_backup_switch_guard(&target, &bak, lang, custom, STATIC_PKG_EN_SHA, "", STATIC_PKG_ID_SHA)? {
         log(
             &format!("  Startup StaticPackage already matches {} (113 strings).", lang.short_code()),
             LogLevel::Ok,
@@ -1275,10 +1602,19 @@ where
         return Ok(113);
     }
     let src_path = if bak.is_file() { &bak } else { &target };
+    let code = custom.map(|c| c.meta.code.as_str()).unwrap_or_else(|| lang.short_code());
 
-    let builtin_dict = match lang {
-        PatchLang::En => load_string_dict(EMBED_BUILTIN_EN_GZ)?,
-        PatchLang::Id => load_string_dict(EMBED_BUILTIN_ID_GZ)?,
+    let effective_base = match custom {
+        Some(c) => c.base,
+        None => match lang {
+            PatchLang::En => CustomBase::En,
+            PatchLang::Id => CustomBase::Id,
+        },
+    };
+    let builtin_dict = match effective_base {
+        CustomBase::En => load_string_dict(EMBED_BUILTIN_EN_GZ)?,
+        CustomBase::Id => load_string_dict(EMBED_BUILTIN_ID_GZ)?,
+        CustomBase::Jp => HashMap::new(),
     };
     let orig_buf = fs::read(src_path).map_err(|e| format!("Read StaticPackage failed: {}", e))?;
     on_sub(0, "Decrypting StaticPackage Block #5 (updatableBuiltInLangString)...");
@@ -1305,12 +1641,34 @@ where
     let en_idx = rows[0].iter().position(|x| x == "en").ok_or("No 'en' column")?;
     let jp_idx = rows[0].iter().position(|x| x == "jp").ok_or("No 'jp' column")?;
     let mut replaced = 0usize;
+    let clear_extra_cols = effective_base == CustomBase::Id
+        || custom.map(|c| !c.builtin.is_empty()).unwrap_or(false);
     for r in rows.iter_mut().skip(1) {
         if r.len() <= jp_idx || r[0].is_empty() {
             continue;
         }
-        let val = match lang {
-            PatchLang::En => {
+        if let Some(custom_val) = custom.and_then(|c| c.builtin.get(&r[0])) {
+            if !custom_val.is_empty() {
+                if clear_extra_cols {
+                    r[en_idx] = custom_val.clone();
+                    if let Some(ci) = cht_idx {
+                        if ci < r.len() {
+                            r[ci].clear();
+                        }
+                    }
+                    if let Some(ki) = kr_idx {
+                        if ki < r.len() {
+                            r[ki].clear();
+                        }
+                    }
+                }
+                r[jp_idx] = custom_val.clone();
+                replaced += 1;
+                continue;
+            }
+        }
+        let val = match effective_base {
+            CustomBase::En => {
                 let mut v = r[en_idx].trim().to_string();
                 if v.is_empty() || has_cjk(&v) {
                     if let Some(fb) = builtin_dict.get(&r[0]) {
@@ -1319,16 +1677,17 @@ where
                 }
                 v
             }
-            PatchLang::Id => {
+            CustomBase::Id => {
                 if let Some(id_val) = builtin_dict.get(&r[0]) {
                     id_val.clone()
                 } else {
                     r[en_idx].trim().to_string()
                 }
             }
+            CustomBase::Jp => String::new(),
         };
         if !val.is_empty() && !has_cjk(&val) {
-            if lang == PatchLang::Id {
+            if clear_extra_cols {
                 r[en_idx] = val.clone();
                 if let Some(ci) = cht_idx {
                     if ci < r.len() {
@@ -1391,13 +1750,13 @@ where
     log(
         &format!(
             "  Startup StaticPackage [{}] installed & verified! Rewritten={}, SHA256={}",
-            lang.short_code(),
+            code,
             replaced,
             post_sha
         ),
         LogLevel::Ok,
     );
-    on_sub(replaced, "StaticPackage verified (113 strings)");
+    on_sub(replaced, &format!("StaticPackage verified ({} strings)", replaced));
     Ok(replaced)
 }
 
@@ -1405,6 +1764,7 @@ fn patch_resources_assets<L, P>(
     game_dir: &Path,
     bak_dir: &Path,
     lang: PatchLang,
+    custom: Option<&CustomPack>,
     log: &mut L,
     on_sub: &mut P,
 ) -> Result<usize, String>
@@ -1418,7 +1778,7 @@ where
         return Err(format!("resources.assets not found: {:?}", target));
     }
     ensure_backup(&target, &bak, RESOURCES_EN_SHA, "", RESOURCES_ID_SHA, log)?;
-    if check_no_backup_switch_guard(&target, &bak, lang, RESOURCES_EN_SHA, "", RESOURCES_ID_SHA)? {
+    if check_no_backup_switch_guard(&target, &bak, lang, custom, RESOURCES_EN_SHA, "", RESOURCES_ID_SHA)? {
         log(
             &format!("  resources.assets already matches {} (358 strings).", lang.short_code()),
             LogLevel::Ok,
@@ -1428,9 +1788,28 @@ where
     }
 
     let src_path = if bak.is_file() { &bak } else { &target };
-    let (diff_gz, expected_sha) = match lang {
-        PatchLang::En => (EMBED_RESOURCES_DIFF_EN_GZ, RESOURCES_EN_SHA),
-        PatchLang::Id => (EMBED_RESOURCES_DIFF_ID_GZ, RESOURCES_ID_SHA),
+    let effective_base = match custom {
+        Some(c) => c.base,
+        None => match lang {
+            PatchLang::En => CustomBase::En,
+            PatchLang::Id => CustomBase::Id,
+        },
+    };
+    if effective_base == CustomBase::Jp {
+        let orig_buf = fs::read(src_path).map_err(|e| format!("Read resources.assets failed: {}", e))?;
+        write_exclusive_verified(&target, &orig_buf, &bak)?;
+        log(
+            "  resources.assets kept as Original JP (custom pack base=jp).",
+            LogLevel::Info,
+        );
+        on_sub(0, "resources.assets kept as Original JP");
+        return Ok(0);
+    }
+
+    let (diff_gz, expected_sha, base_code) = match effective_base {
+        CustomBase::En => (EMBED_RESOURCES_DIFF_EN_GZ, RESOURCES_EN_SHA, "EN"),
+        CustomBase::Id => (EMBED_RESOURCES_DIFF_ID_GZ, RESOURCES_ID_SHA, "ID"),
+        CustomBase::Jp => unreachable!(),
     };
     let diff = gunzip(diff_gz)?;
     let expected_size = read_u32_le(&diff, 0) as usize;
@@ -1457,7 +1836,7 @@ where
     log(
         &format!(
             "  resources.assets [{}] installed & verified! Rewritten=358, SHA256={}",
-            lang.short_code(),
+            base_code,
             cand_sha
         ),
         LogLevel::Ok,
@@ -1933,7 +2312,7 @@ mod tests {
                 let tr = load_vstring_map(gz).unwrap();
                 let (vs_out, vs_cnt) = patch_vstring_pool_bytes(&vs_orig, &tr, &pc_spans, lang, &mut noop_log, &mut noop_prog).unwrap();
                 let vs_sha = sha256_bytes(&vs_out);
-                let (ui_out, ui_cnt) = patch_static_ui_bytes(&ui_orig, 420062, lang, &mut noop_log, &mut noop_prog).unwrap();
+                let (ui_out, ui_cnt) = patch_static_ui_bytes(&ui_orig, 420062, lang, None, &mut noop_log, &mut noop_prog).unwrap();
                 let ui_sha = sha256_bytes(&ui_out);
                 println!("PC_{}_VSTRING={} (cnt={})", lang.short_code(), vs_sha, vs_cnt);
                 println!("PC_{}_STATIC_UI={} (cnt={})", lang.short_code(), ui_sha, ui_cnt);
@@ -1958,9 +2337,9 @@ mod tests {
                     (PatchLang::En, ANDROID_VSTRING_EN_SHA, ANDROID_STATIC_UI_EN_SHA),
                     (PatchLang::Id, ANDROID_VSTRING_ID_SHA, ANDROID_STATIC_UI_ID_SHA),
                 ] {
-                    let (vs_out, vs_cnt) = patch_android_vstring_bytes(&vs_orig, lang, &mut noop_log, &mut noop_prog).unwrap();
+                    let (vs_out, vs_cnt) = patch_android_vstring_bytes(&vs_orig, lang, None, &mut noop_log, &mut noop_prog).unwrap();
                     let vs_sha = sha256_bytes(&vs_out);
-                    let (ui_out, ui_cnt) = patch_static_ui_bytes(&ui_orig, ANDROID_STATIC_UI_SUB_OFFSET, lang, &mut noop_log, &mut noop_prog).unwrap();
+                    let (ui_out, ui_cnt) = patch_static_ui_bytes(&ui_orig, ANDROID_STATIC_UI_SUB_OFFSET, lang, None, &mut noop_log, &mut noop_prog).unwrap();
                     let ui_sha = sha256_bytes(&ui_out);
                     println!("ANDROID_{}_VSTRING={} (cnt={})", lang.short_code(), vs_sha, vs_cnt);
                     println!("ANDROID_{}_STATIC_UI={} (cnt={})", lang.short_code(), ui_sha, ui_cnt);
@@ -1971,6 +2350,64 @@ mod tests {
                         assert_eq!(ui_sha, exp_ui);
                     }
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn verify_custom_pack_parsing_and_repack() {
+        let mut noop_log = |_: &str, _: LogLevel| {};
+        let mut noop_prog = |_: usize, _: &str| {};
+
+        // 1. Structured custom pack template
+        let pack = parse_custom_pack_str(
+            CUSTOM_PACK_TEMPLATE_JSON,
+            "template.json",
+            "template.json",
+        )
+        .unwrap();
+        assert_eq!(pack.meta.code, "CUSTOM");
+        assert_eq!(pack.base, CustomBase::En);
+        assert!(pack.vstring.contains_key(&1504449));
+        assert!(pack.static_ui.contains_key("15DC305A"));
+        assert!(pack.builtin.contains_key("confirm"));
+
+        // 2. Raw flat dictionary drop-in (no meta/vstring wrapper)
+        let raw_json = r#"{
+            "_note": "ignored",
+            "1504449": "Equipar",
+            "15DC305A": "Equipar",
+            "CB185163+1": "Confirmar",
+            "confirm": "Confirmar"
+        }"#;
+        let raw_pack = parse_custom_pack_str(raw_json, "es-dropin.json", "es-dropin.json").unwrap();
+        assert_eq!(raw_pack.meta.name, "es-dropin");
+        assert_eq!(raw_pack.vstring.len(), 1);
+        assert_eq!(raw_pack.static_ui.len(), 2);
+        assert_eq!(raw_pack.builtin.len(), 1);
+
+        // 3. Custom pack overlay on real Android bundles (if local backup exists)
+        if let Ok(la) = std::env::var("LOCALAPPDATA") {
+            let bak = PathBuf::from(la).join(r"RuzaLang\AndroidBackups\emulator-5554");
+            let an_vs = bak.join("1qnamndresrohzjhuvt2lw.r.original");
+            let an_ui = bak.join("nibdvaxcnfh3en5bnvhtw.r.original");
+            if an_vs.is_file() && an_ui.is_file() {
+                let es_json = r#"{
+                    "meta": { "name": "Español Test", "code": "ES", "author": "Test", "base": "en" },
+                    "vstring": { "1504449": "Equipar", "1526899": "Bloqueo Perfecto" },
+                    "static_ui": { "15DC305A": "Equipar" }
+                }"#;
+                let es_pack = parse_custom_pack_str(es_json, "es.json", "es.json").unwrap();
+                let vs_orig = fs::read(&an_vs).unwrap();
+                let ui_orig = fs::read(&an_ui).unwrap();
+                let (vs_out, vs_cnt) = patch_android_vstring_bytes(&vs_orig, PatchLang::En, Some(&es_pack), &mut noop_log, &mut noop_prog).unwrap();
+                let (ui_out, ui_cnt) = patch_static_ui_bytes(&ui_orig, ANDROID_STATIC_UI_SUB_OFFSET, PatchLang::En, Some(&es_pack), &mut noop_log, &mut noop_prog).unwrap();
+                assert_eq!(vs_out.len(), vs_orig.len());
+                assert_eq!(ui_out.len(), ui_orig.len());
+                assert_eq!(vs_cnt, 74055);
+                assert_eq!(ui_cnt, 3135);
+                assert_ne!(sha256_bytes(&vs_out), ANDROID_VSTRING_EN_SHA);
+                assert_ne!(sha256_bytes(&ui_out), ANDROID_STATIC_UI_EN_SHA);
             }
         }
     }

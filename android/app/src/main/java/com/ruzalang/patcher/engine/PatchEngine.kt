@@ -17,6 +17,164 @@ enum class LogLevel(val wire: String) {
     INFO("info"), OK("ok"), WARN("warn"), ERR("err"), DIFF("diff")
 }
 
+enum class CustomBase(val wire: String) {
+    EN("en"),
+    ID("id"),
+    JP("jp");
+
+    companion object {
+        fun fromStr(raw: String?): CustomBase = when (raw?.trim()?.lowercase()) {
+            "id" -> ID
+            "jp", "none", "orig", "original" -> JP
+            else -> EN
+        }
+    }
+}
+
+data class CustomPackMeta(
+    val fileName: String,
+    val name: String,
+    val code: String,
+    val author: String,
+    val base: String,
+    val vstringCount: Int,
+    val staticUiCount: Int,
+    val builtinCount: Int,
+    val totalCount: Int,
+)
+
+data class CustomPack(
+    val meta: CustomPackMeta,
+    val base: CustomBase,
+    val vstring: HashMap<Int, ByteArray>,
+    val staticUi: HashMap<String, String>,
+    val builtin: HashMap<String, String>,
+)
+
+/**
+ * Tiny pure-Kotlin RFC 8259 JSON parser (zero external deps, works identically in JVM unit tests & Android).
+ */
+private class MiniJsonParser(private val src: String) {
+    private var i = 0
+    private val n = src.length
+
+    private fun skipWs() {
+        while (i < n && (src[i] == ' ' || src[i] == '\t' || src[i] == '\r' || src[i] == '\n')) i++
+    }
+
+    fun parseRootObject(): LinkedHashMap<String, Any?> {
+        if (n > 0 && src[0] == '\uFEFF') i = 1
+        skipWs()
+        if (i >= n || src[i] != '{') error("Custom pack JSON root must be an object { ... }.")
+        val obj = parseObject()
+        skipWs()
+        if (i != n) error("Unexpected trailing content in custom pack JSON at offset $i.")
+        return obj
+    }
+
+    private fun parseValue(): Any? {
+        skipWs()
+        if (i >= n) error("Unexpected end of JSON.")
+        return when (src[i]) {
+            '{' -> parseObject()
+            '[' -> parseArray()
+            '"' -> parseString()
+            't' -> { expectLiteral("true"); true }
+            'f' -> { expectLiteral("false"); false }
+            'n' -> { expectLiteral("null"); null }
+            else -> parseNumber()
+        }
+    }
+
+    private fun expectLiteral(lit: String) {
+        if (!src.startsWith(lit, i)) error("Invalid JSON token at offset $i.")
+        i += lit.length
+    }
+
+    private fun parseNumber(): String {
+        val start = i
+        if (i < n && src[i] == '-') i++
+        while (i < n && (src[i] in '0'..'9' || src[i] == '.' || src[i] == 'e' || src[i] == 'E' || src[i] == '+' || src[i] == '-')) i++
+        if (i == start) error("Invalid JSON token '${src.getOrNull(i)}' at offset $i.")
+        return src.substring(start, i)
+    }
+
+    private fun parseArray(): ArrayList<Any?> {
+        i++ // '['
+        val list = ArrayList<Any?>()
+        skipWs()
+        if (i < n && src[i] == ']') { i++; return list }
+        while (true) {
+            list.add(parseValue())
+            skipWs()
+            if (i >= n) error("Unterminated JSON array.")
+            when (src[i]) {
+                ',' -> i++
+                ']' -> { i++; return list }
+                else -> error("Expected ',' or ']' in JSON array at offset $i.")
+            }
+        }
+    }
+
+    private fun parseObject(): LinkedHashMap<String, Any?> {
+        i++ // '{'
+        val map = LinkedHashMap<String, Any?>()
+        skipWs()
+        if (i < n && src[i] == '}') { i++; return map }
+        while (true) {
+            skipWs()
+            if (i >= n || src[i] != '"') error("Expected object key string at offset $i.")
+            val k = parseString()
+            skipWs()
+            if (i >= n || src[i] != ':') error("Expected ':' after key \"$k\" at offset $i.")
+            i++
+            val v = parseValue()
+            map[k] = v
+            skipWs()
+            if (i >= n) error("Unterminated JSON object.")
+            when (src[i]) {
+                ',' -> i++
+                '}' -> { i++; return map }
+                else -> error("Expected ',' or '}' in JSON object at offset $i.")
+            }
+        }
+    }
+
+    private fun parseString(): String {
+        i++ // opening '"'
+        val sb = StringBuilder()
+        while (i < n) {
+            val ch = src[i++]
+            when (ch) {
+                '"' -> return sb.toString()
+                '\\' -> {
+                    if (i >= n) error("Unterminated string escape.")
+                    when (val esc = src[i++]) {
+                        '"' -> sb.append('"')
+                        '\\' -> sb.append('\\')
+                        '/' -> sb.append('/')
+                        'b' -> sb.append('\b')
+                        'f' -> sb.append('\u000C')
+                        'n' -> sb.append('\n')
+                        'r' -> sb.append('\r')
+                        't' -> sb.append('\t')
+                        'u' -> {
+                            if (i + 4 > n) error("Incomplete \\uXXXX escape at offset $i.")
+                            val hex = src.substring(i, i + 4)
+                            val code = hex.toIntOrNull(16) ?: error("Invalid \\u$hex escape.")
+                            sb.append(code.toChar())
+                            i += 4
+                        }
+                        else -> error("Invalid escape \\$esc at offset $i.")
+                    }
+                }
+                else -> sb.append(ch)
+            }
+        }
+        error("Unterminated JSON string.")
+    }
+}
+
 interface PayloadLoader {
     fun load(name: String): ByteArray
 }
@@ -38,13 +196,95 @@ object PatchEngine {
     const val REMOTE_DEFAULT_MANIFEST_DIR =
         "/sdcard/Android/data/com.Yostar.AzurpromiliaJP/files/.res/default_package/ManifestFiles"
 
-    // Verified SHA-256 constants (v0.7.1 — 100% bit-identical with desktop PC/ADB engine)
+    // Verified SHA-256 constants (v0.8.0 — 100% bit-identical with desktop PC/ADB engine)
     const val ANDROID_VSTRING_ORIG_SHA = "C6BA69F2403102A9D4DBF2B3AB079ABBE7DE25896ABDB3969DD5B7988A2DB013"
     const val ANDROID_STATIC_UI_ORIG_SHA = "53A36C59B4ABABF9457ED37B195092DCAFD491C2D95D9BA75A61998C0138D22A"
-    const val ANDROID_VSTRING_EN_SHA = "0D11487EF462D2C7186EE654082BCA47D4E3AA2EC0F66E4A726728B2676932C7"
+    const val ANDROID_VSTRING_EN_SHA = "0739151C287863A4CD45150CC85DE3DDFDD3A7587FB159437F3F5FEED513A4E5"
     const val ANDROID_STATIC_UI_EN_SHA = "2A4428AE21009DB19621A123B1A2561ED1F83A685B4C9160B94BA74CD50E8DAC"
-    const val ANDROID_VSTRING_ID_SHA = "7DF4345957985A83A4EA37AA6DA480860534673DE1C138166FB20FA5EA718E17"
+    const val ANDROID_VSTRING_ID_SHA = "BD9A20B6BE6F9228E12F435F72374386F8C15D270E30B442927401A2EB36A0AF"
     const val ANDROID_STATIC_UI_ID_SHA = "0017773EB20E5B56D3E02179A9F94A6FBC862B48CFD9FF7CF443CCAE9E6A64B2"
+
+    private fun isStaticUiKey(k: String): Boolean {
+        val parts = k.split('+')
+        if (parts.size > 2) return false
+        val hex = parts[0]
+        if (hex.length != 8 || !hex.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) return false
+        return parts.size == 1 || (parts[1].isNotEmpty() && parts[1].all { it in '0'..'9' })
+    }
+
+    private fun sanitizePackCode(raw: String): String {
+        val cleaned = raw.trim().filter { it.isLetterOrDigit() || it == '-' || it == '_' }.take(8).uppercase()
+        return cleaned.ifEmpty { "CUSTOM" }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun parseCustomPackJson(raw: String, fileName: String = "custom-pack.json"): CustomPack {
+        val root = MiniJsonParser(raw).parseRootObject()
+        val defaultName = fileName.substringBeforeLast('.').ifBlank { "Custom Pack" }
+        val metaObj = root["meta"] as? Map<String, Any?>
+        val name = (metaObj?.get("name") as? String)?.trim()?.ifEmpty { null } ?: defaultName
+        val code = sanitizePackCode((metaObj?.get("code") as? String) ?: "CUSTOM")
+        val author = (metaObj?.get("author") as? String)?.trim().orEmpty()
+        val base = CustomBase.fromStr(metaObj?.get("base") as? String)
+
+        val vstring = HashMap<Int, ByteArray>()
+        val staticUi = HashMap<String, String>()
+        val builtin = HashMap<String, String>()
+
+        val vsObj = root["vstring"] as? Map<String, Any?>
+        val uiObj = root["static_ui"] as? Map<String, Any?>
+        val biObj = root["builtin"] as? Map<String, Any?>
+        val hasStructured = vsObj != null || uiObj != null || biObj != null
+
+        if (hasStructured) {
+            vsObj?.forEach { (k, v) ->
+                if (k.startsWith("_")) return@forEach
+                val s = v as? String ?: error("Custom pack vstring[\"$k\"] must be a string.")
+                val id = k.toIntOrNull() ?: error("Custom pack vstring key \"$k\" must be a numeric ID.")
+                vstring[id] = s.toByteArray(Charsets.UTF_8)
+            }
+            uiObj?.forEach { (k, v) ->
+                if (k.startsWith("_")) return@forEach
+                val s = v as? String ?: error("Custom pack static_ui[\"$k\"] must be a string.")
+                staticUi[k] = s
+            }
+            biObj?.forEach { (k, v) ->
+                if (k.startsWith("_")) return@forEach
+                val s = v as? String ?: error("Custom pack builtin[\"$k\"] must be a string.")
+                builtin[k] = s
+            }
+        } else {
+            root.forEach { (k, v) ->
+                if (k == "meta" || k.startsWith("_")) return@forEach
+                val s = v as? String ?: return@forEach
+                if (isStaticUiKey(k)) {
+                    staticUi[k] = s
+                } else if (k.isNotEmpty() && k.all { it in '0'..'9' }) {
+                    k.toIntOrNull()?.let { id -> vstring[id] = s.toByteArray(Charsets.UTF_8) }
+                } else {
+                    builtin[k] = s
+                }
+            }
+        }
+
+        val total = vstring.size + staticUi.size + builtin.size
+        if (total == 0) {
+            error("Custom pack contains 0 translation entries. Add entries under \"vstring\", \"static_ui\", or \"builtin\" (or provide a flat ID->text JSON dictionary).")
+        }
+
+        val meta = CustomPackMeta(
+            fileName = fileName,
+            name = name,
+            code = code,
+            author = author,
+            base = base.wire,
+            vstringCount = vstring.size,
+            staticUiCount = staticUi.size,
+            builtinCount = builtin.size,
+            totalCount = total,
+        )
+        return CustomPack(meta, base, vstring, staticUi, builtin)
+    }
 
     private fun loadPcVStringMap(gz: ByteArray): HashMap<Int, ByteArray> {
         val raw = CryptoLz4.gunzip(gz)
@@ -61,9 +301,25 @@ object PatchEngine {
         return map
     }
 
-    fun loadAndroidVStringMap(loader: PayloadLoader, lang: PatchLang): HashMap<Int, ByteArray> {
-        val gzName = if (lang == PatchLang.ID) "vstring_id.bin.gz" else "vstring_en.bin.gz"
-        val pcMap = loadPcVStringMap(loader.load(gzName))
+    fun loadAndroidVStringMap(
+        loader: PayloadLoader,
+        lang: PatchLang,
+        custom: CustomPack? = null,
+    ): HashMap<Int, ByteArray> {
+        val pcMap = when {
+            custom != null -> when (custom.base) {
+                CustomBase.EN -> loadPcVStringMap(loader.load("vstring_en.bin.gz"))
+                CustomBase.ID -> loadPcVStringMap(loader.load("vstring_id.bin.gz"))
+                CustomBase.JP -> HashMap(custom.vstring.size * 4 / 3 + 16)
+            }
+            lang == PatchLang.ID -> loadPcVStringMap(loader.load("vstring_id.bin.gz"))
+            else -> loadPcVStringMap(loader.load("vstring_en.bin.gz"))
+        }
+        if (custom != null) {
+            for ((id, bytes) in custom.vstring) {
+                pcMap[id] = bytes
+            }
+        }
         val rawRuns = CryptoLz4.gunzip(loader.load("vstring_android_map.bin.gz"))
         if (rawRuns.size < 4) error("Corrupt Android VStringPool remap table")
         val runCount = CryptoLz4.readI32Le(rawRuns, 0)
@@ -79,7 +335,9 @@ object PatchEngine {
                 if (tr != null) anMap[anStart + k] = tr
             }
         }
-        if (anMap.size != pcMap.size) error("Android VStringPool remap incomplete (${anMap.size} != ${pcMap.size})")
+        if (custom == null && anMap.size != pcMap.size) {
+            error("Android VStringPool remap incomplete (${anMap.size} != ${pcMap.size})")
+        }
         return anMap
     }
 
@@ -111,13 +369,15 @@ object PatchEngine {
         loader: PayloadLoader,
         lang: PatchLang,
         log: (String, LogLevel) -> Unit,
+        custom: CustomPack? = null,
         onSub: (Int, String) -> Unit,
     ): Int {
         if (buf.size < 4144) error("VStringPool file too small (${buf.size})")
-        onSub(0, "Remapping 74,055 VStringPool (${lang.shortCode}) entries...")
+        val activeCode = custom?.meta?.code ?: lang.shortCode
+        onSub(0, "Remapping VStringPool ($activeCode) entries...")
         val key4096 = loader.load("mmap_key_4096.bin")
-        val translations = loadAndroidVStringMap(loader, lang)
-        log("  Remapped ${translations.size} embedded ${lang.shortCode} VStringPool translations.", LogLevel.INFO)
+        val translations = loadAndroidVStringMap(loader, lang, custom)
+        log("  Remapped ${translations.size} $activeCode VStringPool translations.", LogLevel.INFO)
 
         onSub(0, "Decrypting VStringPool (130 MB MMap)...")
         val h1 = buf.copyOfRange(4120, 4144)
@@ -170,7 +430,7 @@ object PatchEngine {
                 if (tr != null) {
                     rewritten++
                     if (rewritten % 2500 == 0) {
-                        onSub(rewritten, "Rewriting VStringPool [${lang.shortCode} / $name]: $rewritten / $totalTr")
+                        onSub(rewritten, "Rewriting VStringPool [$activeCode / $name]: $rewritten / $totalTr")
                     }
                     CryptoLz4.writeI32Le(len4, 0, tr.size)
                     packed.write(len4)
@@ -233,6 +493,7 @@ object PatchEngine {
         origBuf: ByteArray,
         loader: PayloadLoader,
         lang: PatchLang,
+        custom: CustomPack? = null,
         onSub: (Int, String) -> Unit,
     ): Pair<ByteArray, Int> {
         val subOffset = ANDROID_STATIC_UI_SUB_OFFSET
@@ -245,8 +506,21 @@ object PatchEngine {
         if (subOffset + subSize > origBuf.size) {
             error("Static UI sub-bundle offset out of range ($subOffset + $subSize > ${origBuf.size})")
         }
-        val gzName = if (lang == PatchLang.ID) "static_ui_id.bin.gz" else "static_ui_en.bin.gz"
-        val trMap = loadStringDict(loader.load(gzName))
+        val activeCode = custom?.meta?.code ?: lang.shortCode
+        val trMap = when {
+            custom != null -> when (custom.base) {
+                CustomBase.EN -> loadStringDict(loader.load("static_ui_en.bin.gz"))
+                CustomBase.ID -> loadStringDict(loader.load("static_ui_id.bin.gz"))
+                CustomBase.JP -> HashMap(custom.staticUi.size * 4 / 3 + 16)
+            }
+            lang == PatchLang.ID -> loadStringDict(loader.load("static_ui_id.bin.gz"))
+            else -> loadStringDict(loader.load("static_ui_en.bin.gz"))
+        }
+        if (custom != null) {
+            for ((k, v) in custom.staticUi) {
+                trMap[k] = v
+            }
+        }
 
         onSub(0, "Decrypting UnityCN ast_staticTextKeyConfig.asset...")
         val bundle = UnityCnBundle.parse(origBuf, subOffset)
@@ -289,7 +563,7 @@ object PatchEngine {
             val v = if (tr != null) {
                 replaced++
                 if (replaced % 400 == 0) {
-                    onSub(replaced, "Rewriting Static UI KeyConfig [${lang.shortCode}]: $replaced / 3,135")
+                    onSub(replaced, "Rewriting Static UI KeyConfig [$activeCode]: $replaced / 3,135")
                 }
                 tr
             } else {

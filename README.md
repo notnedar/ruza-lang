@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.7.1`)
+# Ruza-Lang (`v0.8.0`)
 
 [![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
 
@@ -7,23 +7,25 @@
 > - Confirmed **tested and working in-game** on both PC and Android clients (standalone APK & PC/ADB).
 > - This is a **vibe-coded educational project** — future client updates or hotfixes may still cause quirks or breaking changes. Always keep automatic backups (`_ENPatchBackup\` / local APK backups) and use at your own risk.
 
-An educational bilingual localization & asset-repacking suite demonstrating exact-size string patching (**English** & **Bahasa Indonesia**) for **Windows PC** and **Android** (both a **standalone zero-PC Android APK** and **PC-to-Android ADB**), SHA-256 verification, and safe one-click rollback.
+An educational localization & asset-repacking suite demonstrating exact-size string patching (**English**, **Bahasa Indonesia**, and **Bring Your Own Custom Language Packs**) for **Windows PC** and **Android** (both a **standalone zero-PC Android APK** and **PC-to-Android ADB**), SHA-256 verification, and safe one-click rollback.
 
 > **Pre-built official binaries:** download **`RuzaLangPatcher.exe`** (Windows PC) or **`RuzaLangPatcher.apk`** (Standalone Android — 100% no PC, no root!) from [Releases](https://github.com/notnedar/ruza-lang/releases).
 
 ---
 
-## What's New in `v0.7.1`
+## What's New in `v0.8.0`
 
-- **Major Contextual Translation & UI Fit Overhaul (`EN` & `ID`):**
-  - **Fixed 6 off-by-one chunk shifts (`424` scrambled strings):** Repaired misaligned IDs across food/equipment/material tables (including the bottom-right `Equip` button that previously displayed `"Item"`, plus `Anima`, `Item`, `Quest Item`, `Kibo Egg`, crafting materials) and 5 story dialogue ranges across EN & ID.
-  - **Official Global Terminology Alignment (`3,362` entries):** Standardized place & character names (`Fleece`, `Sprout Valley`, `Jinghua Cape`, `Charlulu Village`, `Terara`, `Cathbelle`, `Cabbird`), eliminated `900+` leaked element names + `11` wrong-element skill descriptions across all 9 elements (`Fire`, `Water`, `Lightning`, `Wind`, `Earth`, `Ice`, `Wood`, `Light`, `Dark`), and polished awkward literal Indonesian skill phrasing.
-  - **Anti-Wrap UI Button & Pill Pass (`162` overrides):** Shortened tight RPG buttons & toggles (`Skill Comparison → Skills`, `Recommended → Rec. / Saran`, `Recommended Anima Sorting → Sort: Rec.`, `Matches character role → Matches Role`, `Breakthrough → Ascend`, `Disassemble → Dismantle / Bongkar`, `Lore → Legacy`) so labels sit cleanly inside pills without mid-word breaks.
-- **Android APK Polish (`100% Non-Root` + Android 15–17 Edge-to-Edge Fix):**
-  - Fixed Android 15–17 status bar, camera cutout, and bottom navigation bar insets (`WindowInsetsCompat`) so top/bottom controls are never obscured.
-  - Added automatic bilingual **Download Shizuku** prompt on launch when Shizuku isn't detected yet (with direct link + SAF folder picker option).
-  - Removed all optional `Root (su)` code paths completely — pure non-root (**Shizuku Wireless Debugging**, **SAF Folder Picker**, and **Direct Storage** for Android 8–10).
-- **Standalone Universal Android APK (`RuzaLangPatcher.apk`, `v0.7.0`):** Patch directly on your Android phone with **zero laptop, zero root, and zero APK re-signing** — responsive Portrait phone & Landscape tablet UI, **77,190 verified strings (`99.4%`)** + Cached News in ~3 seconds with automatic local backups and one-click **Rollback JP**.
+- **Bring Your Own Language Pack (`BYOL` · PC, Android ADB & Standalone APK):**
+  - Load any custom `.json` language pack directly inside **Files → Custom Language Pack → Load JSON** on **Windows PC**, **PC-to-Android ADB**, or **Standalone Android APK** (100% offline — no compiling required!).
+  - Supports **base inheritance** (`meta.base`: `"en"`, `"id"`, or `"jp"`), flat dictionary drop-ins, and **automatic PC → Android ID remapping** so one single `.json` pack works everywhere.
+  - Export a ready-to-edit starter template directly from the Windows app (**Files → Template**) or grab [`patches/custom-pack-template.json`](patches/custom-pack-template.json).
+- **Community Language Contribution Kit & Validator CLI:**
+  - Added [`CONTRIBUTING.md`](CONTRIBUTING.md) with a step-by-step guide for bringing your own language pack and submitting PRs for `EN`/`ID` fixes or new community languages.
+  - Added zero-dependency validator [`tools/validate-pack.mjs`](tools/validate-pack.mjs) (`node tools/validate-pack.mjs <pack.json>`) checking JSON syntax, placeholder parity (`{0}`, `%s`, `|`), Unity rich-text tags, tight-button wrap warnings, and UTF-8 byte budget.
+- **Combat Timing Terminology Fix (`EN` & `ID`):**
+  - Replaced all `62 EN + 73 ID` literal `"Just Block / Guard / Parry / Dodge / Evade"` strings with natural action-RPG timing terms (**`Perfect Guard`**, **`Perfect Parry`**, **`Perfect Dodge`**, **`Parry Window / Celah Parry`**, **`Dodge Counter`**, **`Perfect Guard: Counter`**) and fixed `Guard` (`ID` previously `"Penjaga"`).
+- **Previous Highlights (`v0.7.1` & `v0.7.0`):**
+  - Repaired `6` off-by-one chunk shifts (`424` scrambled strings, including the `Equip` button), aligned `3,362` official global terms & 9 elements, applied `162` anti-wrap UI overrides, fixed Android 15–17 Edge-to-Edge insets, added automatic **Download Shizuku** popup, and made the standalone APK `100%` non-root.
 
 ---
 
@@ -104,6 +106,13 @@ Works on any real Android phone (USB or Android 11+ Wireless Debugging) or Windo
 1. Finish downloading in-game data and **completely close the game** on Android.
 2. Enable **USB Debugging** (or **Wireless Debugging** / Emulator ADB setting) and connect to your PC.
 3. Open `RuzaLangPatcher.exe`, switch the bottom dock toggle to **Android** (or click **ADB Guide `?`** for step-by-step setup & Wireless `IP:Port` connect), choose **`EN`** or **`ID`**, and click **Install Patch**.
+
+### Option D — Bring Your Own Language Pack (BYOL) & Language Contributions
+Want to play in another language (Spanish, Portuguese, French, Vietnamese, Thai, Russian, etc.), tweak wording yourself, or help improve `EN` / `ID`?
+1. Export the starter JSON template from **Files → Template** (or copy [`patches/custom-pack-template.json`](patches/custom-pack-template.json)).
+2. Edit your strings (set `"base": "en"`, `"id"`, or `"jp"` for untranslated fallback keys) and validate with `node tools/validate-pack.mjs your-pack.json`.
+3. Open **Files → Custom Language Pack → Load JSON** on **Windows PC** or **Android APK**, then click **Install Patch (`<CODE>`)**! One `.json` pack works across both PC and Android automatically.
+4. Read **[`CONTRIBUTING.md`](CONTRIBUTING.md)** for full JSON schema documentation, formatting rules, and how to submit translation Pull Requests.
 
 ---
 

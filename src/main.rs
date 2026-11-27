@@ -48,6 +48,7 @@ struct IpcCommand {
     serial: Option<String>,
     adb_path: Option<String>,
     endpoint: Option<String>,
+    custom_pack_path: Option<String>,
 }
 
 enum UserEvent {
@@ -86,6 +87,7 @@ fn run_selftest(mock_dir: &str) -> i32 {
         let rew_en = patch_engine::apply_patch_for_selftest(
             &dir,
             PatchLang::En,
+            None,
             |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
             |cur, _tot, _st| last_cur = cur,
         )?;
@@ -106,6 +108,7 @@ fn run_selftest(mock_dir: &str) -> i32 {
         let rew_id = patch_engine::apply_patch_for_selftest(
             &dir,
             PatchLang::Id,
+            None,
             |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
             |cur, _tot, _st| last_cur = cur,
         )?;
@@ -126,6 +129,7 @@ fn run_selftest(mock_dir: &str) -> i32 {
         let _ = patch_engine::apply_patch_for_selftest(
             &dir,
             PatchLang::En,
+            None,
             |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
             |_, _, _| {},
         )?;
@@ -270,6 +274,7 @@ fn run_selftest_android(mock_dir: &str) -> i32 {
             let (vs_out, vs_cnt) = patch_engine::patch_android_vstring_bytes(
                 &vs_orig,
                 lang,
+                None,
                 &mut |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
                 &mut |_, _| {},
             )?;
@@ -277,6 +282,7 @@ fn run_selftest_android(mock_dir: &str) -> i32 {
                 &ui_orig,
                 patch_engine::ANDROID_STATIC_UI_SUB_OFFSET,
                 lang,
+                None,
                 &mut |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
                 &mut |_, _| {},
             )?;
@@ -369,6 +375,7 @@ fn run_cli_android_patch(mode: &str, out_log: &str) -> i32 {
                 &adb_bin,
                 &dev.serial,
                 lang,
+                None,
                 |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
                 |_, _, _| {},
             )?;
@@ -488,7 +495,7 @@ fn main() {
     let proxy = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
-        .with_title("Ruza-Lang Patcher v0.7.1 — EN / ID")
+        .with_title("Ruza-Lang Patcher v0.8.0 — EN / ID + Custom Packs")
         .with_inner_size(LogicalSize::new(960.0, 580.0))
         .with_decorations(false)
         .with_resizable(false)
@@ -558,7 +565,7 @@ fn main() {
                     }
                     thread::spawn(move || {
                         if is_init {
-                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.7.1 (EN / ID · PC + Android ADB) initialized.");
+                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.8.0 (EN / ID + Custom Packs · PC + Android ADB) initialized.");
                             push_log(&p, LogLevel::Info, "Safety: Exact byte sizes preserved with SHA-256 verification.");
                         }
                         let procs = patch_engine::find_running_game_processes();
@@ -598,8 +605,78 @@ fn main() {
                     let dir = parsed.path.unwrap_or_default();
                     thread::spawn(move || do_scan(&p, &dir));
                 }
+                "pick_custom_pack" => {
+                    thread::spawn(move || {
+                        let dlg = rfd::FileDialog::new()
+                            .set_title("Select Custom Language Pack (.json)")
+                            .add_filter("Language Pack JSON", &["json"]);
+                        if let Some(file) = dlg.pick_file() {
+                            match patch_engine::load_custom_pack(&file) {
+                                Ok(pack) => {
+                                    push_log(
+                                        &p,
+                                        LogLevel::Ok,
+                                        &format!(
+                                            "Loaded Custom Language Pack: {} ({}) · base={} · {} overrides ({})",
+                                            pack.meta.name,
+                                            pack.meta.code,
+                                            pack.meta.base.to_uppercase(),
+                                            pack.meta.total_count,
+                                            pack.meta.file_name
+                                        ),
+                                    );
+                                    push_event(&p, json!({ "type": "custom_pack", "pack": pack.meta }));
+                                }
+                                Err(e) => {
+                                    push_log(&p, LogLevel::Error, &format!("Custom pack load failed: {}", e));
+                                    let title = match lang {
+                                        PatchLang::Id => "Paket Bahasa Kustom Tidak Valid",
+                                        PatchLang::En => "Invalid Custom Language Pack",
+                                    };
+                                    push_event(&p, json!({ "type": "alert", "title": title, "body": e }));
+                                }
+                            }
+                        }
+                    });
+                }
+                "clear_custom_pack" => {
+                    push_log(&p, LogLevel::Info, "Cleared Custom Language Pack — using built-in EN / ID.");
+                    push_event(&p, json!({ "type": "custom_pack", "pack": serde_json::Value::Null }));
+                }
+                "export_pack_template" => {
+                    thread::spawn(move || {
+                        let dlg = rfd::FileDialog::new()
+                            .set_title("Save Custom Language Pack Template")
+                            .set_file_name("ruza-custom-pack-template.json")
+                            .add_filter("Language Pack JSON", &["json"]);
+                        if let Some(dst) = dlg.save_file() {
+                            match patch_engine::export_custom_pack_template(&dst) {
+                                Ok(()) => {
+                                    let s = dst.to_string_lossy().to_string();
+                                    push_log(&p, LogLevel::Ok, &format!("Saved Custom Language Pack template: {}", s));
+                                    let (title, body) = match lang {
+                                        PatchLang::Id => (
+                                            "Template Tersimpan!",
+                                            format!("Template JSON berhasil disimpan di:\n{}\n\nEdit file tersebut, lalu klik Muat JSON untuk langsung memasang bahasamu sendiri di PC maupun Android.", s),
+                                        ),
+                                        PatchLang::En => (
+                                            "Template Saved!",
+                                            format!("Starter JSON template saved to:\n{}\n\nEdit the file and click Load JSON to install your own language pack on both PC and Android.", s),
+                                        ),
+                                    };
+                                    push_event(&p, json!({ "type": "alert", "title": title, "body": body }));
+                                }
+                                Err(e) => {
+                                    push_log(&p, LogLevel::Error, &e);
+                                    push_event(&p, json!({ "type": "alert", "title": "Export Failed", "body": e }));
+                                }
+                            }
+                        }
+                    });
+                }
                 "patch" => {
                     let dir = parsed.path.unwrap_or_default();
+                    let custom_path = parsed.custom_pack_path;
                     thread::spawn(move || {
                         let path = PathBuf::from(&dir);
                         if !patch_engine::is_valid_game_folder(&path) {
@@ -635,25 +712,59 @@ fn main() {
                             push_event(&p, json!({ "type": "alert", "title": title, "body": body }));
                             return;
                         }
+                        let custom_pack = match custom_path.as_deref().filter(|s| !s.trim().is_empty()) {
+                            Some(cp) => match patch_engine::load_custom_pack(std::path::Path::new(cp)) {
+                                Ok(pk) => {
+                                    push_event(&p, json!({ "type": "custom_pack", "pack": pk.meta }));
+                                    Some(pk)
+                                }
+                                Err(e) => {
+                                    push_log(&p, LogLevel::Error, &format!("Custom pack load failed: {}", e));
+                                    push_event(&p, json!({ "type": "alert", "title": "Custom Pack Error", "body": e }));
+                                    return;
+                                }
+                            },
+                            None => None,
+                        };
                         push_event(&p, json!({ "type": "busy", "value": true }));
                         match patch_engine::apply_patch(
                             &path,
                             lang,
+                            custom_pack.as_ref(),
                             |m, l| push_log(&p, l, m),
                             |cur, tot, st| {
                                 push_event(&p, json!({ "type": "progress", "current": cur, "total": tot, "stage": st }));
                             },
                         ) {
                             Ok(n) => {
-                                let (title, body) = match lang {
-                                    PatchLang::Id => (
-                                        "Patch Bahasa Indonesia Selesai!",
-                                        format!("Patch Bahasa Indonesia (ID) berhasil dipasang & diverifikasi 100%!\nTotal string di-rewrite: {} strings.", n),
-                                    ),
-                                    PatchLang::En => (
-                                        "English Patch Complete!",
-                                        format!("English (EN) patch installed & verified 100%!\nTotal strings rewritten: {} strings.", n),
-                                    ),
+                                let (title, body) = if let Some(ref c) = custom_pack {
+                                    match lang {
+                                        PatchLang::Id => (
+                                            "Patch Bahasa Kustom Selesai!".to_string(),
+                                            format!(
+                                                "Paket kustom {} ({}) berhasil dipasang & diverifikasi 100%!\nBase: {} · Override: {} · Total di-rewrite: {} strings.",
+                                                c.meta.name, c.meta.code, c.meta.base.to_uppercase(), c.meta.total_count, n
+                                            ),
+                                        ),
+                                        PatchLang::En => (
+                                            "Custom Language Patch Complete!".to_string(),
+                                            format!(
+                                                "Custom pack {} ({}) installed & verified 100%!\nBase: {} · Overrides: {} · Total rewritten: {} strings.",
+                                                c.meta.name, c.meta.code, c.meta.base.to_uppercase(), c.meta.total_count, n
+                                            ),
+                                        ),
+                                    }
+                                } else {
+                                    match lang {
+                                        PatchLang::Id => (
+                                            "Patch Bahasa Indonesia Selesai!".to_string(),
+                                            format!("Patch Bahasa Indonesia (ID) berhasil dipasang & diverifikasi 100%!\nTotal string di-rewrite: {} strings.", n),
+                                        ),
+                                        PatchLang::En => (
+                                            "English Patch Complete!".to_string(),
+                                            format!("English (EN) patch installed & verified 100%!\nTotal strings rewritten: {} strings.", n),
+                                        ),
+                                    }
                                 };
                                 push_event(&p, json!({ "type": "alert", "title": title, "body": body }));
                             }
@@ -947,6 +1058,7 @@ fn main() {
                 "android_patch" => {
                     let custom_adb = parsed.adb_path;
                     let serial = parsed.serial.unwrap_or_default();
+                    let custom_path = parsed.custom_pack_path;
                     thread::spawn(move || {
                         let Some(adb_bin) = adb::detect_adb_binary(custom_adb.as_deref()) else {
                             push_event(&p, json!({ "type": "alert", "title": "ADB Not Found", "body": "Could not locate adb.exe or HD-Adb.exe. Click 'ADB' to pick it manually." }));
@@ -956,11 +1068,26 @@ fn main() {
                             push_event(&p, json!({ "type": "alert", "title": "No Android Device", "body": "Connect an Android device with USB Debugging or start BlueStacks, then click Scan." }));
                             return;
                         }
+                        let custom_pack = match custom_path.as_deref().filter(|s| !s.trim().is_empty()) {
+                            Some(cp) => match patch_engine::load_custom_pack(std::path::Path::new(cp)) {
+                                Ok(pk) => {
+                                    push_event(&p, json!({ "type": "custom_pack", "pack": pk.meta }));
+                                    Some(pk)
+                                }
+                                Err(e) => {
+                                    push_log(&p, LogLevel::Error, &format!("Custom pack load failed: {}", e));
+                                    push_event(&p, json!({ "type": "alert", "title": "Custom Pack Error", "body": e }));
+                                    return;
+                                }
+                            },
+                            None => None,
+                        };
                         push_event(&p, json!({ "type": "busy", "value": true }));
                         match adb::apply_android_patch(
                             &adb_bin,
                             &serial,
                             lang,
+                            custom_pack.as_ref(),
                             |m, l| push_log(&p, l, m),
                             |cur, tot, st| {
                                 push_event(&p, json!({ "type": "android_progress", "current": cur, "total": tot, "stage": st }));
@@ -968,15 +1095,34 @@ fn main() {
                             },
                         ) {
                             Ok(n) => {
-                                let (title, body) = match lang {
-                                    PatchLang::Id => (
-                                        "Patch Android (ID) Selesai!",
-                                        format!("Patch Bahasa Indonesia (ID) berhasil dipasang & diverifikasi 100% di {}!\nTotal string di-rewrite: {} strings (VStringPool + Static UI).", serial, n),
-                                    ),
-                                    PatchLang::En => (
-                                        "Android English Patch Complete!",
-                                        format!("English (EN) patch installed & verified 100% on {}!\nTotal strings rewritten: {} strings (VStringPool + Static UI).", serial, n),
-                                    ),
+                                let (title, body) = if let Some(ref c) = custom_pack {
+                                    match lang {
+                                        PatchLang::Id => (
+                                            format!("Patch Android ({}) Selesai!", c.meta.code),
+                                            format!(
+                                                "Paket kustom {} ({}) berhasil dipasang & diverifikasi 100% di {}!\nBase: {} · Override: {} · Total di-rewrite: {} strings.",
+                                                c.meta.name, c.meta.code, serial, c.meta.base.to_uppercase(), c.meta.total_count, n
+                                            ),
+                                        ),
+                                        PatchLang::En => (
+                                            format!("Android {} Patch Complete!", c.meta.code),
+                                            format!(
+                                                "Custom pack {} ({}) installed & verified 100% on {}!\nBase: {} · Overrides: {} · Total rewritten: {} strings.",
+                                                c.meta.name, c.meta.code, serial, c.meta.base.to_uppercase(), c.meta.total_count, n
+                                            ),
+                                        ),
+                                    }
+                                } else {
+                                    match lang {
+                                        PatchLang::Id => (
+                                            "Patch Android (ID) Selesai!".to_string(),
+                                            format!("Patch Bahasa Indonesia (ID) berhasil dipasang & diverifikasi 100% di {}!\nTotal string di-rewrite: {} strings (VStringPool + Static UI).", serial, n),
+                                        ),
+                                        PatchLang::En => (
+                                            "Android English Patch Complete!".to_string(),
+                                            format!("English (EN) patch installed & verified 100% on {}!\nTotal strings rewritten: {} strings (VStringPool + Static UI).", serial, n),
+                                        ),
+                                    }
                                 };
                                 push_event(&p, json!({ "type": "alert", "title": title, "body": body }));
                             }

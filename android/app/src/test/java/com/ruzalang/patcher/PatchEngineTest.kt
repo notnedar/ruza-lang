@@ -1,10 +1,12 @@
 package com.ruzalang.patcher
 
 import com.ruzalang.patcher.engine.CryptoLz4
+import com.ruzalang.patcher.engine.CustomBase
 import com.ruzalang.patcher.engine.PatchEngine
 import com.ruzalang.patcher.engine.PatchLang
 import com.ruzalang.patcher.engine.PayloadLoader
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -28,9 +30,41 @@ class PatchEngineTest {
         assertEquals(target, exact.size)
         assertTrue(CryptoLz4.lz4Decompress(exact, sample.size).contentEquals(sample))
 
-        assertTrue(UpdateChecker.isNewer("v0.7.1", "0.7.0"))
-        assertTrue(!UpdateChecker.isNewer("v0.7.0", "0.7.0"))
-        assertTrue(!UpdateChecker.isNewer("v0.6.1", "0.7.0"))
+        assertTrue(UpdateChecker.isNewer("v0.8.0", "0.7.1"))
+        assertTrue(!UpdateChecker.isNewer("v0.8.0", "0.8.0"))
+        assertTrue(!UpdateChecker.isNewer("v0.7.1", "0.8.0"))
+    }
+
+    @Test
+    fun testCustomPackParsingAndRemap() {
+        val structured = """
+            {
+              "_comment": "demo",
+              "meta": { "name": "Español (ES)", "code": "es", "author": "Tester", "base": "en" },
+              "vstring": { "_note": "skip", "1504449": "Equipar", "1526899": "Bloqueo Perfecto" },
+              "static_ui": { "15DC305A": "Equipar" },
+              "builtin": { "confirm": "Confirmar" }
+            }
+        """.trimIndent()
+        val p1 = PatchEngine.parseCustomPackJson(structured, "es-pack.json")
+        assertEquals("ES", p1.meta.code)
+        assertEquals(CustomBase.EN, p1.base)
+        assertEquals(2, p1.meta.vstringCount)
+        assertEquals(1, p1.meta.staticUiCount)
+        assertEquals(1, p1.meta.builtinCount)
+
+        // Flat dictionary drop-in (including all-digit 8-hex Static UI key!)
+        val flat = """{ "_ignore": "x", "1504449": "Equipar", "15DC305A": "Equipar", "11369082": "Botón", "CB185163+1": "Confirmar" }"""
+        val p2 = PatchEngine.parseCustomPackJson(flat, "dropin.json")
+        assertEquals("dropin", p2.meta.name)
+        assertEquals(1, p2.vstring.size)
+        assertEquals(3, p2.staticUi.size)
+
+        // JP base only maps the provided vstring IDs
+        val jpOnly = """{ "meta": { "name": "Minimal", "code": "MIN", "base": "jp" }, "vstring": { "1504449": "Equipar" } }"""
+        val p3 = PatchEngine.parseCustomPackJson(jpOnly, "min.json")
+        val anMap = PatchEngine.loadAndroidVStringMap(loader, PatchLang.EN, p3)
+        assertEquals(1, anMap.size)
     }
 
     @Test
@@ -55,7 +89,7 @@ class PatchEngineTest {
             Triple(PatchLang.ID, PatchEngine.ANDROID_VSTRING_ID_SHA, PatchEngine.ANDROID_STATIC_UI_ID_SHA),
         )) {
             val vsBuf = vsOrigFile.readBytes()
-            val vsCnt = PatchEngine.patchAndroidVStringInPlace(vsBuf, loader, lang, { _, _ -> }, { _, _ -> })
+            val vsCnt = PatchEngine.patchAndroidVStringInPlace(vsBuf, loader, lang, { _, _ -> }) { _, _ -> }
             assertEquals(74055, vsCnt)
             assertEquals(expVs, CryptoLz4.sha256Bytes(vsBuf))
 
@@ -65,5 +99,25 @@ class PatchEngineTest {
             assertEquals(uiOrig.size, uiOut.size)
             assertEquals(expUi, CryptoLz4.sha256Bytes(uiOut))
         }
+
+        // Verify Custom Language Pack produces valid exact-size bundles with distinct SHA-256
+        val esJson = """
+            {
+              "meta": { "name": "Español Test", "code": "ES", "author": "Test", "base": "en" },
+              "vstring": { "1504449": "Equipar", "1526899": "Bloqueo Perfecto" },
+              "static_ui": { "15DC305A": "Equipar" }
+            }
+        """.trimIndent()
+        val esPack = PatchEngine.parseCustomPackJson(esJson, "es.json")
+        val vsBuf = vsOrigFile.readBytes()
+        val vsCnt = PatchEngine.patchAndroidVStringInPlace(vsBuf, loader, PatchLang.EN, { _, _ -> }, esPack) { _, _ -> }
+        assertEquals(74055, vsCnt)
+        assertNotEquals(PatchEngine.ANDROID_VSTRING_EN_SHA, CryptoLz4.sha256Bytes(vsBuf))
+
+        val uiOrig = uiOrigFile.readBytes()
+        val (uiOut, uiCnt) = PatchEngine.patchAndroidStaticUiBytes(uiOrig, loader, PatchLang.EN, esPack) { _, _ -> }
+        assertEquals(3135, uiCnt)
+        assertEquals(uiOrig.size, uiOut.size)
+        assertNotEquals(PatchEngine.ANDROID_STATIC_UI_EN_SHA, CryptoLz4.sha256Bytes(uiOut))
     }
 }

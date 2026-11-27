@@ -36,8 +36,8 @@ android {
         applicationId = "com.ruzalang.patcher"
         minSdk = 26
         targetSdk = 35
-        versionCode = 701
-        versionName = "0.7.1"
+        versionCode = 800
+        versionName = "0.8.0"
     }
 
     buildFeatures {

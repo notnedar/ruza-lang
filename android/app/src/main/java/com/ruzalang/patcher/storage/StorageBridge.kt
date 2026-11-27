@@ -7,6 +7,7 @@ import android.os.Build
 import androidx.documentfile.provider.DocumentFile
 import com.ruzalang.patcher.IPatcherFileService
 import com.ruzalang.patcher.engine.CryptoLz4
+import com.ruzalang.patcher.engine.CustomPack
 import com.ruzalang.patcher.engine.LogLevel
 import com.ruzalang.patcher.engine.PatchEngine
 import com.ruzalang.patcher.engine.PatchLang
@@ -77,6 +78,38 @@ class StorageBridge(private val context: Context) {
 
     val stageDir: File
         get() = File(appFilesRoot, "stage").apply { mkdirs() }
+
+    private val customPackFile: File
+        get() = File(appFilesRoot, "custom_pack.json")
+
+    private val customPackNameFile: File
+        get() = File(appFilesRoot, "custom_pack.name")
+
+    fun saveCustomPack(rawJson: String, fileName: String): CustomPack {
+        val parsed = PatchEngine.parseCustomPackJson(rawJson, fileName)
+        customPackFile.writeText(rawJson, Charsets.UTF_8)
+        customPackNameFile.writeText(fileName, Charsets.UTF_8)
+        return parsed
+    }
+
+    fun loadPersistedCustomPack(): CustomPack? {
+        if (!customPackFile.isFile) return null
+        return try {
+            val fname = if (customPackNameFile.isFile) {
+                customPackNameFile.readText(Charsets.UTF_8).trim().ifEmpty { "custom-pack.json" }
+            } else {
+                "custom-pack.json"
+            }
+            PatchEngine.parseCustomPackJson(customPackFile.readText(Charsets.UTF_8), fname)
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    fun clearCustomPack() {
+        customPackFile.delete()
+        customPackNameFile.delete()
+    }
 
     private fun isDirectFsWritable(): Boolean {
         return try {
@@ -439,6 +472,7 @@ class StorageBridge(private val context: Context) {
         remotePath: String,
         bakFile: File,
         lang: PatchLang,
+        custom: CustomPack?,
         enSha: String,
         idSha: String,
         label: String,
@@ -450,6 +484,9 @@ class StorageBridge(private val context: Context) {
             val isEn = curSha.equals(enSha, ignoreCase = true)
             val isId = curSha.equals(idSha, ignoreCase = true)
             if (isEn || isId) {
+                if (custom != null) {
+                    error("$label is already patched and original backup is missing. Restore Original JP first before applying a Custom Language Pack.")
+                }
                 if (lang == PatchLang.EN && isEn) return true
                 if (lang == PatchLang.ID && isId) return true
                 error("$label is already patched and original backup is missing. Restore Original JP first.")
@@ -469,12 +506,14 @@ class StorageBridge(private val context: Context) {
             log("  Saved verified original backup: ${bakFile.name} (SHA256=${pulledSha.take(12)}...)", LogLevel.OK)
             return false
         }
+        if (custom != null) return false
         val wantSha = if (lang == PatchLang.ID) idSha else enSha
         return curSha.equals(wantSha, ignoreCase = true)
     }
 
     fun applyPatch(
         lang: PatchLang,
+        custom: CustomPack? = null,
         log: (String, LogLevel) -> Unit,
         onProgress: (Int, Int, String) -> Unit,
     ): Int {
@@ -485,25 +524,31 @@ class StorageBridge(private val context: Context) {
             error("Blocked: Game is currently running (PID ${pids.joinToString(", ")}). Force-close the game before patching!")
         }
 
+        val activeLabel = custom?.let { "${it.meta.name} (${it.meta.code} · base=${it.meta.base.uppercase()})" } ?: lang.label
+        val activeCode = custom?.meta?.code ?: lang.shortCode
+
         var rewritten = 0
-        log("=== Starting ${lang.label} Patch (${mode.label}) ===", LogLevel.INFO)
+        log("=== Starting $activeLabel Patch (${mode.label}) ===", LogLevel.INFO)
+        if (custom != null) {
+            log("  Custom Pack: ${custom.meta.fileName} (${custom.meta.vstringCount} vstring + ${custom.meta.staticUiCount} static_ui overrides)", LogLevel.INFO)
+        }
         onProgress(0, PatchEngine.ANDROID_TOTAL_STRINGS, "Checking Android bundles...")
 
         // [1/2] VStringPool (74,055 strings)
-        log("=== [1/2] Patching VStringPool (${lang.shortCode}) ===", LogLevel.INFO)
+        log("=== [1/2] Patching VStringPool ($activeCode) ===", LogLevel.INFO)
         val vsBak = File(backupDir, "1qnamndresrohzjhuvt2lw.r.original")
         onProgress(0, PatchEngine.ANDROID_TOTAL_STRINGS, "Checking / backing up VStringPool (130 MB)...")
         val vsUpToDate = ensureBackup(
-            mode, PatchEngine.REMOTE_VSTRING, vsBak, lang,
+            mode, PatchEngine.REMOTE_VSTRING, vsBak, lang, custom,
             PatchEngine.ANDROID_VSTRING_EN_SHA, PatchEngine.ANDROID_VSTRING_ID_SHA, "VStringPool", log,
         )
         if (vsUpToDate) {
-            log("  VStringPool already matches ${lang.shortCode} (74,055 strings).", LogLevel.OK)
+            log("  VStringPool already matches $activeCode (74,055 strings).", LogLevel.OK)
             rewritten += 74055
             onProgress(rewritten, PatchEngine.ANDROID_TOTAL_STRINGS, "VStringPool already up-to-date")
         } else {
             val buf = vsBak.readBytes()
-            val cnt = PatchEngine.patchAndroidVStringInPlace(buf, loader, lang, log) { delta, stg ->
+            val cnt = PatchEngine.patchAndroidVStringInPlace(buf, loader, lang, log, custom) { delta, stg ->
                 onProgress(delta, PatchEngine.ANDROID_TOTAL_STRINGS, stg)
             }
             val staged = File(stageDir, "1qnamndresrohzjhuvt2lw.r.staged")
@@ -515,25 +560,25 @@ class StorageBridge(private val context: Context) {
             } finally {
                 staged.delete()
             }
-            log("  VStringPool [${lang.shortCode}] installed & verified! Rewritten=$cnt, SHA256=$finalSha", LogLevel.OK)
+            log("  VStringPool [$activeCode] installed & verified! Rewritten=$cnt, SHA256=$finalSha", LogLevel.OK)
             rewritten += cnt
         }
 
         // [2/2] Static UI KeyConfig (3,135 strings)
-        log("=== [2/2] Patching Static UI KeyConfig (${lang.shortCode}) ===", LogLevel.INFO)
+        log("=== [2/2] Patching Static UI KeyConfig ($activeCode) ===", LogLevel.INFO)
         val uiBak = File(backupDir, "nibdvaxcnfh3en5bnvhtw.r.original")
         onProgress(rewritten, PatchEngine.ANDROID_TOTAL_STRINGS, "Checking / backing up Static UI (6 MB)...")
         val uiUpToDate = ensureBackup(
-            mode, PatchEngine.REMOTE_STATIC_UI, uiBak, lang,
+            mode, PatchEngine.REMOTE_STATIC_UI, uiBak, lang, custom,
             PatchEngine.ANDROID_STATIC_UI_EN_SHA, PatchEngine.ANDROID_STATIC_UI_ID_SHA, "Static UI KeyConfig", log,
         )
         if (uiUpToDate) {
-            log("  Static UI KeyConfig already matches ${lang.shortCode} (3,135 strings).", LogLevel.OK)
+            log("  Static UI KeyConfig already matches $activeCode (3,135 strings).", LogLevel.OK)
             rewritten += 3135
             onProgress(rewritten, PatchEngine.ANDROID_TOTAL_STRINGS, "Static UI already up-to-date")
         } else {
             val origBytes = uiBak.readBytes()
-            val (outBytes, cnt) = PatchEngine.patchAndroidStaticUiBytes(origBytes, loader, lang) { delta, stg ->
+            val (outBytes, cnt) = PatchEngine.patchAndroidStaticUiBytes(origBytes, loader, lang, custom) { delta, stg ->
                 onProgress(rewritten + delta, PatchEngine.ANDROID_TOTAL_STRINGS, stg)
             }
             val staged = File(stageDir, "nibdvaxcnfh3en5bnvhtw.r.staged")
@@ -545,12 +590,12 @@ class StorageBridge(private val context: Context) {
             } finally {
                 staged.delete()
             }
-            log("  Static UI KeyConfig [${lang.shortCode}] installed & verified! Rewritten=$cnt, SHA256=$finalSha", LogLevel.OK)
+            log("  Static UI KeyConfig [$activeCode] installed & verified! Rewritten=$cnt, SHA256=$finalSha", LogLevel.OK)
             rewritten += cnt
         }
 
-        onProgress(rewritten, PatchEngine.ANDROID_TOTAL_STRINGS, "All targets verified 100% (${lang.shortCode})!")
-        log("=== COMPLETE [${lang.label}]! Rewritten & verified: $rewritten strings ===", LogLevel.OK)
+        onProgress(rewritten, PatchEngine.ANDROID_TOTAL_STRINGS, "All targets verified 100% ($activeCode)!")
+        log("=== COMPLETE [$activeLabel]! Rewritten & verified: $rewritten strings ===", LogLevel.OK)
         return rewritten
     }
 

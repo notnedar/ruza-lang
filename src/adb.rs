@@ -666,6 +666,7 @@ fn ensure_android_backup<L>(
     remote: &str,
     bak_path: &Path,
     lang: PatchLang,
+    custom: Option<&patch_engine::CustomPack>,
     en_sha: &str,
     id_sha: &str,
     label: &str,
@@ -681,6 +682,12 @@ where
         let is_en = sha_matches(&cur_sha, en_sha);
         let is_id = sha_matches(&cur_sha, id_sha);
         if is_en || is_id {
+            if custom.is_some() {
+                return Err(format!(
+                    "Android {} is already patched and original PC backup is missing. Restore Original JP first before applying a Custom Language Pack.",
+                    label
+                ));
+            }
             match lang {
                 PatchLang::En if is_en => return Ok(true),
                 PatchLang::Id if is_id => return Ok(true),
@@ -726,6 +733,11 @@ where
         return Ok(false);
     }
 
+    // Never skip when a custom pack is active so edited custom JSON always repacks fresh from backup
+    if custom.is_some() {
+        return Ok(false);
+    }
+
     // Backup exists; check if remote is already on desired language
     let target_sha = match lang {
         PatchLang::En => en_sha,
@@ -741,6 +753,7 @@ pub fn apply_android_patch<L, P>(
     adb: &Path,
     serial: &str,
     lang: PatchLang,
+    custom: Option<&patch_engine::CustomPack>,
     mut log: L,
     mut on_progress: P,
 ) -> Result<usize, String>
@@ -753,15 +766,33 @@ where
     let bak_dir = android_backup_dir(serial);
     fs::create_dir_all(&bak_dir).map_err(|e| format!("Create Android backup dir failed: {}", e))?;
 
+    let active_label = match custom {
+        Some(c) => format!("{} ({} · base={})", c.meta.name, c.meta.code, c.base.as_str().to_uppercase()),
+        None => lang.label().to_string(),
+    };
+    let active_code = match custom {
+        Some(c) => c.meta.code.as_str(),
+        None => lang.short_code(),
+    };
+
     let mut rewritten = 0usize;
     log(
         &format!(
             "=== Starting Android {} Patch on {} ===",
-            lang.label(),
+            active_label,
             serial
         ),
         LogLevel::Info,
     );
+    if let Some(c) = custom {
+        log(
+            &format!(
+                "  Custom Pack: {} ({} vstring + {} static_ui overrides)",
+                c.meta.file_name, c.meta.vstring_count, c.meta.static_ui_count
+            ),
+            LogLevel::Info,
+        );
+    }
     on_progress(
         0,
         ANDROID_TOTAL_STRINGS,
@@ -770,7 +801,7 @@ where
 
     // [1/2] Android VStringPool (74,055 strings)
     log(
-        &format!("=== [1/2] Patching Android VStringPool ({}) ===", lang.short_code()),
+        &format!("=== [1/2] Patching Android VStringPool ({}) ===", active_code),
         LogLevel::Info,
     );
     let vs_bak = bak_dir.join("1qnamndresrohzjhuvt2lw.r.original");
@@ -781,6 +812,7 @@ where
         REMOTE_VSTRING,
         &vs_bak,
         lang,
+        custom,
         ANDROID_VSTRING_EN_SHA,
         ANDROID_VSTRING_ID_SHA,
         "VStringPool",
@@ -788,7 +820,7 @@ where
     )?;
     if vs_already {
         log(
-            &format!("  Android VStringPool already matches {} (74,055 strings).", lang.short_code()),
+            &format!("  Android VStringPool already matches {} (74,055 strings).", active_code),
             LogLevel::Ok,
         );
         rewritten += 74055;
@@ -798,6 +830,7 @@ where
         let (out_buf, count) = patch_engine::patch_android_vstring_bytes(
             &orig_buf,
             lang,
+            custom,
             &mut log,
             &mut |delta, stg| on_progress(delta, ANDROID_TOTAL_STRINGS, stg),
         )?;
@@ -812,7 +845,7 @@ where
         log(
             &format!(
                 "  Android VStringPool [{}] installed & verified! Rewritten={}, SHA256={}",
-                lang.short_code(),
+                active_code,
                 count,
                 final_sha
             ),
@@ -823,7 +856,7 @@ where
 
     // [2/2] Android Static UI KeyConfig (3,135 strings)
     log(
-        &format!("=== [2/2] Patching Android Static UI KeyConfig ({}) ===", lang.short_code()),
+        &format!("=== [2/2] Patching Android Static UI KeyConfig ({}) ===", active_code),
         LogLevel::Info,
     );
     let ui_bak = bak_dir.join("nibdvaxcnfh3en5bnvhtw.r.original");
@@ -834,6 +867,7 @@ where
         REMOTE_STATIC_UI,
         &ui_bak,
         lang,
+        custom,
         ANDROID_STATIC_UI_EN_SHA,
         ANDROID_STATIC_UI_ID_SHA,
         "Static UI KeyConfig",
@@ -841,7 +875,7 @@ where
     )?;
     if ui_already {
         log(
-            &format!("  Android Static UI KeyConfig already matches {} (3,135 strings).", lang.short_code()),
+            &format!("  Android Static UI KeyConfig already matches {} (3,135 strings).", active_code),
             LogLevel::Ok,
         );
         rewritten += 3135;
@@ -852,6 +886,7 @@ where
             &orig_buf,
             ANDROID_STATIC_UI_SUB_OFFSET,
             lang,
+            custom,
             &mut log,
             &mut |delta, stg| on_progress(rewritten + delta, ANDROID_TOTAL_STRINGS, stg),
         )?;
@@ -870,7 +905,7 @@ where
         log(
             &format!(
                 "  Android Static UI KeyConfig [{}] installed & verified! Rewritten={}, SHA256={}",
-                lang.short_code(),
+                active_code,
                 count,
                 final_sha
             ),
@@ -882,12 +917,12 @@ where
     on_progress(
         rewritten,
         ANDROID_TOTAL_STRINGS,
-        &format!("Android patch verified 100% ({})!", lang.short_code()),
+        &format!("Android patch verified 100% ({})!", active_code),
     );
     log(
         &format!(
             "=== ANDROID COMPLETE [{}]! Rewritten & verified: {} strings ===",
-            lang.label(),
+            active_label,
             rewritten
         ),
         LogLevel::Ok,

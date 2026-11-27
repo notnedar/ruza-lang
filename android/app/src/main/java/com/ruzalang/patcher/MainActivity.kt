@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.provider.DocumentsContract
+import android.provider.OpenableColumns
 import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
@@ -29,6 +30,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewClientCompat
+import com.ruzalang.patcher.engine.CustomPackMeta
 import com.ruzalang.patcher.engine.LogLevel
 import com.ruzalang.patcher.engine.PatchEngine
 import com.ruzalang.patcher.engine.PatchLang
@@ -94,6 +96,58 @@ class MainActivity : AppCompatActivity() {
     private val shizukuBinderDead = Shizuku.OnBinderDeadListener {
         bridge.shizukuService = null
         shizukuBound = false
+    }
+
+    private val customPackPickerLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri == null) return@registerForActivityResult
+            worker.execute {
+                pushBusy(true)
+                try {
+                    val fileName = resolveDisplayName(uri) ?: "custom-pack.json"
+                    val raw = contentResolver.openInputStream(uri)?.use {
+                        it.readBytes().toString(Charsets.UTF_8)
+                    } ?: error("Failed reading selected file.")
+                    val pack = bridge.saveCustomPack(raw, fileName)
+                    pushLog(
+                        LogLevel.OK,
+                        "Loaded Custom Language Pack: ${pack.meta.name} (${pack.meta.code}) · base=${pack.meta.base.uppercase()} · ${pack.meta.totalCount} overrides ($fileName)",
+                    )
+                    pushEvent(JSONObject().put("type", "custom_pack").put("pack", customPackMetaToJson(pack.meta)))
+                } catch (e: Throwable) {
+                    pushLog(LogLevel.ERR, "Custom pack load failed: ${e.message}")
+                    pushEvent(
+                        JSONObject()
+                            .put("type", "alert")
+                            .put("title", "Invalid Custom Language Pack")
+                            .put("body", e.message ?: "Failed to parse JSON."),
+                    )
+                } finally {
+                    pushBusy(false)
+                }
+            }
+        }
+
+    private fun resolveDisplayName(uri: Uri): String? {
+        return try {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun customPackMetaToJson(m: CustomPackMeta): JSONObject = JSONObject().apply {
+        put("file_name", m.fileName)
+        put("name", m.name)
+        put("code", m.code)
+        put("author", m.author)
+        put("base", m.base)
+        put("vstring_count", m.vstringCount)
+        put("static_ui_count", m.staticUiCount)
+        put("builtin_count", m.builtinCount)
+        put("total_count", m.totalCount)
     }
 
     private val safPickerLauncher =
@@ -358,8 +412,15 @@ class MainActivity : AppCompatActivity() {
 
             when (cmd) {
                 "init" -> {
-                    pushLog(LogLevel.INFO, "Ruza-Lang Android v${BuildConfig.VERSION_NAME} (EN / ID) initialized.")
+                    pushLog(LogLevel.INFO, "Ruza-Lang Android v${BuildConfig.VERSION_NAME} (EN / ID + Custom Packs) initialized.")
                     pushLog(LogLevel.INFO, "Safety: Exact byte sizes · Zero root · Zero APK re-signing.")
+                    bridge.loadPersistedCustomPack()?.let { saved ->
+                        pushLog(
+                            LogLevel.OK,
+                            "Restored Custom Language Pack: ${saved.meta.name} (${saved.meta.code}) · ${saved.meta.totalCount} overrides.",
+                        )
+                        pushEvent(JSONObject().put("type", "custom_pack").put("pack", customPackMetaToJson(saved.meta)))
+                    }
                     runOnUiThread { bindShizukuIfReady() }
                     triggerScanAsync()
                     // Silent background update check
@@ -425,6 +486,24 @@ class MainActivity : AppCompatActivity() {
 
                 "pick_saf" -> runOnUiThread { launchSafPicker() }
 
+                "pick_custom_pack" -> {
+                    runOnUiThread {
+                        try {
+                            customPackPickerLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                        } catch (e: Throwable) {
+                            pushLog(LogLevel.ERR, "Could not open file picker: ${e.message}")
+                        }
+                    }
+                }
+
+                "clear_custom_pack" -> {
+                    worker.execute {
+                        bridge.clearCustomPack()
+                        pushLog(LogLevel.INFO, "Cleared Custom Language Pack — reverted to built-in EN / ID.")
+                        pushEvent(JSONObject().put("type", "custom_pack").put("pack", JSONObject.NULL))
+                    }
+                }
+
                 "open_app_settings" -> {
                     runOnUiThread {
                         try {
@@ -441,12 +520,22 @@ class MainActivity : AppCompatActivity() {
                     worker.execute {
                         pushBusy(true)
                         try {
+                            val custom = bridge.loadPersistedCustomPack()
                             val n = bridge.applyPatch(
                                 lang = lang,
+                                custom = custom,
                                 log = { m, l -> pushLog(l, m) },
                                 onProgress = { c, t, s -> pushProgress(c, t, s) },
                             )
-                            val (title, body) = if (lang == PatchLang.ID) {
+                            val (title, body) = if (custom != null) {
+                                if (lang == PatchLang.ID) {
+                                    "Patch Bahasa Kustom (${custom.meta.code}) Selesai!" to
+                                        "Paket kustom ${custom.meta.name} (${custom.meta.code}) berhasil dipasang & diverifikasi 100%!\nBasis: ${custom.meta.base.uppercase()} · Override: ${custom.meta.totalCount} · Total di-rewrite: $n strings."
+                                } else {
+                                    "Custom Pack (${custom.meta.code}) Complete!" to
+                                        "Custom pack ${custom.meta.name} (${custom.meta.code}) installed & verified 100%!\nBase: ${custom.meta.base.uppercase()} · Overrides: ${custom.meta.totalCount} · Total rewritten: $n strings."
+                                }
+                            } else if (lang == PatchLang.ID) {
                                 "Patch Bahasa Indonesia Selesai!" to
                                     "Patch Bahasa Indonesia (ID) berhasil dipasang & diverifikasi 100%!\nTotal string di-rewrite: $n strings."
                             } else {
