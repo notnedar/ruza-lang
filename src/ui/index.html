@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Ruza-Lang Patcher v0.4.2 — EN / ID</title>
+<title>Ruza-Lang Patcher v0.4.3 — EN / ID</title>
 <style>
   :root {
     --rail-w: 68px;
@@ -272,13 +272,6 @@
     color: #ffffff;
     text-shadow: 0 1px 10px rgba(14, 32, 54, 0.42);
   }
-  .crumb-sub {
-    font-size: 10px;
-    letter-spacing: 1.4px;
-    text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.78);
-    text-shadow: 0 1px 8px rgba(14, 32, 54, 0.38);
-  }
 
   /* Floating Process Warning (ONLY shown when a target process is running) */
   .proc-alert {
@@ -348,7 +341,7 @@
   .hero-canvas {
     flex: 1;
     position: relative;
-    padding: 58px 42px 18px;
+    padding: 62px 42px 18px;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
@@ -357,18 +350,9 @@
   .hero-copy {
     max-width: 392px;
   }
-  .hero-eyebrow {
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 2.2px;
-    text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.86);
-    text-shadow: 0 1px 10px rgba(16, 46, 80, 0.35);
-    margin-bottom: 5px;
-  }
   .hero-title {
     font-family: "Segoe UI Variable Display", "Segoe UI", "Yu Gothic UI", sans-serif;
-    font-size: 38px;
+    font-size: 40px;
     font-weight: 600;
     line-height: 1.06;
     letter-spacing: -0.7px;
@@ -467,8 +451,8 @@
     display: none;
     flex-direction: column;
     width: 432px;
-    height: 186px;
-    margin-top: 14px;
+    height: 198px;
+    margin-top: 16px;
     border-radius: 8px;
     background: rgba(16, 23, 34, 0.64);
     backdrop-filter: blur(18px);
@@ -486,8 +470,8 @@
     to { opacity: 1; transform: translateY(0); }
   }
   .home-log-head {
-    height: 27px;
-    padding: 0 10px;
+    height: 28px;
+    padding: 0 11px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -496,24 +480,10 @@
     flex-shrink: 0;
   }
   .home-log-title {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.6px;
-    text-transform: uppercase;
-    color: rgba(238, 244, 250, 0.88);
-  }
-  .home-log-pulse {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #8ce5c0;
-  }
-  .home-log-pulse.busy {
-    background: #7dd3fc;
-    animation: pulse 1.1s infinite;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.15px;
+    color: rgba(238, 244, 250, 0.90);
   }
   .home-log-ctrls {
     display: flex;
@@ -1055,14 +1025,14 @@
 <div class="shell">
   <!-- LEFT SLIM LAUNCHER RAIL -->
   <aside class="rail">
-    <div class="rail-brand" data-drag="1" title="Ruza-Lang v0.4.2">
+    <div class="rail-brand" data-drag="1" title="Ruza-Lang v0.4.3">
       <div class="mark-box">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <path d="M6.5 4.5H13.8C16.4 4.5 18 6 18 8.3C18 10.3 16.7 11.7 14.5 12L18.5 19.5H15.4L11.8 12.4H9V19.5H6.5V4.5ZM9 6.8V10.3H13.4C14.7 10.3 15.5 9.6 15.5 8.5C15.5 7.4 14.7 6.8 13.4 6.8H9Z" fill="#f3eee2"/>
           <path d="M16.5 4.5L19.5 4.5L19.5 7.5" stroke="#e8d2a0" stroke-width="1.3"/>
         </svg>
       </div>
-      <span class="rail-ver">0.4.2</span>
+      <span class="rail-ver">0.4.3</span>
     </div>
 
     <nav class="rail-nav">
@@ -1097,7 +1067,6 @@
     <header class="topbar" data-drag="1">
       <div class="page-crumb">
         <span id="crumbTitle" class="crumb-title">Packages</span>
-        <span id="crumbSub" class="crumb-sub">CLIENT VERIFICATION</span>
       </div>
 
       <div id="procAlert" class="proc-alert">
@@ -1122,7 +1091,6 @@
     <section id="viewHome" class="view active">
       <div class="hero-canvas" data-drag="1">
         <div class="hero-copy">
-          <div id="heroEyebrow" class="hero-eyebrow">BILINGUAL LOCALIZATION &middot; v0.4.2</div>
           <h1 class="hero-title">Ruza-Lang</h1>
           <div class="hero-rule"></div>
           <p id="heroDesc" class="hero-desc">
@@ -1148,10 +1116,7 @@
         <!-- Live Activity Log Feed (open by default in lower-left white space; stays live on Install Patch / Translate News / Rollback) -->
         <div id="homeLogBox" class="home-log-box open">
           <div class="home-log-head">
-            <span class="home-log-title">
-              <span id="homeLogPulse" class="home-log-pulse"></span>
-              <span id="homeLogTitle">Activity Log</span>
-            </span>
+            <span id="homeLogTitle" class="home-log-title">Activity Log</span>
             <div class="home-log-ctrls">
               <button id="btnHomeLogFull" class="home-log-link" type="button">Full Log</button>
               <button id="btnHomeLogHide" class="home-log-link" type="button" title="Hide">&times;</button>
@@ -1353,11 +1318,10 @@
     en: {
       navHome: 'Home', navPackages: 'Files', navNews: 'News', navLog: 'Log',
       crumbs: {
-        packages: ['Packages', 'CLIENT VERIFICATION'],
-        news: ['News Cache', 'IN-GAME ANNOUNCEMENTS'],
-        log: ['Execution Log', 'SHA-256 VERIFICATION']
+        packages: 'Packages',
+        news: 'News Cache',
+        log: 'Execution Log'
       },
-      heroEyebrow: 'BILINGUAL LOCALIZATION · v0.4.2',
       heroDesc: 'English & Indonesian client localization with exact\u2011size repacking, SHA\u2011256 verification, and safe one\u2011click rollback.',
       stateScanning: 'Scanning target installation...',
       stateEnOk: 'English (EN) active · 4/4 packages verified',
@@ -1431,11 +1395,10 @@
     id: {
       navHome: 'Utama', navPackages: 'Paket', navNews: 'Berita', navLog: 'Log',
       crumbs: {
-        packages: ['Paket Klien', 'VERIFIKASI FILE'],
-        news: ['Cache Berita', 'PENGUMUMAN IN-GAME'],
-        log: ['Log Eksekusi', 'VERIFIKASI SHA-256']
+        packages: 'Paket Klien',
+        news: 'Cache Berita',
+        log: 'Log Eksekusi'
       },
-      heroEyebrow: 'LOKALISASI BILINGUAL · v0.4.2',
       heroDesc: 'Lokalisasi klien Inggris & Indonesia dengan repacking ukuran byte identik, verifikasi SHA\u2011256, dan rollback sekali klik.',
       stateScanning: 'Memindai folder target...',
       stateEnOk: 'Bahasa Inggris (EN) aktif · 4/4 paket terverifikasi',
@@ -1531,10 +1494,7 @@
 
   function updateCrumb() {
     const c = t().crumbs[activeTab];
-    if (c) {
-      $('crumbTitle').textContent = c[0];
-      $('crumbSub').textContent = c[1];
-    }
+    if (c) $('crumbTitle').textContent = c;
   }
 
   function updateHeroState() {
@@ -1632,7 +1592,6 @@
     $('navLblPackages').textContent = tr.navPackages;
     $('navLblNews').textContent = tr.navNews;
     $('navLblLog').textContent = tr.navLog;
-    $('heroEyebrow').textContent = tr.heroEyebrow;
     $('heroDesc').textContent = tr.heroDesc;
     $('homeLogTitle').textContent = tr.homeLogTitle;
     $('btnHomeLogFull').textContent = tr.homeLogFull;
@@ -1716,7 +1675,6 @@
 
   function setBusy(v) {
     busy = v;
-    $('homeLogPulse').classList.toggle('busy', v);
     for (const id of ['btnAuto', 'btnBrowse', 'btnScan', 'btnAutoQuick', 'btnScanQuick', 'btnPatch', 'btnNews', 'btnNewsPage', 'btnRollback', 'btnRollbackPkg', 'langEn', 'langId', 'folderInput']) {
       $(id).disabled = v;
     }
