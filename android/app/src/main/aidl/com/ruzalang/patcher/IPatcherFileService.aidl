@@ -10,4 +10,6 @@ interface IPatcherFileService {
     String findRunningPids(String packageName) = 6;
     String getPackageVersion(String packageName) = 7;
     boolean isPackageInstalled(String packageName) = 8;
+    String findActiveVStringBundle(String rawBundleDir, in byte[] key4096) = 9;
+    String findActiveStaticUiBundle(String defaultBundleDir, String preferredName) = 10;
 }

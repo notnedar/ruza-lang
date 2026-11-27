@@ -12,7 +12,7 @@ Welcome to **Ruza-Lang**! Here are the easiest ways to use custom translations o
 
 **We live in the present age where LLMs are actually good at this — use it.**
 
-Seriously, nobody is expecting you to sit there hand-translating 77,000 JSON lines in Notepad like it's 2009. Just tell your AI agent (Antigravity, Gemini CLI, Claude Code, Codex, Cursor, etc.) — or literally open **Gemini** or **ChatGPT** — drop this repo link (`https://github.com/notnedar/ruza-lang`), and tell it to build the translation pack for you!
+Seriously, nobody is expecting you to sit there hand-translating 79,000 JSON lines in Notepad like it's 2009. Just tell your AI agent (Antigravity, Gemini CLI, Claude Code, Codex, Cursor, etc.) — or literally open **Gemini** or **ChatGPT** — drop this repo link (`https://github.com/notnedar/ruza-lang`), and tell it to build the translation pack for you!
 
 ### Copy-Paste Prompt for AI Coding Agents (Recommended for Full Packs)
 
@@ -23,7 +23,7 @@ Open the repository https://github.com/notnedar/ruza-lang (read CONTRIBUTING.md 
 Help me create a <TARGET LANGUAGE> (<CODE>) Custom Language Pack for Ruza-Lang:
 
 1. Read patches/custom-pack-template.json to follow the exact JSON schema (meta + vstring + static_ui + builtin).
-2. Translate patches/static-ui-en-3219598.json (3,135 UI labels) and patches/full-en-3219598.json (74,055 strings) into natural, contextual <TARGET LANGUAGE> RPG phrasing (don't do awkward literal translations; keep tight UI buttons short so they don't wrap in-game).
+2. Translate patches/static-ui-en-3219598.json (3,135 UI labels) and patches/full-en-3219598.json (76,180 strings) into natural, contextual <TARGET LANGUAGE> RPG phrasing (don't do awkward literal translations; keep tight UI buttons short so they don't wrap in-game).
 3. Strictly preserve all placeholders ({0}, {1}, {playerName}, %s, %d), gender splits (|), and Unity rich-text tags (<color=...>, <b>, <i>, <size=...>).
 4. Save the combined pack as patches/community/<code_lowercase>.json with meta.base = "en" and meta.code = "<CODE>".
 5. Run `node tools/validate-pack.mjs patches/community/<code_lowercase>.json` and fix any reported errors or tight-button wrap warnings until it passes cleanly with 0 errors.
@@ -119,8 +119,8 @@ All canonical dictionaries are human-readable JSON right inside [`patches/`](pat
 
 | File | Coverage | Entries | Notes |
 | :--- | :--- | :---: | :--- |
-| [`patches/full-en-3219598.json`](patches/full-en-3219598.json) | Dialogue, quests, skills, items, settings (`EN`) | `74,055` | Canonical PC IDs (auto-remapped on Android) |
-| [`patches/full-id-3219598.json`](patches/full-id-3219598.json) | Dialogue, quests, skills, items, settings (`ID`) | `74,055` | Indonesian reference |
+| [`patches/full-en-3219598.json`](patches/full-en-3219598.json) | Dialogue, quests, skills, items, settings (`EN`) | `76,180` | Canonical PC IDs (universally content-hash matched across PC, Android & hotfixes) |
+| [`patches/full-id-3219598.json`](patches/full-id-3219598.json) | Dialogue, quests, skills, items, settings (`ID`) | `76,180` | Indonesian reference |
 | [`patches/static-ui-en-3219598.json`](patches/static-ui-en-3219598.json) | Prefab buttons, tabs, headers, notices (`EN`) | `3,135` | Works identically on PC & Android |
 | [`patches/static-ui-id-3219598.json`](patches/static-ui-id-3219598.json) | Prefab buttons, tabs, headers, notices (`ID`) | `3,135` | Indonesian Static UI reference |
 

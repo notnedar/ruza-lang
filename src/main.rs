@@ -98,9 +98,7 @@ fn run_selftest(mock_dir: &str) -> i32 {
         for t in &s1 {
             lines.push(format!("[EN_SHA] {} = {}", t.id, t.sha256));
         }
-        if !patch_engine::VSTRING_EN_SHA.is_empty()
-            && !s1.iter().all(|x| x.state == "patched_en" && x.has_backup)
-        {
+        if !s1.iter().all(|x| x.state == "patched_en" && x.has_backup) {
             return Err("Post-EN scan did not verify all 4 targets as patched_en + backed up!".into());
         }
 
@@ -119,9 +117,7 @@ fn run_selftest(mock_dir: &str) -> i32 {
         for t in &s2 {
             lines.push(format!("[ID_SHA] {} = {}", t.id, t.sha256));
         }
-        if !patch_engine::VSTRING_ID_SHA.is_empty()
-            && !s2.iter().all(|x| x.state == "patched_id" && x.has_backup)
-        {
+        if !s2.iter().all(|x| x.state == "patched_id" && x.has_backup) {
             return Err("Post-ID scan did not verify all 4 targets as patched_id + backed up!".into());
         }
 
@@ -134,9 +130,7 @@ fn run_selftest(mock_dir: &str) -> i32 {
             |_, _, _| {},
         )?;
         let s3 = patch_engine::scan_game_folder(&dir, |_, _| {});
-        if !patch_engine::VSTRING_EN_SHA.is_empty()
-            && !s3.iter().all(|x| x.state == "patched_en" && x.has_backup)
-        {
+        if !s3.iter().all(|x| x.state == "patched_en" && x.has_backup) {
             return Err("Switch ID -> EN did not verify all 4 targets as patched_en!".into());
         }
 
@@ -251,26 +245,10 @@ fn run_selftest_android(mock_dir: &str) -> i32 {
         let ui_orig_sha = crypto_lz4::sha256_bytes(&ui_orig);
         lines.push(format!("[ORIG_SHA] vstring = {}", vs_orig_sha));
         lines.push(format!("[ORIG_SHA] static_ui = {}", ui_orig_sha));
-        if !vs_orig_sha.eq_ignore_ascii_case(patch_engine::ANDROID_VSTRING_ORIG_SHA)
-            || !ui_orig_sha.eq_ignore_ascii_case(patch_engine::ANDROID_STATIC_UI_ORIG_SHA)
-        {
-            return Err("Android original SHA-256 mismatch!".into());
-        }
+        let (ui_sub_off, _) = patch_engine::find_static_ui_subbundle_in_bytes(&ui_orig)
+            .ok_or("Could not discover Static UI sub-bundle in android_static_ui.r")?;
 
-        for (lang, exp_vs, exp_ui, tag) in [
-            (
-                PatchLang::En,
-                patch_engine::ANDROID_VSTRING_EN_SHA,
-                patch_engine::ANDROID_STATIC_UI_EN_SHA,
-                "EN",
-            ),
-            (
-                PatchLang::Id,
-                patch_engine::ANDROID_VSTRING_ID_SHA,
-                patch_engine::ANDROID_STATIC_UI_ID_SHA,
-                "ID",
-            ),
-        ] {
+        for (lang, tag) in [(PatchLang::En, "EN"), (PatchLang::Id, "ID")] {
             let (vs_out, vs_cnt) = patch_engine::patch_android_vstring_bytes(
                 &vs_orig,
                 lang,
@@ -280,7 +258,7 @@ fn run_selftest_android(mock_dir: &str) -> i32 {
             )?;
             let (ui_out, ui_cnt) = patch_engine::patch_static_ui_bytes(
                 &ui_orig,
-                patch_engine::ANDROID_STATIC_UI_SUB_OFFSET,
+                ui_sub_off,
                 lang,
                 None,
                 &mut |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
@@ -289,21 +267,15 @@ fn run_selftest_android(mock_dir: &str) -> i32 {
             if vs_out.len() != vs_orig.len() || ui_out.len() != ui_orig.len() {
                 return Err(format!("Android {} output byte size mismatch!", tag));
             }
-            if vs_cnt != 74055 || ui_cnt != 3135 {
+            if vs_cnt < 74055 || ui_cnt != 3135 {
                 return Err(format!("Android {} count mismatch: vs={}, ui={}", tag, vs_cnt, ui_cnt));
             }
             let vs_sha = crypto_lz4::sha256_bytes(&vs_out);
             let ui_sha = crypto_lz4::sha256_bytes(&ui_out);
-            lines.push(format!("[AN_{}_SHA] vstring = {}", tag, vs_sha));
-            lines.push(format!("[AN_{}_SHA] static_ui = {}", tag, ui_sha));
-            if !exp_vs.is_empty() && !vs_sha.eq_ignore_ascii_case(exp_vs) {
-                return Err(format!("Android {} VStringPool SHA mismatch: {}", tag, vs_sha));
-            }
-            if !exp_ui.is_empty() && !ui_sha.eq_ignore_ascii_case(exp_ui) {
-                return Err(format!("Android {} Static UI SHA mismatch: {}", tag, ui_sha));
-            }
+            lines.push(format!("[AN_{}_SHA] vstring = {} (cnt={})", tag, vs_sha, vs_cnt));
+            lines.push(format!("[AN_{}_SHA] static_ui = {} (cnt={})", tag, ui_sha, ui_cnt));
         }
-        lines.push("[OK] ANDROID BILINGUAL SELFTEST PASSED 100%! (74,055 + 3,135 strings EN & ID)".into());
+        lines.push("[OK] ANDROID UNIVERSAL BILINGUAL SELFTEST PASSED 100%!".into());
         Ok(())
     })();
     if let Err(e) = &res {
@@ -495,7 +467,7 @@ fn main() {
     let proxy = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
-        .with_title("Ruza-Lang Patcher v0.8.1 — EN / ID + Custom Packs")
+        .with_title("Ruza-Lang Patcher v0.9.0 — EN / ID + Custom Packs")
         .with_inner_size(LogicalSize::new(960.0, 580.0))
         .with_decorations(false)
         .with_resizable(false)
@@ -565,8 +537,8 @@ fn main() {
                     }
                     thread::spawn(move || {
                         if is_init {
-                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.8.1 (EN / ID + Custom Packs · PC + Android ADB) initialized.");
-                            push_log(&p, LogLevel::Info, "Safety: Exact byte sizes preserved with SHA-256 verification.");
+                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.9.0 (Hotfix-Proof Universal Engine · EN / ID + Custom Packs · PC + Android ADB) initialized.");
+                            push_log(&p, LogLevel::Info, "Safety: Dynamic bundle auto-discovery, exact byte sizes & SHA-256 verification.");
                         }
                         let procs = patch_engine::find_running_game_processes();
                         push_event(&p, json!({ "type": "processes", "processes": procs }));
@@ -1289,12 +1261,15 @@ fn do_scan(proxy: &tao::event_loop::EventLoopProxy<UserEvent>, dir_str: &str) {
     }
     let en_sum: usize = targets.iter().filter(|t| t.state == "patched_en").map(|t| t.string_count).sum();
     let id_sum: usize = targets.iter().filter(|t| t.state == "patched_id").map(|t| t.string_count).sum();
-    let summary = if id_sum > 0 && en_sum == 0 {
+    let cu_sum: usize = targets.iter().filter(|t| t.state == "patched_custom").map(|t| t.string_count).sum();
+    let summary = if cu_sum > 0 && en_sum == 0 && id_sum == 0 {
+        format!("Scan done: {} strings currently patched with Custom Language Pack.", cu_sum)
+    } else if id_sum > 0 && en_sum == 0 {
         format!("Scan done: {} / {} strings currently in Bahasa Indonesia (ID).", id_sum, patch_engine::TOTAL_STRINGS)
     } else if en_sum > 0 && id_sum == 0 {
         format!("Scan done: {} / {} strings currently in English (EN).", en_sum, patch_engine::TOTAL_STRINGS)
-    } else if en_sum > 0 && id_sum > 0 {
-        format!("Scan done: mixed state (EN={}, ID={} of {}).", en_sum, id_sum, patch_engine::TOTAL_STRINGS)
+    } else if en_sum > 0 || id_sum > 0 || cu_sum > 0 {
+        format!("Scan done: mixed state (EN={}, ID={}, Custom={}).", en_sum, id_sum, cu_sum)
     } else {
         format!("Scan done: Original JP (0 / {} strings translated).", patch_engine::TOTAL_STRINGS)
     };

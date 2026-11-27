@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Ruza-Lang Patcher v0.8.1 — EN / ID + Custom Packs</title>
+<title>Ruza-Lang Patcher v0.9.0 — EN / ID + Custom Packs</title>
 <style>
   :root {
     --rail-w: 68px;
@@ -1001,6 +1001,8 @@
   .pkg-state.patched_en .pkg-dot { background: var(--sky-deep); }
   .pkg-state.patched_id { color: var(--jade); }
   .pkg-state.patched_id .pkg-dot { background: var(--jade); }
+  .pkg-state.patched_custom { color: #5b48a8; }
+  .pkg-state.patched_custom .pkg-dot { background: #5b48a8; }
   .pkg-state.original { color: var(--ink-soft); }
   .pkg-state.modified { color: var(--amber); }
   .pkg-state.modified .pkg-dot { background: var(--amber); }
@@ -1219,14 +1221,14 @@
 <div class="shell">
   <!-- LEFT SLIM LAUNCHER RAIL -->
   <aside class="rail">
-    <div class="rail-brand" data-drag="1" title="Ruza-Lang v0.8.1">
+    <div class="rail-brand" data-drag="1" title="Ruza-Lang v0.9.0">
       <div class="mark-box">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <path d="M6.5 4.5H13.8C16.4 4.5 18 6 18 8.3C18 10.3 16.7 11.7 14.5 12L18.5 19.5H15.4L11.8 12.4H9V19.5H6.5V4.5ZM9 6.8V10.3H13.4C14.7 10.3 15.5 9.6 15.5 8.5C15.5 7.4 14.7 6.8 13.4 6.8H9Z" fill="#f3eee2"/>
           <path d="M16.5 4.5L19.5 4.5L19.5 7.5" stroke="#e8d2a0" stroke-width="1.3"/>
         </svg>
       </div>
-      <span class="rail-ver">0.8.1</span>
+      <span class="rail-ver">0.9.0</span>
     </div>
 
     <nav class="rail-nav">
@@ -1302,7 +1304,7 @@
             <div style="display:flex;align-items:center;gap:12px;">
               <button id="heroVerBtn" class="hero-ver-btn" type="button" style="display:none;">
                 <span class="hero-ver-dot"></span>
-                <span id="heroVerText">Client v1.0.2 (r3219598) &middot; Synced</span>
+                <span id="heroVerText">Client v1.0.2 (r3273853) &middot; Synced</span>
               </button>
               <button id="btnShowHomeLog" class="hero-ver-btn" type="button" style="display:none;text-decoration:underline;text-underline-offset:3px;">
                 <span id="btnShowHomeLogText">Show Activity Log</span>
@@ -1338,7 +1340,7 @@
         <div class="dock-left">
           <div class="dock-status">
             <span id="progStage" class="dock-stage">Ready &mdash; inspect target folder to verify status.</span>
-            <span id="progCount" class="dock-count">0 / 77,661</span>
+            <span id="progCount" class="dock-count">0 / 79,786</span>
           </div>
           <div class="dock-meta-row">
             <div class="mode-seg" role="group" aria-label="Target platform">
@@ -1407,10 +1409,10 @@
             <div class="set-row">
               <div>
                 <div id="lblVerRow" class="set-label">Client Version Sync</div>
-                <div id="lblVerSub" class="set-sub">Verified for client v1.0.2 (r3219598)</div>
+                <div id="lblVerSub" class="set-sub">Verified for client v1.0.2 (r3273853 · Auto-Sync)</div>
               </div>
               <div class="set-right">
-                <span id="pkgVerDetected" class="pkg-count">v1.0.2 &middot; r3219598</span>
+                <span id="pkgVerDetected" class="pkg-count">v1.0.2 &middot; r3273853</span>
                 <span id="pkgVerState" class="pkg-state patched_id"><span class="pkg-dot"></span>Synced</span>
               </div>
             </div>
@@ -1430,7 +1432,7 @@
 
           <div class="sec-bar">
             <span id="lblPackagesSec">Client Localization Packages</span>
-            <span class="sec-bar-right" id="pkgSummaryRight">77,661 verified strings</span>
+            <span class="sec-bar-right" id="pkgSummaryRight">79,786 verified strings</span>
           </div>
           <div class="rows-block" id="targetsList" style="margin-bottom: 6px;"></div>
 
@@ -1477,7 +1479,7 @@
             <div class="set-row">
               <div>
                 <div id="lblAnVerRow" class="set-label">Android Client Sync</div>
-                <div id="lblAnVerSub" class="set-sub">Verified for Android v1.0.0 (r3219596) &middot; Exact-size &middot; No APK re-sign</div>
+                <div id="lblAnVerSub" class="set-sub">Verified for Android v1.0.0 (r3273851 · Auto-Sync) &middot; Exact-size &middot; No APK re-sign</div>
               </div>
               <div class="set-right">
                 <span id="anVerDetected" class="pkg-count">&mdash;</span>
@@ -1488,14 +1490,14 @@
 
           <div class="sec-bar">
             <span id="lblAnPkgSec">Android Localization Packages</span>
-            <span id="anPkgSummaryRight" class="sec-bar-right">77,190 verified strings (99.4%)</span>
+            <span id="anPkgSummaryRight" class="sec-bar-right">79,315 verified strings (99.4%)</span>
           </div>
           <div class="rows-block" id="androidTargetsList" style="margin-bottom: 6px;"></div>
 
           <div class="an-prog-box">
             <div class="an-prog-top">
               <span id="anProgStage" class="an-prog-stage">Click Scan to inspect connected Android device via ADB.</span>
-              <span id="anProgCount" class="an-prog-count">0 / 77,190</span>
+              <span id="anProgCount" class="an-prog-count">0 / 79,315</span>
             </div>
             <div class="an-prog-track"><div id="anBarFill" class="an-prog-fill"></div></div>
           </div>
@@ -1626,12 +1628,12 @@
   let lastTargets = [];
   let clientVersion = null;
   let updateInfo = null;
-  let lastProgress = { current: 0, total: 77661, stage: '' };
+  let lastProgress = { current: 0, total: 79786, stage: '' };
   let androidAdbPath = '';
   let androidDevices = [];
   let androidScan = null;
   let androidInited = false;
-  let lastAnProgress = { current: 0, total: 77190, stage: '' };
+  let lastAnProgress = { current: 0, total: 79315, stage: '' };
   let customPack = null;
 
   const I18N = {
@@ -1647,6 +1649,7 @@
       stateScanning: 'Scanning target installation...',
       stateEnOk: 'English (EN) active · 4/4 packages verified',
       stateIdOk: 'Indonesian (ID) active · 4/4 packages verified',
+      stateCustomOk: 'Custom Language Pack active · 4/4 packages verified',
       stateOrig: 'Original JP detected · Ready to patch',
       stateMixed: 'Partial patch state · Click to inspect',
       stateInvalid: 'Target folder not detected · Click to configure',
@@ -1679,12 +1682,13 @@
       installAnyway: 'Install Anyway',
       installedEn: 'Installed: English (EN)',
       installedId: 'Installed: Bahasa Indonesia (ID)',
+      installedCustom: 'Installed: Custom Language Pack',
       origReady: 'Original JP — ready to patch.',
       lblFolder: 'Target Directory',
       lblFolderRow: 'Installation Folder',
       lblFolderSub: 'Client executable and asset bundles',
       lblPackagesSec: 'Client Localization Packages',
-      pkgSummaryRight: '77,661 verified strings',
+      pkgSummaryRight: '79,786 verified strings',
       lblNewsSec: 'Cached In-Game Announcements',
       newsRow1Title: 'Cache Location',
       newsRow1Sub: 'Local client HTTP announcement cache in AppData\\LocalLow',
@@ -1734,7 +1738,7 @@
       invalidFolder: 'Target executable not found',
       bakYes: 'Backup OK',
       bakNo: 'No Backup',
-      badges: { patched_en: 'English OK', patched_id: 'Indo OK', original: 'Original JP', modified: 'Modified', missing: 'Missing' },
+      badges: { patched_en: 'English OK', patched_id: 'Indo OK', patched_custom: 'Custom OK', original: 'Original JP', modified: 'Modified', missing: 'Missing' },
       lblAnDeviceSec: 'Android Device (ADB)',
       anAdbNotFound: 'ADB not found — click ADB',
       lblAnDevRow: 'Connected Device',
@@ -1748,7 +1752,7 @@
       anRunningBadge: 'App Running',
       anNotInstalled: 'Not Installed',
       lblAnPkgSec: 'Android Localization Packages',
-      anPkgSummaryRight: '77,190 verified strings (99.4%)',
+      anPkgSummaryRight: '79,315 verified strings (99.4%)',
       anNewsRowName: 'Cached News',
       anNewsRowSub: 'BestHTTP HTTPCache & Library v3 (open in-game News once)',
       anNewsReady: 'Cache Ready',
@@ -1761,6 +1765,7 @@
       anReadyOrig: 'Android Original JP — ready to patch via ADB.',
       anInstalledEn: 'Android Installed: English (EN)',
       anInstalledId: 'Android Installed: Bahasa Indonesia (ID)',
+      anInstalledCustom: 'Android Installed: Custom Language Pack',
       anBlockedTitle: 'Close Android Client First',
       anBlockedBody: (pids) => `The Android client is currently running on the device (PID ${pids}).\n\nPlease force-close or swipe away the app on Android/BlueStacks before patching or rollback.`,
       anRollbackTitle: 'Confirm Android Rollback to Original JP',
@@ -1799,6 +1804,7 @@
       heroAnRunning: (pids) => `Android client running (PID ${pids}) · Close first`,
       heroAnEnOk: 'Android English (EN) active · 2/2 bundles verified',
       heroAnIdOk: 'Android Indonesian (ID) active · 2/2 bundles verified',
+      heroAnCustomOk: 'Android Custom Pack active · 2/2 bundles verified',
       heroAnOrig: 'Android Original JP detected · Ready to patch',
       heroAnMixed: 'Android partial state · Click to inspect',
       dockPcMissing: 'PC folder not found — click to browse',
@@ -1849,6 +1855,7 @@
       stateScanning: 'Memindai folder target...',
       stateEnOk: 'Bahasa Inggris (EN) aktif · 4/4 paket terverifikasi',
       stateIdOk: 'Bahasa Indonesia (ID) aktif · 4/4 paket terverifikasi',
+      stateCustomOk: 'Paket Bahasa Kustom aktif · 4/4 paket terverifikasi',
       stateOrig: 'Original JP terdeteksi · Siap dipasang',
       stateMixed: 'Status patch campuran · Klik untuk cek',
       stateInvalid: 'Folder target belum terdeteksi · Klik untuk atur',
@@ -1881,12 +1888,13 @@
       installAnyway: 'Tetap Pasang',
       installedEn: 'Terpasang: Bahasa Inggris (EN)',
       installedId: 'Terpasang: Bahasa Indonesia (ID)',
+      installedCustom: 'Terpasang: Paket Bahasa Kustom',
       origReady: 'Original JP — siap dipasang.',
       lblFolder: 'Folder Target',
       lblFolderRow: 'Direktori Instalasi',
       lblFolderSub: 'Executable klien dan paket aset',
       lblPackagesSec: 'Paket Lokalisasi Klien',
-      pkgSummaryRight: '77.661 string terverifikasi',
+      pkgSummaryRight: '79.786 string terverifikasi',
       lblNewsSec: 'Cache Pengumuman In-Game',
       newsRow1Title: 'Lokasi Cache',
       newsRow1Sub: 'Cache pengumuman HTTP lokal di AppData\\LocalLow',
@@ -1936,7 +1944,7 @@
       invalidFolder: 'Executable target tidak ditemukan',
       bakYes: 'Backup Siap',
       bakNo: 'Belum Backup',
-      badges: { patched_en: 'English OK', patched_id: 'Indo OK', original: 'Original JP', modified: 'Modifikasi', missing: 'Hilang' },
+      badges: { patched_en: 'English OK', patched_id: 'Indo OK', patched_custom: 'Custom OK', original: 'Original JP', modified: 'Modifikasi', missing: 'Hilang' },
       lblAnDeviceSec: 'Perangkat Android (ADB)',
       anAdbNotFound: 'ADB tidak ditemukan — klik ADB',
       lblAnDevRow: 'Perangkat Terhubung',
@@ -1950,7 +1958,7 @@
       anRunningBadge: 'Game Berjalan',
       anNotInstalled: 'Belum Terpasang',
       lblAnPkgSec: 'Paket Lokalisasi Android',
-      anPkgSummaryRight: '77.190 string terverifikasi (99,4%)',
+      anPkgSummaryRight: '79.315 string terverifikasi (99,4%)',
       anNewsRowName: 'Cache Berita',
       anNewsRowSub: 'BestHTTP HTTPCache & Library v3 (buka menu Berita di game dulu)',
       anNewsReady: 'Cache Siap',
@@ -1963,6 +1971,7 @@
       anReadyOrig: 'Android Original JP — siap dipasang via ADB.',
       anInstalledEn: 'Android Terpasang: Bahasa Inggris (EN)',
       anInstalledId: 'Android Terpasang: Bahasa Indonesia (ID)',
+      anInstalledCustom: 'Android Terpasang: Paket Bahasa Kustom',
       anBlockedTitle: 'Tutup Game di Android Dulu',
       anBlockedBody: (pids) => `Aplikasi klien masih berjalan di perangkat Android (PID ${pids}).\n\nHarap tutup dulu game di Android/BlueStacks sebelum patch atau rollback.`,
       anRollbackTitle: 'Konfirmasi Rollback Android ke Original JP',
@@ -2001,6 +2010,7 @@
       heroAnRunning: (pids) => `Game Android sedang berjalan (PID ${pids}) · Tutup dulu`,
       heroAnEnOk: 'Android Bahasa Inggris (EN) aktif · 2/2 bundle terverifikasi',
       heroAnIdOk: 'Android Bahasa Indonesia (ID) aktif · 2/2 bundle terverifikasi',
+      heroAnCustomOk: 'Android Paket Kustom aktif · 2/2 bundle terverifikasi',
       heroAnOrig: 'Android Original JP terdeteksi · Siap dipasang',
       heroAnMixed: 'Status Android campuran · Klik untuk cek',
       dockPcMissing: 'Folder PC belum ketemu — klik pilih',
@@ -2145,27 +2155,31 @@
     const tr = t();
     if (targetMode === 'pc') {
       if (!pcFolderValid || !lastTargets.length) {
-        renderProgress(0, 77661, tr.stagePcMissing);
+        renderProgress(0, 79786, tr.stagePcMissing);
         return;
       }
-      const activeCount = lastTargets.filter(x => x.state === 'patched_en' || x.state === 'patched_id').reduce((s, x) => s + x.string_count, 0);
+      const totalStr = lastTargets.reduce((s, x) => s + x.string_count, 0) || 79786;
+      const activeCount = lastTargets.filter(x => x.state === 'patched_en' || x.state === 'patched_id' || x.state === 'patched_custom').reduce((s, x) => s + x.string_count, 0);
       const allId = lastTargets.every(x => x.state === 'patched_id');
       const allEn = lastTargets.every(x => x.state === 'patched_en');
-      renderProgress(activeCount, 77661, allId ? tr.installedId : (allEn ? tr.installedEn : tr.origReady));
+      const allCu = lastTargets.every(x => x.state === 'patched_custom');
+      renderProgress(activeCount, totalStr, allCu ? tr.installedCustom : (allId ? tr.installedId : (allEn ? tr.installedEn : tr.origReady)));
     } else {
       if (!androidScan) {
-        renderProgress(0, 77190, androidInited ? tr.stageAnNoDev : tr.anIdleStage);
+        renderProgress(0, 79315, androidInited ? tr.stageAnNoDev : tr.anIdleStage);
         return;
       }
       if (!androidScan.installed) {
-        renderProgress(0, 77190, tr.stageAnNotInst);
+        renderProgress(0, 79315, tr.stageAnNotInst);
         return;
       }
       const list = androidScan.targets || [];
-      const activeCount = list.filter(x => x.state === 'patched_en' || x.state === 'patched_id').reduce((s, x) => s + x.string_count, 0);
+      const totalStr = list.reduce((s, x) => s + x.string_count, 0) || 79315;
+      const activeCount = list.filter(x => x.state === 'patched_en' || x.state === 'patched_id' || x.state === 'patched_custom').reduce((s, x) => s + x.string_count, 0);
       const allId = list.length > 0 && list.every(x => x.state === 'patched_id');
       const allEn = list.length > 0 && list.every(x => x.state === 'patched_en');
-      renderProgress(activeCount, 77190, allId ? tr.anInstalledId : (allEn ? tr.anInstalledEn : tr.anReadyOrig));
+      const allCu = list.length > 0 && list.every(x => x.state === 'patched_custom');
+      renderProgress(activeCount, totalStr, allCu ? tr.anInstalledCustom : (allId ? tr.anInstalledId : (allEn ? tr.anInstalledEn : tr.anReadyOrig)));
     }
   }
 
@@ -2218,8 +2232,10 @@
       }
       const allEn = list.length > 0 && list.every(x => x.state === 'patched_en');
       const allId = list.length > 0 && list.every(x => x.state === 'patched_id');
+      const allCu = list.length > 0 && list.every(x => x.state === 'patched_custom');
       const allOrig = list.length > 0 && list.every(x => x.state === 'original');
-      if (allEn) { dot.className = 'state-diamond en'; txt.textContent = tr.heroAnEnOk; }
+      if (allCu) { dot.className = 'state-diamond id'; txt.textContent = tr.heroAnCustomOk; }
+      else if (allEn) { dot.className = 'state-diamond en'; txt.textContent = tr.heroAnEnOk; }
       else if (allId) { dot.className = 'state-diamond id'; txt.textContent = tr.heroAnIdOk; }
       else if (allOrig) { dot.className = 'state-diamond'; txt.textContent = tr.heroAnOrig; }
       else { dot.className = 'state-diamond warn'; txt.textContent = tr.heroAnMixed; }
@@ -2233,8 +2249,12 @@
     }
     const allEn = lastTargets.every(x => x.state === 'patched_en');
     const allId = lastTargets.every(x => x.state === 'patched_id');
+    const allCu = lastTargets.every(x => x.state === 'patched_custom');
     const allOrig = lastTargets.every(x => x.state === 'original');
-    if (allEn) {
+    if (allCu) {
+      dot.className = 'state-diamond id';
+      txt.textContent = tr.stateCustomOk;
+    } else if (allEn) {
       dot.className = 'state-diamond en';
       txt.textContent = tr.stateEnOk;
     } else if (allId) {
@@ -2270,7 +2290,7 @@
     lblVerRow.textContent = tr.lblVerRow;
 
     if (!clientVersion) {
-      lblVerSub.textContent = tr.lblVerSubSynced('v1.0.2 (r3219598)');
+      lblVerSub.textContent = tr.lblVerSubSynced('v1.0.2 (r3273853)');
       pkgDet.textContent = '—';
       pkgSt.className = 'pkg-state original';
       pkgSt.innerHTML = `<span class="pkg-dot"></span>—`;
@@ -2572,7 +2592,7 @@
 
   function renderAndroidProgress(cur, tot, stage) {
     lastAnProgress = { current: cur, total: tot, stage: stage || lastAnProgress.stage };
-    const safeTot = Math.max(1, tot || 77190);
+    const safeTot = Math.max(1, tot || 79315);
     const pct = Math.min(100, (cur * 100) / safeTot);
     $('anBarFill').style.width = pct.toFixed(2) + '%';
     $('anProgCount').textContent = `${fmt(cur)} / ${fmt(safeTot)} · ${pct.toFixed(0)}%`;
@@ -2625,9 +2645,9 @@
       verDet.textContent = '—';
       verSt.className = 'pkg-state original';
       verSt.innerHTML = '<span class="pkg-dot"></span>—';
-      verSub.textContent = tr.lblAnVerSubSynced('v1.0.0 (r3219596)');
+      verSub.textContent = tr.lblAnVerSubSynced('v1.0.0 (r3273851)');
       for (const [name, sub, cnt] of [
-        ['VStringPool', 'Story, Quests, Skills, Kibo, Settings', 74055],
+        ['VStringPool', 'Story, Quests, Skills, Kibo, Settings', 76180],
         ['Static UI KeyConfig', 'Prefab Buttons, Headers, Notices', 3135]
       ]) {
         const row = document.createElement('div');
@@ -2639,7 +2659,7 @@
       nRow.className = 'set-row';
       nRow.innerHTML = `<div><div class="set-label">${tr.anNewsRowName}</div><div class="set-sub">${tr.anNewsRowSub}</div></div><div class="set-right"><span class="pkg-count">16 pages</span><span class="pkg-bak">—</span><span class="pkg-state original"><span class="pkg-dot"></span>—</span></div>`;
       listBox.appendChild(nRow);
-      if (!busy) renderAndroidProgress(0, 77190, tr.anIdleStage);
+      if (!busy) renderAndroidProgress(0, 79315, tr.anIdleStage);
       return;
     }
 
@@ -2700,17 +2720,19 @@
     listBox.appendChild(nRow);
 
     if (!busy) {
-      const activeCount = targets.filter(x => x.state === 'patched_en' || x.state === 'patched_id').reduce((s, x) => s + x.string_count, 0);
+      const totalStr = targets.reduce((s, x) => s + x.string_count, 0) || 79315;
+      const activeCount = targets.filter(x => x.state === 'patched_en' || x.state === 'patched_id' || x.state === 'patched_custom').reduce((s, x) => s + x.string_count, 0);
       const allId = targets.length > 0 && targets.every(x => x.state === 'patched_id');
       const allEn = targets.length > 0 && targets.every(x => x.state === 'patched_en');
-      const stg = allId ? tr.anInstalledId : (allEn ? tr.anInstalledEn : tr.anReadyOrig);
-      renderAndroidProgress(activeCount, 77190, stg);
+      const allCu = targets.length > 0 && targets.every(x => x.state === 'patched_custom');
+      const stg = allCu ? tr.anInstalledCustom : (allId ? tr.anInstalledId : (allEn ? tr.anInstalledEn : tr.anReadyOrig));
+      renderAndroidProgress(activeCount, totalStr, stg);
     }
   }
 
   function renderProgress(cur, tot, stage) {
     lastProgress = { current: cur, total: tot, stage: stage || lastProgress.stage };
-    const safeTot = Math.max(1, tot || 77661);
+    const safeTot = Math.max(1, tot || 79786);
     const pct = Math.min(100, (cur * 100) / safeTot);
     $('barFill').style.width = pct.toFixed(2) + '%';
     if (safeTot > 200000) {
@@ -2756,7 +2778,7 @@
         break;
       }
       case 'progress':
-        renderProgress(ev.current || 0, ev.total || (targetMode === 'android' ? 77190 : 77661), ev.stage);
+        renderProgress(ev.current || 0, ev.total || (targetMode === 'android' ? 79315 : 79786), ev.stage);
         break;
       case 'android_devices':
         androidInited = true;
@@ -2782,7 +2804,7 @@
         if (targetMode === 'android') syncHomeProgress();
         break;
       case 'android_progress':
-        renderAndroidProgress(ev.current || 0, ev.total || 77190, ev.stage);
+        renderAndroidProgress(ev.current || 0, ev.total || 79315, ev.stage);
         break;
       case 'busy':
         setBusy(!!ev.value);

@@ -13,7 +13,6 @@ val syncSharedPayloads by tasks.registering(Sync::class) {
             "mmap_key_4096.bin",
             "vstring_en.bin.gz",
             "vstring_id.bin.gz",
-            "vstring_android_map.bin.gz",
             "static_ui_en.bin.gz",
             "static_ui_id.bin.gz",
             "news_en.bin.gz",
@@ -36,8 +35,8 @@ android {
         applicationId = "com.ruzalang.patcher"
         minSdk = 26
         targetSdk = 35
-        versionCode = 801
-        versionName = "0.8.1"
+        versionCode = 900
+        versionName = "0.9.0"
     }
 
     buildFeatures {

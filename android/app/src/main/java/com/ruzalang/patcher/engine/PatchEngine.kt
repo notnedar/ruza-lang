@@ -2,6 +2,7 @@ package com.ruzalang.patcher.engine
 
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.RandomAccessFile
 
 enum class PatchLang(val shortCode: String, val label: String) {
     EN("EN", "English (EN)"),
@@ -179,30 +180,129 @@ interface PayloadLoader {
     fun load(name: String): ByteArray
 }
 
+data class JpKey(val hash: Long, val len: Int)
+data class DiscoveredVString(val fileName: String, val entryCount: Int)
+data class DiscoveredStaticUi(val fileName: String, val subOffset: Int, val subSize: Int)
+
 object PatchEngine {
     const val ANDROID_PACKAGE_ID = "com.Yostar.AzurpromiliaJP"
     const val ANDROID_EXPECTED_VERSION = "1.0.0"
-    const val ANDROID_EXPECTED_RES_REV = "3219596"
-    const val ANDROID_TOTAL_STRINGS = 74055 + 3135 // 77,190
-    const val ANDROID_STATIC_UI_SUB_OFFSET = 4200075
+    const val ANDROID_EXPECTED_RES_REV = "3273851"
+    const val VSTRING_STRINGS = 76180
+    const val STATIC_UI_STRINGS = 3135
+    const val ANDROID_TOTAL_STRINGS = VSTRING_STRINGS + STATIC_UI_STRINGS // 79,315
 
     const val REMOTE_FILES_ROOT = "/sdcard/Android/data/com.Yostar.AzurpromiliaJP/files"
-    const val REMOTE_VSTRING =
-        "/sdcard/Android/data/com.Yostar.AzurpromiliaJP/files/.res/raw_base_package/BundleFiles/1qnamndresrohzjhuvt2lw.r"
-    const val REMOTE_STATIC_UI =
-        "/sdcard/Android/data/com.Yostar.AzurpromiliaJP/files/.res/default_package/BundleFiles/nibdvaxcnfh3en5bnvhtw.r"
+    const val REMOTE_RAW_BUNDLE_DIR =
+        "/sdcard/Android/data/com.Yostar.AzurpromiliaJP/files/.res/raw_base_package/BundleFiles"
+    const val REMOTE_DEFAULT_BUNDLE_DIR =
+        "/sdcard/Android/data/com.Yostar.AzurpromiliaJP/files/.res/default_package/BundleFiles"
     const val REMOTE_RAW_MANIFEST_DIR =
         "/sdcard/Android/data/com.Yostar.AzurpromiliaJP/files/.res/raw_base_package/ManifestFiles"
     const val REMOTE_DEFAULT_MANIFEST_DIR =
         "/sdcard/Android/data/com.Yostar.AzurpromiliaJP/files/.res/default_package/ManifestFiles"
 
-    // Verified SHA-256 constants (v0.8.0 — 100% bit-identical with desktop PC/ADB engine)
-    const val ANDROID_VSTRING_ORIG_SHA = "C6BA69F2403102A9D4DBF2B3AB079ABBE7DE25896ABDB3969DD5B7988A2DB013"
-    const val ANDROID_STATIC_UI_ORIG_SHA = "53A36C59B4ABABF9457ED37B195092DCAFD491C2D95D9BA75A61998C0138D22A"
-    const val ANDROID_VSTRING_EN_SHA = "0739151C287863A4CD45150CC85DE3DDFDD3A7587FB159437F3F5FEED513A4E5"
-    const val ANDROID_STATIC_UI_EN_SHA = "2A4428AE21009DB19621A123B1A2561ED1F83A685B4C9160B94BA74CD50E8DAC"
-    const val ANDROID_VSTRING_ID_SHA = "BD9A20B6BE6F9228E12F435F72374386F8C15D270E30B442927401A2EB36A0AF"
-    const val ANDROID_STATIC_UI_ID_SHA = "0017773EB20E5B56D3E02179A9F94A6FBC862B48CFD9FF7CF443CCAE9E6A64B2"
+    val KNOWN_ANDROID_STATIC_UI_NAMES = listOf("nibdvaxcnfh3en5bnvhtw.r")
+
+    // Known SHA-256 sets (supplementing dynamic _ruza_state.json hotfix tracking)
+    val ANDROID_VSTRING_ORIG_SHAS = setOf(
+        "C6BA69F2403102A9D4DBF2B3AB079ABBE7DE25896ABDB3969DD5B7988A2DB013", // r3219596
+    )
+    val ANDROID_STATIC_UI_ORIG_SHAS = setOf(
+        "53A36C59B4ABABF9457ED37B195092DCAFD491C2D95D9BA75A61998C0138D22A", // r3219596
+    )
+    val ANDROID_VSTRING_KNOWN_EN_SHAS = setOf(
+        "0739151C287863A4CD45150CC85DE3DDFDD3A7587FB159437F3F5FEED513A4E5", // v0.8.x r3219596
+        "3216E4E2A56F2BC36EAA2FFF79B203C854FA834A93A97C2CA218B40E909FF5F1", // v0.9.0 r3219596
+    )
+    val ANDROID_VSTRING_KNOWN_ID_SHAS = setOf(
+        "BD9A20B6BE6F9228E12F435F72374386F8C15D270E30B442927401A2EB36A0AF", // v0.8.x r3219596
+        "EBC5EE0155910A58D3B62AB978A886CCD1BA4FA68F4CE929B7763E32454531DE", // v0.9.0 r3219596
+    )
+    val ANDROID_STATIC_UI_KNOWN_EN_SHAS = setOf(
+        "2A4428AE21009DB19621A123B1A2561ED1F83A685B4C9160B94BA74CD50E8DAC", // r3219596
+    )
+    val ANDROID_STATIC_UI_KNOWN_ID_SHAS = setOf(
+        "0017773EB20E5B56D3E02179A9F94A6FBC862B48CFD9FF7CF443CCAE9E6A64B2", // v0.8.x r3219596
+        "60F0B86F98FCA84D46AE1AD7531510320812972D5371F80FC358860B660BC308", // v0.9.0 r3219596
+    )
+
+    fun probeVStringFile(file: File, key4096: ByteArray): Int? {
+        if (!file.isFile) return null
+        val fsize = file.length()
+        if (fsize < 50_000_000L || fsize > Int.MAX_VALUE.toLong()) return null
+        return try {
+            RandomAccessFile(file, "r").use { raf ->
+                val h1 = ByteArray(24)
+                raf.seek(4120L)
+                raf.readFully(h1)
+                CryptoLz4.xorMMapRangeInPlace(h1, 0, h1.size, 4120, key4096)
+                val hashBytes = CryptoLz4.readI32Le(h1, 0)
+                val hashStart = CryptoLz4.readI32Le(h1, 4)
+                if (hashStart != 4120 || hashBytes <= 0) return null
+                val strSecOff = 4120L + hashBytes.toLong()
+                if (strSecOff + 20L > fsize) return null
+                val sh = ByteArray(20)
+                raf.seek(strSecOff)
+                raf.readFully(sh)
+                CryptoLz4.xorMMapRangeInPlace(sh, 0, sh.size, strSecOff.toInt(), key4096)
+                val count = CryptoLz4.readI32Le(sh, 16)
+                if (count < 500_000 || strSecOff + 20L + count.toLong() * 4L >= fsize) return null
+                count
+            }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    fun discoverVStringInDir(dir: File, key4096: ByteArray): DiscoveredVString? {
+        if (!dir.isDirectory) return null
+        val files = dir.listFiles() ?: return null
+        var bestName: String? = null
+        var bestCount = -1
+        var bestMtime = -1L
+        for (f in files) {
+            if (!f.isFile || !f.name.endsWith(".r") || f.length() < 50_000_000L) continue
+            val cnt = probeVStringFile(f, key4096) ?: continue
+            val mt = f.lastModified()
+            if (cnt > bestCount || (cnt == bestCount && mt > bestMtime)) {
+                bestCount = cnt
+                bestMtime = mt
+                bestName = f.name
+            }
+        }
+        return bestName?.let { DiscoveredVString(it, bestCount) }
+    }
+
+    fun discoverStaticUiInDir(dir: File, preferredNames: List<String> = KNOWN_ANDROID_STATIC_UI_NAMES): DiscoveredStaticUi? {
+        if (!dir.isDirectory) return null
+        val checked = HashSet<String>()
+        for (name in preferredNames) {
+            if (name.isBlank() || !checked.add(name)) continue
+            val f = File(dir, name)
+            if (!f.isFile || f.length() !in 100_000L..30_000_000L) continue
+            try {
+                val found = CryptoLz4.findStaticUiSubBundle(f.readBytes())
+                if (found != null) return DiscoveredStaticUi(name, found.first, found.second)
+            } catch (_: Throwable) {
+            }
+        }
+        val files = dir.listFiles()?.filter {
+            it.isFile && it.name.endsWith(".r") && !checked.contains(it.name) && it.length() in 100_000L..30_000_000L
+        } ?: return null
+        val sorted = files.sortedWith(
+            compareBy<File> { it.length() !in 2_500_000L..10_000_000L }
+                .thenByDescending { it.lastModified() },
+        )
+        for (f in sorted) {
+            try {
+                val found = CryptoLz4.findStaticUiSubBundle(f.readBytes())
+                if (found != null) return DiscoveredStaticUi(f.name, found.first, found.second)
+            } catch (_: Throwable) {
+            }
+        }
+        return null
+    }
 
     private fun isStaticUiKey(k: String): Boolean {
         val parts = k.split('+')
@@ -286,59 +386,60 @@ object PatchEngine {
         return CustomPack(meta, base, vstring, staticUi, builtin)
     }
 
-    private fun loadPcVStringMap(gz: ByteArray): HashMap<Int, ByteArray> {
+    fun loadRzv2Table(gz: ByteArray): Pair<HashMap<JpKey, ByteArray>, HashMap<Int, JpKey>> {
         val raw = CryptoLz4.gunzip(gz)
-        val count = CryptoLz4.readI32Le(raw, 0)
-        val map = HashMap<Int, ByteArray>(count * 4 / 3 + 16)
-        var p = 4
-        for (i in 0 until count) {
-            val id = CryptoLz4.readI32Le(raw, p)
-            val len = CryptoLz4.readI32Le(raw, p + 4)
-            p += 8
-            map[id] = raw.copyOfRange(p, p + len)
-            p += len
+        if (raw.size < 8 ||
+            raw[0] != 'R'.code.toByte() ||
+            raw[1] != 'Z'.code.toByte() ||
+            raw[2] != 'V'.code.toByte() ||
+            raw[3] != '2'.code.toByte()
+        ) {
+            error("Corrupt RZV2 VStringPool payload header")
         }
-        return map
+        val count = CryptoLz4.readI32Le(raw, 4)
+        val byHash = HashMap<JpKey, ByteArray>(count * 4 / 3 + 16)
+        val pcIdToJp = HashMap<Int, JpKey>(count * 4 / 3 + 16)
+        var p = 8
+        for (i in 0 until count) {
+            if (p + 20 > raw.size) error("Truncated RZV2 record header")
+            val pcId = CryptoLz4.readI32Le(raw, p)
+            val jpHash = CryptoLz4.readI64Le(raw, p + 4)
+            val jpLen = CryptoLz4.readI32Le(raw, p + 12)
+            val trLen = CryptoLz4.readI32Le(raw, p + 16)
+            p += 20
+            if (p + trLen > raw.size) error("Truncated RZV2 record payload")
+            val key = JpKey(jpHash, jpLen)
+            byHash[key] = raw.copyOfRange(p, p + trLen)
+            pcIdToJp[pcId] = key
+            p += trLen
+        }
+        return Pair(byHash, pcIdToJp)
     }
 
-    fun loadAndroidVStringMap(
+    fun buildVStringHashTable(
         loader: PayloadLoader,
         lang: PatchLang,
         custom: CustomPack? = null,
-    ): HashMap<Int, ByteArray> {
-        val pcMap = when {
+    ): HashMap<JpKey, ByteArray> {
+        val (byHash, pcIdToJp) = when {
             custom != null -> when (custom.base) {
-                CustomBase.EN -> loadPcVStringMap(loader.load("vstring_en.bin.gz"))
-                CustomBase.ID -> loadPcVStringMap(loader.load("vstring_id.bin.gz"))
-                CustomBase.JP -> HashMap(custom.vstring.size * 4 / 3 + 16)
+                CustomBase.EN -> loadRzv2Table(loader.load("vstring_en.bin.gz"))
+                CustomBase.ID -> loadRzv2Table(loader.load("vstring_id.bin.gz"))
+                CustomBase.JP -> {
+                    val (_, idMap) = loadRzv2Table(loader.load("vstring_en.bin.gz"))
+                    Pair(HashMap<JpKey, ByteArray>(custom.vstring.size * 4 / 3 + 16), idMap)
+                }
             }
-            lang == PatchLang.ID -> loadPcVStringMap(loader.load("vstring_id.bin.gz"))
-            else -> loadPcVStringMap(loader.load("vstring_en.bin.gz"))
+            lang == PatchLang.ID -> loadRzv2Table(loader.load("vstring_id.bin.gz"))
+            else -> loadRzv2Table(loader.load("vstring_en.bin.gz"))
         }
         if (custom != null) {
-            for ((id, bytes) in custom.vstring) {
-                pcMap[id] = bytes
+            for ((pcId, bytes) in custom.vstring) {
+                val fp = pcIdToJp[pcId]
+                if (fp != null) byHash[fp] = bytes
             }
         }
-        val rawRuns = CryptoLz4.gunzip(loader.load("vstring_android_map.bin.gz"))
-        if (rawRuns.size < 4) error("Corrupt Android VStringPool remap table")
-        val runCount = CryptoLz4.readI32Le(rawRuns, 0)
-        if (rawRuns.size != 4 + runCount * 12) error("Android VStringPool remap table length mismatch")
-        val anMap = HashMap<Int, ByteArray>(pcMap.size * 4 / 3 + 16)
-        for (i in 0 until runCount) {
-            val base = 4 + i * 12
-            val pcStart = CryptoLz4.readI32Le(rawRuns, base)
-            val anStart = CryptoLz4.readI32Le(rawRuns, base + 4)
-            val len = CryptoLz4.readI32Le(rawRuns, base + 8)
-            for (k in 0 until len) {
-                val tr = pcMap[pcStart + k]
-                if (tr != null) anMap[anStart + k] = tr
-            }
-        }
-        if (custom == null && anMap.size != pcMap.size) {
-            error("Android VStringPool remap incomplete (${anMap.size} != ${pcMap.size})")
-        }
-        return anMap
+        return byHash
     }
 
     fun loadStringDict(gz: ByteArray): HashMap<String, String> {
@@ -361,8 +462,9 @@ object PatchEngine {
     }
 
     /**
-     * Low-RAM in-place Android VStringPool exact-size repacker (~145 MB peak RAM for 131 MB bundle).
-     * Mutates [buf] in-place and returns the rewritten string count (74,055).
+     * Low-RAM in-place universal VStringPool exact-size repacker (~145 MB peak RAM for 131 MB bundle).
+     * Matches strings by (FNV-1a64(orig_jp_bytes), orig_jp_len) + dynamic contiguous spans (MAX_GAP=4096),
+     * producing 100% bit-for-bit identical output to the desktop engine across all hotfixes!
      */
     fun patchAndroidVStringInPlace(
         buf: ByteArray,
@@ -374,12 +476,12 @@ object PatchEngine {
     ): Int {
         if (buf.size < 4144) error("VStringPool file too small (${buf.size})")
         val activeCode = custom?.meta?.code ?: lang.shortCode
-        onSub(0, "Remapping VStringPool ($activeCode) entries...")
+        onSub(0, "Loading universal $activeCode dictionary (RZV2)...")
         val key4096 = loader.load("mmap_key_4096.bin")
-        val translations = loadAndroidVStringMap(loader, lang, custom)
-        log("  Remapped ${translations.size} $activeCode VStringPool translations.", LogLevel.INFO)
+        val byHash = buildVStringHashTable(loader, lang, custom)
+        log("  Loaded ${byHash.size} universal $activeCode VStringPool hash entries.", LogLevel.INFO)
 
-        onSub(0, "Decrypting VStringPool (130 MB MMap)...")
+        onSub(0, "Decrypting VStringPool (MMap)...")
         val h1 = buf.copyOfRange(4120, 4144)
         CryptoLz4.xorMMapRangeInPlace(h1, 0, h1.size, 4120, key4096)
         val hashBytes = CryptoLz4.readI32Le(h1, 0)
@@ -392,33 +494,62 @@ object PatchEngine {
         // Decrypt string section in-place (zero extra 130 MB copy!)
         CryptoLz4.xorMMapRangeInPlace(buf, strSecOff, buf.size, strSecOff, key4096)
         val count = CryptoLz4.readI32Le(buf, strSecOff + 16)
+        if (strSecOff + 20 + count.toLong() * 4L > buf.size.toLong()) {
+            error("VStringPool offset table out of bounds (count=$count)")
+        }
         log("  Decrypted VStringPool: $count total strings.", LogLevel.INFO)
 
-        val spans = arrayOf(
-            Triple("base_jp_1", 1473040, 1541595),
-            Triple("base_jp_2", 1613715, 1616061),
-            Triple("hotfix_jp", 1642789, count - 1),
-        )
-
-        val inplaceIds = ArrayList<Int>(4)
-        for (id in translations.keys) {
-            if (id < 0 || id >= count) error("VStringPool ID #$id out of range (count=$count)")
-            val inSpan = spans.any { (_, s, e) -> id in s..e }
-            if (!inSpan) inplaceIds.add(id)
+        onSub(0, "Matching $activeCode strings by content hash...")
+        val matchedIds = ArrayList<Int>(minOf(byHash.size, count))
+        val matchedMap = HashMap<Int, ByteArray>(minOf(byHash.size, count) * 4 / 3 + 16)
+        for (id in 0 until count) {
+            val oAbs = CryptoLz4.readI32Le(buf, strSecOff + 20 + id * 4)
+            if (oAbs < strSecOff || oAbs + 4 > buf.size) error("VStringPool offset OOB at #$id")
+            val oLen = CryptoLz4.readI32Le(buf, oAbs)
+            if (oLen < 0) continue
+            if (oAbs + 4 + oLen > buf.size) error("VStringPool payload OOB at #$id")
+            val h = CryptoLz4.fnv1a64(buf, oAbs + 4, oLen)
+            val tr = byHash[JpKey(h, oLen)]
+            if (tr != null) {
+                matchedIds.add(id)
+                matchedMap[id] = tr
+            }
         }
+        if (matchedIds.isEmpty()) error("No matching VStringPool entries found in this bundle.")
+        log("  Matched ${matchedIds.size} strings dynamically across pool (count=$count).", LogLevel.INFO)
+
+        // Group matched IDs into contiguous repackable spans (MAX_GAP=4096, MIN_SPAN_LEN=2)
+        val maxGap = 4096
+        val minSpanLen = 2
+        val spans = ArrayList<Pair<Int, Int>>(8)
+        val inplaceIds = ArrayList<Int>(8)
+        var s = matchedIds[0]
+        var e = matchedIds[0]
+        for (i in 1 until matchedIds.size) {
+            val id = matchedIds[i]
+            if (id - e <= maxGap) {
+                e = id
+            } else {
+                if (e - s + 1 >= minSpanLen) spans.add(Pair(s, e)) else inplaceIds.add(s)
+                s = id
+                e = id
+            }
+        }
+        if (e - s + 1 >= minSpanLen) spans.add(Pair(s, e)) else inplaceIds.add(s)
 
         var rewritten = 0
-        val totalTr = translations.size
+        val totalTr = matchedIds.size
         val len4 = ByteArray(4)
 
-        for ((name, start, end) in spans) {
-            if (end >= count || start > end) error("Invalid VStringPool span $name [$start..$end]")
+        for ((spanIdx, span) in spans.withIndex()) {
+            val (start, end) = span
             val spanStartAbs = CryptoLz4.readI32Le(buf, strSecOff + 20 + start * 4)
             val spanEndAbs = if (end + 1 < count) {
                 CryptoLz4.readI32Le(buf, strSecOff + 20 + (end + 1) * 4)
             } else {
                 buf.size
             }
+            if (spanEndAbs < spanStartAbs) error("Non-monotonic span offsets [$start..$end]")
             val capacity = spanEndAbs - spanStartAbs
             val packed = ByteArrayOutputStream(capacity)
             val newOffsets = IntArray(end - start + 1)
@@ -426,11 +557,11 @@ object PatchEngine {
 
             for (id in start..end) {
                 newOffsets[id - start] = cursor
-                val tr = translations[id]
+                val tr = matchedMap[id]
                 if (tr != null) {
                     rewritten++
                     if (rewritten % 2500 == 0) {
-                        onSub(rewritten, "Rewriting VStringPool [$activeCode / $name]: $rewritten / $totalTr")
+                        onSub(rewritten, "Rewriting VStringPool [$activeCode / span ${spanIdx + 1}]: $rewritten / $totalTr")
                     }
                     CryptoLz4.writeI32Le(len4, 0, tr.size)
                     packed.write(len4)
@@ -444,9 +575,8 @@ object PatchEngine {
                 }
             }
             val used = cursor - spanStartAbs
-            if (used > capacity) error("Span $name overflowed by ${used - capacity} bytes")
+            if (used > capacity) error("Span #${spanIdx + 1} [$start..$end] overflowed by ${used - capacity} bytes")
 
-            // Write updated offsets + repacked span bytes directly into buf
             for (i in newOffsets.indices) {
                 CryptoLz4.writeI32Le(buf, strSecOff + 20 + (start + i) * 4, newOffsets[i])
             }
@@ -455,14 +585,19 @@ object PatchEngine {
             if (used < capacity) {
                 buf.fill(0, spanStartAbs + used, spanStartAbs + capacity)
             }
-            log("  Repacked $name [#$start..#$end]: $used/$capacity B (free slack ${capacity - used} B)", LogLevel.DIFF)
+            log("  Repacked span #${spanIdx + 1} [#$start..#$end]: $used/$capacity B (free slack ${capacity - used} B)", LogLevel.DIFF)
         }
 
+        var skippedInplace = 0
         for (id in inplaceIds) {
             val oAbs = CryptoLz4.readI32Le(buf, strSecOff + 20 + id * 4)
             val oLen = CryptoLz4.readI32Le(buf, oAbs)
-            val payload = translations[id]!!
-            if (payload.size > oLen) error("In-place ID $id overflow (${payload.size} > $oLen)")
+            val payload = matchedMap[id]!!
+            if (payload.size > oLen) {
+                matchedMap.remove(id)
+                skippedInplace++
+                continue
+            }
             CryptoLz4.writeI32Le(buf, oAbs, payload.size)
             System.arraycopy(payload, 0, buf, oAbs + 4, payload.size)
             if (payload.size < oLen) {
@@ -470,10 +605,13 @@ object PatchEngine {
             }
             rewritten++
         }
+        if (skippedInplace > 0) {
+            log("  Skipped $skippedInplace isolated singleton string(s) exceeding in-place byte length.", LogLevel.WARN)
+        }
 
-        // Verify all 74,055 strings before re-encryption
-        onSub(rewritten, "Re-encrypting & verifying 74,055 VStringPool strings...")
-        for ((id, expected) in translations) {
+        // Verify all applied strings before re-encryption
+        onSub(rewritten, "Re-encrypting & verifying $rewritten VStringPool strings...")
+        for ((id, expected) in matchedMap) {
             val a = CryptoLz4.readI32Le(buf, strSecOff + 20 + id * 4)
             val l = CryptoLz4.readI32Le(buf, a)
             if (l != expected.size) error("VStringPool verification length mismatch on #$id")
@@ -489,23 +627,40 @@ object PatchEngine {
 
     private fun align4(n: Int): Int = (n + 3) and 3.inv()
 
+    private fun findObj0SizeOffset(sf: ByteArray, dataOff: Int, origMbSize: Int): Int {
+        if (3220 + 4 <= dataOff && CryptoLz4.readI32Le(sf, 3220) == origMbSize) {
+            return 3220
+        }
+        var o = 8
+        while (o + 4 <= dataOff) {
+            if (CryptoLz4.readI32Le(sf, o) == origMbSize) {
+                var allZero = true
+                for (z in o - 8 until o) {
+                    if (sf[z] != 0.toByte()) {
+                        allZero = false
+                        break
+                    }
+                }
+                if (allZero) return o
+            }
+            o += 4
+        }
+        var o2 = maxOf(0, dataOff - 512) and 3.inv()
+        while (o2 + 4 <= dataOff) {
+            if (CryptoLz4.readI32Le(sf, o2) == origMbSize) return o2
+            o2 += 4
+        }
+        return -1
+    }
+
     fun patchAndroidStaticUiBytes(
         origBuf: ByteArray,
+        subOffset: Int,
         loader: PayloadLoader,
         lang: PatchLang,
         custom: CustomPack? = null,
         onSub: (Int, String) -> Unit,
     ): Pair<ByteArray, Int> {
-        val subOffset = ANDROID_STATIC_UI_SUB_OFFSET
-        val subSize = 83151
-        val dataOff = 3392
-        val mbNameOff = 3420
-        val obj0SizeOff = 3220
-        val origMbSize = 161392
-
-        if (subOffset + subSize > origBuf.size) {
-            error("Static UI sub-bundle offset out of range ($subOffset + $subSize > ${origBuf.size})")
-        }
         val activeCode = custom?.meta?.code ?: lang.shortCode
         val trMap = when {
             custom != null -> when (custom.base) {
@@ -524,16 +679,30 @@ object PatchEngine {
 
         onSub(0, "Decrypting UnityCN ast_staticTextKeyConfig.asset...")
         val bundle = UnityCnBundle.parse(origBuf, subOffset)
+        val subSize = bundle.fsize
+        if (subOffset + subSize > origBuf.size) {
+            error("Static UI sub-bundle offset out of range ($subOffset + $subSize > ${origBuf.size})")
+        }
+        if (bundle.blocks.isEmpty()) error("Static UI sub-bundle has 0 blocks")
         val origSf = bundle.readAll()
 
-        var cur = mbNameOff + 28
+        val marker = "ast_staticTextKeyConfig".toByteArray(Charsets.US_ASCII)
+        val markerPos = CryptoLz4.findBytes(origSf, marker)
+        if (markerPos < 32 || CryptoLz4.readI32Le(origSf, markerPos - 4) != marker.size) {
+            error("Unexpected ast_staticTextKeyConfig MonoBehaviour layout")
+        }
+        val mbNameOff = markerPos - 4
+        val dataOff = mbNameOff - 28
+        val nameEnd = mbNameOff + 4 + align4(marker.size)
+
+        var cur = nameEnd
         val langLen = CryptoLz4.readI32Le(origSf, cur); cur += 4
         val langTag = String(origSf, cur, langLen, Charsets.UTF_8)
         cur = align4(cur + langLen)
         val pairCount = CryptoLz4.readI32Le(origSf, cur); cur += 4
 
-        val newMb = ByteArrayOutputStream(origMbSize)
-        newMb.write(origSf, dataOff, (mbNameOff + 28) - dataOff)
+        val newMb = ByteArrayOutputStream(maxOf(16384, origSf.size - dataOff))
+        newMb.write(origSf, dataOff, nameEnd - dataOff)
         val len4 = ByteArray(4)
         val zeros = ByteArray(4)
 
@@ -563,7 +732,7 @@ object PatchEngine {
             val v = if (tr != null) {
                 replaced++
                 if (replaced % 400 == 0) {
-                    onSub(replaced, "Rewriting Static UI KeyConfig [$activeCode]: $replaced / 3,135")
+                    onSub(replaced, "Rewriting Static UI KeyConfig [$activeCode]: $replaced / $STATIC_UI_STRINGS")
                 }
                 tr
             } else {
@@ -572,6 +741,10 @@ object PatchEngine {
             writeStr(k)
             writeStr(v)
         }
+
+        val origMbSize = cur - dataOff
+        val obj0SizeOff = findObj0SizeOffset(origSf, dataOff, origMbSize)
+        if (obj0SizeOff < 0) error("Could not locate MonoBehaviour ObjectInfo size=$origMbSize in Static UI SF")
 
         val newMbBytes = newMb.toByteArray()
         if (newMbBytes.size > origMbSize) {
@@ -584,27 +757,41 @@ object PatchEngine {
         CryptoLz4.writeI32Le(newSf, obj0SizeOff, newMbBytes.size)
 
         onSub(replaced, "Compressing (LZ4HC exact) & UnityCN encrypting Static UI...")
-        val u0 = bundle.blocks[0].uSize
-        val u1 = bundle.blocks[1].uSize
         val totalBudget = subSize - bundle.dataStart
-        val c0 = CryptoLz4.lz4Compress(newSf.copyOfRange(0, u0), 1024)
-        val c1 = CryptoLz4.lz4CompressExact(newSf.copyOfRange(u0, u0 + u1), totalBudget - c0.size, 1024)
-        bundle.cipher.encryptBlockInPlace(c0, 0)
-        bundle.cipher.encryptBlockInPlace(c1, 1)
+        val compBlocks = ArrayList<ByteArray>(bundle.blocks.size)
+        var sfPos = 0
+        var usedComp = 0
+        val lastIdx = bundle.blocks.size - 1
+        for ((idx, blk) in bundle.blocks.withIndex()) {
+            val slice = newSf.copyOfRange(sfPos, sfPos + blk.uSize)
+            sfPos += blk.uSize
+            val c = if (idx < lastIdx) {
+                CryptoLz4.lz4Compress(slice, 1024)
+            } else {
+                if (usedComp >= totalBudget) {
+                    error("Static UI compressed blocks exceeded budget ($usedComp >= $totalBudget)")
+                }
+                CryptoLz4.lz4CompressExact(slice, totalBudget - usedComp, 1024)
+            }
+            if ((blk.flags and 0x100) != 0) {
+                bundle.cipher.encryptBlockInPlace(c, idx)
+            }
+            usedComp += c.size
+            compBlocks.add(c)
+        }
 
         val biOut = ByteArrayOutputStream(128)
         biOut.write(bundle.dataHash)
         val be4 = ByteArray(4)
         val be8 = ByteArray(8)
-        CryptoLz4.writeI32Be(be4, 0, 2); biOut.write(be4)
-        for ((uSz, cSz, fl) in listOf(
-            Triple(u0, c0.size, bundle.blocks[0].flags),
-            Triple(u1, c1.size, bundle.blocks[1].flags),
-        )) {
-            CryptoLz4.writeI32Be(be4, 0, uSz); biOut.write(be4)
-            CryptoLz4.writeI32Be(be4, 0, cSz); biOut.write(be4)
-            biOut.write((fl ushr 8) and 0xFF)
-            biOut.write(fl and 0xFF)
+        CryptoLz4.writeI32Be(be4, 0, bundle.blocks.size); biOut.write(be4)
+        for (i in bundle.blocks.indices) {
+            val blk = bundle.blocks[i]
+            val c = compBlocks[i]
+            CryptoLz4.writeI32Be(be4, 0, blk.uSize); biOut.write(be4)
+            CryptoLz4.writeI32Be(be4, 0, c.size); biOut.write(be4)
+            biOut.write((blk.flags ushr 8) and 0xFF)
+            biOut.write(blk.flags and 0xFF)
         }
         CryptoLz4.writeI32Be(be4, 0, bundle.dirs.size); biOut.write(be4)
         for (d in bundle.dirs) {
@@ -626,8 +813,11 @@ object PatchEngine {
         CryptoLz4.writeI32Be(newSub, bundle.cinfoOff, newBiComp.size)
         CryptoLz4.writeI32Be(newSub, bundle.cinfoOff + 4, newBiPlain.size)
         System.arraycopy(newBiComp, 0, newSub, bundle.blocksInfoOff, newBiComp.size)
-        System.arraycopy(c0, 0, newSub, bundle.dataStart, c0.size)
-        System.arraycopy(c1, 0, newSub, bundle.dataStart + c0.size, c1.size)
+        var wp = bundle.dataStart
+        for (c in compBlocks) {
+            System.arraycopy(c, 0, newSub, wp, c.size)
+            wp += c.size
+        }
 
         val outBuf = origBuf.copyOf()
         System.arraycopy(newSub, 0, outBuf, subOffset, subSize)

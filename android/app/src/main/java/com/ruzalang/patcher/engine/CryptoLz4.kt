@@ -56,6 +56,84 @@ object CryptoLz4 {
         return hexUpper(md.digest())
     }
 
+    fun fnv1a64(buf: ByteArray, start: Int, len: Int): Long {
+        var h = (0xcbf29ce4L shl 32) or 0x84222325L
+        val prime = 0x100000001b3L
+        val end = start + len
+        for (i in start until end) {
+            h = h xor (buf[i].toLong() and 0xFFL)
+            h *= prime
+        }
+        return h
+    }
+
+    fun readI64Le(b: ByteArray, o: Int): Long {
+        var v = 0L
+        for (i in 0 until 8) {
+            v = v or ((b[o + i].toLong() and 0xFFL) shl (i * 8))
+        }
+        return v
+    }
+
+    fun findBytes(haystack: ByteArray, needle: ByteArray, start: Int = 0): Int {
+        if (needle.isEmpty() || start < 0 || start + needle.size > haystack.size) return -1
+        val limit = haystack.size - needle.size
+        val first = needle[0]
+        var i = start
+        while (i <= limit) {
+            if (haystack[i] == first) {
+                var ok = true
+                for (j in 1 until needle.size) {
+                    if (haystack[i + j] != needle[j]) {
+                        ok = false
+                        break
+                    }
+                }
+                if (ok) return i
+            }
+            i++
+        }
+        return -1
+    }
+
+    fun findStaticUiSubBundle(buf: ByteArray): Triple<Int, Int, Boolean>? {
+        val magic = byteArrayOf('U'.code.toByte(), 'n'.code.toByte(), 'i'.code.toByte(), 't'.code.toByte(), 'y'.code.toByte(), 'F'.code.toByte(), 'S'.code.toByte(), 0)
+        val cabName = "CAB-d373fa6fedc5b221683a433ac01d8eb0"
+        val marker = "ast_staticTextKeyConfig".toByteArray(Charsets.US_ASCII)
+        if (buf.size < 128) return null
+        val fallbackOffsets = ArrayList<Int>(2)
+        var pos = 0
+        while (pos + 8 <= buf.size) {
+            val off = findBytes(buf, magic, pos)
+            if (off < 0) break
+            pos = off + 8
+            try {
+                val bundle = UnityCnBundle.parse(buf, off)
+                if (bundle.dirs.size == 1 && bundle.dirs[0].name == cabName) {
+                    return Triple(off, bundle.fsize, true)
+                }
+                if (bundle.dirs.size == 1 &&
+                    bundle.fsize in 30_000..500_000 &&
+                    bundle.dirs[0].size in 80_000L..450_000L
+                ) {
+                    fallbackOffsets.add(off)
+                }
+            } catch (_: Throwable) {
+            }
+        }
+        for (off in fallbackOffsets) {
+            try {
+                val bundle = UnityCnBundle.parse(buf, off)
+                val sf = bundle.readAll()
+                if (findBytes(sf, marker) >= 0) {
+                    return Triple(off, bundle.fsize, false)
+                }
+            } catch (_: Throwable) {
+            }
+        }
+        return null
+    }
+
     fun xorMMapRangeInPlace(buf: ByteArray, startIdx: Int, endIdx: Int, fileStartOffset: Int, key4096: ByteArray) {
         var pos = fileStartOffset
         for (i in startIdx until endIdx) {
@@ -504,6 +582,7 @@ data class UnityCnDir(val offset: Long, val size: Long, val flags: Int, val name
 class UnityCnBundle(
     val src: ByteArray,
     val baseOff: Int,
+    val fsize: Int,
     val fsizeOff: Int,
     val cinfoOff: Int,
     val blocksInfoOff: Int,
@@ -538,22 +617,31 @@ class UnityCnBundle(
 
     companion object {
         fun parse(src: ByteArray, baseOff: Int): UnityCnBundle {
+            if (baseOff < 0 || baseOff + 64 > src.size) error("UnityFS header truncated")
             var o = baseOff
             fun readCStr(): String {
+                val maxEnd = minOf(o + 128, src.size)
                 var end = o
-                while (end < src.size && src[end] != 0.toByte()) end++
-                if (end >= src.size) error("Missing null terminator in UnityFS header")
+                while (end < maxEnd && src[end] != 0.toByte()) end++
+                if (end >= maxEnd) error("Missing null terminator in UnityFS header")
                 val s = String(src, o, end - o, Charsets.UTF_8)
                 o = end + 1
                 return s
             }
             val sig = readCStr()
             if (sig != "UnityFS") error("Expected UnityFS, got $sig")
+            if (o + 4 > src.size) error("UnityFS version truncated")
             val ver = CryptoLz4.readI32Be(src, o); o += 4
             readCStr() // pver
             readCStr() // ever
+            if (o + 20 > src.size) error("UnityFS size/info header truncated")
             val fsizeOff = o - baseOff
-            o += 8 // fsize
+            val fsizeLong = CryptoLz4.readI64Be(src, o)
+            if (fsizeLong <= 0L || fsizeLong > (src.size - baseOff).toLong()) {
+                error("UnityFS fsize out of range: $fsizeLong")
+            }
+            val fsize = fsizeLong.toInt()
+            o += 8
             val cinfoOff = o - baseOff
             val cInfo = CryptoLz4.readI32Be(src, o); o += 4
             val uInfo = CryptoLz4.readI32Be(src, o); o += 4
@@ -561,6 +649,7 @@ class UnityCnBundle(
             if (ver >= 7) {
                 o = baseOff + (((o - baseOff) + 15) and 15.inv())
             }
+            if (o + 65 > src.size) error("UnityCN key block truncated")
             val infoBytesOff = o
             val infoKeyOff = o + 16
             val sigBytesOff = o + 33
@@ -576,14 +665,19 @@ class UnityCnBundle(
             }
             val cipher = UnityCnCipher(src, infoBytesOff, src, infoKeyOff)
             val blocksInfoOff = ((o - baseOff) + 65 + 15) and 15.inv()
+            if (cInfo < 0 || uInfo < 0 || uInfo > 8 * 1024 * 1024 || baseOff + blocksInfoOff + cInfo > src.size) {
+                error("UnityFS blocksInfo out of bounds")
+            }
             val headerPrefix = src.copyOfRange(baseOff, baseOff + blocksInfoOff)
             val blocksInfoComp = src.copyOfRange(baseOff + blocksInfoOff, baseOff + blocksInfoOff + cInfo)
             val blocksInfo = CryptoLz4.lz4Decompress(blocksInfoComp, uInfo)
             val dataStart = (blocksInfoOff + cInfo + 15) and 15.inv()
+            if (blocksInfo.size < 24) error("UnityFS blocksInfo too small")
 
             val dataHash = blocksInfo.copyOfRange(0, 16)
             var bp = 16
             val bCount = CryptoLz4.readI32Be(blocksInfo, bp); bp += 4
+            if (bCount < 0 || bp + bCount * 10 + 4 > blocksInfo.size) error("UnityFS block table truncated")
             val blocks = ArrayList<UnityCnBlock>(bCount)
             var curOff = dataStart
             for (i in 0 until bCount) {
@@ -595,8 +689,10 @@ class UnityCnBundle(
                 bp += 10
             }
             val dCount = CryptoLz4.readI32Be(blocksInfo, bp); bp += 4
+            if (dCount < 0 || dCount > 10000) error("UnityFS dir count invalid")
             val dirs = ArrayList<UnityCnDir>(dCount)
             for (i in 0 until dCount) {
+                if (bp + 20 > blocksInfo.size) error("UnityFS dir table truncated")
                 val offset = CryptoLz4.readI64Be(blocksInfo, bp); bp += 8
                 val size = CryptoLz4.readI64Be(blocksInfo, bp); bp += 8
                 val flags = CryptoLz4.readI32Be(blocksInfo, bp); bp += 4
@@ -609,6 +705,7 @@ class UnityCnBundle(
             return UnityCnBundle(
                 src = src,
                 baseOff = baseOff,
+                fsize = fsize,
                 fsizeOff = fsizeOff,
                 cinfoOff = cinfoOff,
                 blocksInfoOff = blocksInfoOff,

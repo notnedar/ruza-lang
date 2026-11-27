@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.8.1`)
+# Ruza-Lang (`v0.9.0`)
 
 [![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
 
@@ -13,22 +13,19 @@ An educational localization & asset-repacking suite demonstrating exact-size str
 
 ---
 
-## What's New in `v0.8.1`
+## What's New in `v0.9.0`
 
-- **Live Process-Guard Button Locking (`PC` & `Android`):**
-  - Automatically disables **Install Patch**, **Translate News**, and **Rollback JP** (showing **`Close Game First` / `Tutup Game Dulu`**) whenever the target game or launcher is running — preventing accidental clicks before closing the game.
-  - On **PC**, buttons re-enable automatically within 2 seconds the moment the game closes. On **Android APK**, tap the red running banner to jump straight to **App Info (Force Stop)**, and returning to Ruza-Lang auto-rescans and unlocks immediately.
-- **Bring Your Own Language Pack (`BYOL` · `v0.8.0`):**
-  - Load any custom `.json` language pack directly inside **Files → Custom Language Pack → Load JSON** on **Windows PC**, **PC-to-Android ADB**, or **Standalone Android APK** (100% offline — no compiling required!).
-  - Supports **base inheritance** (`meta.base`: `"en"`, `"id"`, or `"jp"`), flat dictionary drop-ins, and **automatic PC → Android ID remapping** so one single `.json` pack works everywhere.
-  - Export a ready-to-edit starter template directly from the Windows app (**Files → Template**) or grab [`patches/custom-pack-template.json`](patches/custom-pack-template.json).
-- **Community Language Contribution Kit & Validator CLI:**
-  - Added [`CONTRIBUTING.md`](CONTRIBUTING.md) with a step-by-step guide for bringing your own language pack and submitting PRs for `EN`/`ID` fixes or new community languages.
-  - Added zero-dependency validator [`tools/validate-pack.mjs`](tools/validate-pack.mjs) (`node tools/validate-pack.mjs <pack.json>`) checking JSON syntax, placeholder parity (`{0}`, `%s`, `|`), Unity rich-text tags, tight-button wrap warnings, and UTF-8 byte budget.
-- **Combat Timing Terminology Fix (`EN` & `ID`):**
-  - Replaced all `62 EN + 73 ID` literal `"Just Block / Guard / Parry / Dodge / Evade"` strings with natural action-RPG timing terms (**`Perfect Guard`**, **`Perfect Parry`**, **`Perfect Dodge`**, **`Parry Window / Celah Parry`**, **`Dodge Counter`**, **`Perfect Guard: Counter`**) and fixed `Guard` (`ID` previously `"Penjaga"`).
-- **Previous Highlights (`v0.7.1` & `v0.7.0`):**
-  - Repaired `6` off-by-one chunk shifts (`424` scrambled strings, including the `Equip` button), aligned `3,362` official global terms & 9 elements, applied `162` anti-wrap UI overrides, fixed Android 15–17 Edge-to-Edge insets, added automatic **Download Shizuku** popup, and made the standalone APK `100%` non-root.
+- **Hotfix-Proof Universal Engine (`PC` & `Android`):**
+  - **Dynamic Bundle Auto-Discovery:** Automatically locates the active `VStringPool` (`raw_base_package`) and `Static UI KeyConfig` (`default_package`, via constant Unity CAB signature) `.r` files on both PC and Android (Shizuku, SAF, Direct, and ADB) — zero hardcoded `.r` filenames or sub-bundle byte offsets!
+  - **Universal Content-Hash Matching (`RZV2`):** Matches all **`76,180`** `VStringPool` strings by `FNV-1a64` content hash + byte length with dynamic contiguous span repacking across builds (`r3219596`, `r3219598`, `r3273851`, `r3273853`, and future resource hotfixes!) — removing the legacy platform remap table completely.
+  - **Smart Hotfix Version Sync:** Automatically syncs compatible resource hotfixes (eliminating false `Client Version Mismatch` popups on `r3273851` / `r3273853` and future minor hotfixes) while preserving per-bundle state tracking (`_ruza_state.json`) and `<bundle>.original` backups.
+- **Full `r3273853` / `r3273851` Hotfix Localization (`+2,125` New Strings in `EN` & `ID`):**
+  - Translated all **`2,125`** new strings introduced in the latest hotfix into both **English (`EN`)** and **Bahasa Indonesia (`ID`)**, raising total coverage to **`79,786` strings on PC** and **`79,315` strings on Android (`99.4%`)**.
+  - Tightened `Static UI KeyConfig` Indonesian labels to fit cleanly inside the tighter `r3273853` LZ4HC exact-size budget with verified free slack on both `EN` and `ID`.
+- **Previous Highlights (`v0.8.1` & `v0.8.0`):**
+  - **Live Process-Guard Button Locking (`v0.8.1`):** Automatically disables **Install Patch**, **Translate News**, and **Rollback JP** (showing `Close Game First` / `Tutup Game Dulu`) while the target game or launcher is running on PC, Android ADB, and Standalone APK.
+  - **Bring Your Own Language Pack (`BYOL` · `v0.8.0`):** Load any custom `.json` language pack directly inside **Files → Custom Language Pack → Load JSON** (with `Custom OK` state tracking, base inheritance `en`/`id`/`jp`, flat dictionary drop-ins, and [`CONTRIBUTING.md`](CONTRIBUTING.md) + `node tools/validate-pack.mjs`).
+  - **Combat Timing Terminology & Official Glossary (`v0.8.0` / `v0.7.1`):** Natural action-RPG timing terms (`Perfect Guard`, `Perfect Parry`, `Perfect Dodge`, `Parry Window / Celah Parry`), `3,362` official global terms, and `100%` non-root standalone Android APK.
 
 ---
 
@@ -67,12 +64,12 @@ An educational localization & asset-repacking suite demonstrating exact-size str
 ## Features / Fitur
 
 - **Bilingual Switch (`EN` / `ID`):** Toggle between **English** and **Bahasa Indonesia** directly inside the GUI (Windows & Android) — switches both the app interface and the target localization pack.
-- **PC 4-Store Localization Pipeline (`77,661` strings):**
-  - `VStringPool` — `74,055` strings (dialogue, quests, skills, items, settings)
-  - `Static UI KeyConfig` — `3,135` strings (prefab labels, buttons, headers, notices)
+- **PC 4-Store Localization Pipeline (`79,786` strings):**
+  - `VStringPool` — `76,180` strings (dialogue, quests, skills, items, settings — hotfix-proof content-hash matched)
+  - `Static UI KeyConfig` — `3,135` strings (prefab labels, buttons, headers, notices — dynamically discovered)
   - `StaticPackage CSV` — `113` strings (startup & updater messages)
   - `resources.assets` — `358` strings (fallback startup & SDK UI)
-- **Android 2-Bundle Pipeline (`77,190` strings · `99.4%` coverage):** `VStringPool` (`74,055`) + `Static UI KeyConfig` (`3,135`) + Android Cached News (`EN` / `ID`) — zero root and zero game APK re-signing.
+- **Android 2-Bundle Pipeline (`79,315` strings · `99.4%` coverage):** `VStringPool` (`76,180`) + `Static UI KeyConfig` (`3,135`) + Android Cached News (`EN` / `ID`) — zero root, zero APK re-signing, and automatic hotfix sync.
 - **Dedicated Translate News (`EN` / `ID`) Button:** Translates cached in-game announcement HTML pages (`16` pages in `HTTPCache` + `Library v3`) with automatic backup restore on Rollback.
 - **Process Guard:** Checks whether target client/launcher processes are running (PC & Android) and blocks patching, news translation, or rollback until closed.
 - **One-Click Rollback:** Saves verified original backups automatically before patching and restores exact original SHA-256 hashes anytime.

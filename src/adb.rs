@@ -1,12 +1,14 @@
-use crate::crypto_lz4::sha256_file;
+use crate::crypto_lz4::{read_u32_le, sha256_file, xor_mmap_in_place};
 use crate::patch_engine::{
-    self, ClientVersionInfo, LogLevel, PatchLang, TargetStatus, ANDROID_EXPECTED_RES_REV,
-    ANDROID_EXPECTED_VERSION, ANDROID_PACKAGE_ID, ANDROID_STATIC_UI_EN_SHA,
-    ANDROID_STATIC_UI_ID_SHA, ANDROID_STATIC_UI_ORIG_SHA, ANDROID_STATIC_UI_SUB_OFFSET,
-    ANDROID_TOTAL_STRINGS, ANDROID_VSTRING_EN_SHA, ANDROID_VSTRING_ID_SHA,
-    ANDROID_VSTRING_ORIG_SHA,
+    self, BundlePatchState, ClientVersionInfo, LogLevel, PatchLang, PatchStateFile, TargetStatus,
+    ANDROID_EXPECTED_RES_REV, ANDROID_EXPECTED_VERSION, ANDROID_PACKAGE_ID,
+    ANDROID_STATIC_UI_KNOWN_EN_SHAS, ANDROID_STATIC_UI_KNOWN_ID_SHAS, ANDROID_STATIC_UI_ORIG_SHAS,
+    ANDROID_TOTAL_STRINGS, ANDROID_VSTRING_KNOWN_EN_SHAS, ANDROID_VSTRING_KNOWN_ID_SHAS,
+    ANDROID_VSTRING_ORIG_SHAS, EMBED_MMAP_KEY, KNOWN_ANDROID_STATIC_UI_NAMES, STATIC_UI_STRINGS,
+    VSTRING_STRINGS,
 };
 use serde::Serialize;
+use std::collections::HashSet;
 use std::fs;
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
@@ -15,10 +17,10 @@ use std::process::{Command, Stdio};
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 pub const REMOTE_FILES_ROOT: &str = "/sdcard/Android/data/com.Yostar.AzurpromiliaJP/files";
-pub const REMOTE_VSTRING: &str =
-    "/sdcard/Android/data/com.Yostar.AzurpromiliaJP/files/.res/raw_base_package/BundleFiles/1qnamndresrohzjhuvt2lw.r";
-pub const REMOTE_STATIC_UI: &str =
-    "/sdcard/Android/data/com.Yostar.AzurpromiliaJP/files/.res/default_package/BundleFiles/nibdvaxcnfh3en5bnvhtw.r";
+pub const REMOTE_RAW_BUNDLE_DIR: &str =
+    "/sdcard/Android/data/com.Yostar.AzurpromiliaJP/files/.res/raw_base_package/BundleFiles";
+pub const REMOTE_DEFAULT_BUNDLE_DIR: &str =
+    "/sdcard/Android/data/com.Yostar.AzurpromiliaJP/files/.res/default_package/BundleFiles";
 pub const REMOTE_RAW_MANIFEST_DIR: &str =
     "/sdcard/Android/data/com.Yostar.AzurpromiliaJP/files/.res/raw_base_package/ManifestFiles";
 pub const REMOTE_DEFAULT_MANIFEST_DIR: &str =
@@ -356,8 +358,245 @@ pub fn android_backup_dir(serial: &str) -> PathBuf {
         .join(sanitize_serial(serial))
 }
 
-fn sha_matches(sha: &str, expected: &str) -> bool {
-    !expected.is_empty() && sha.eq_ignore_ascii_case(expected)
+fn base64_decode(input: &str) -> Vec<u8> {
+    let mut out = Vec::with_capacity((input.len() * 3) / 4);
+    let mut vals = [0u8; 4];
+    let mut n = 0usize;
+    for b in input.bytes() {
+        let v = match b {
+            b'A'..=b'Z' => b - b'A',
+            b'a'..=b'z' => b - b'a' + 26,
+            b'0'..=b'9' => b - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            b'=' => {
+                if n == 2 {
+                    out.push((vals[0] << 2) | (vals[1] >> 4));
+                } else if n == 3 {
+                    out.push((vals[0] << 2) | (vals[1] >> 4));
+                    out.push((vals[1] << 4) | (vals[2] >> 2));
+                }
+                break;
+            }
+            _ => continue,
+        };
+        vals[n] = v;
+        n += 1;
+        if n == 4 {
+            out.push((vals[0] << 2) | (vals[1] >> 4));
+            out.push((vals[1] << 4) | (vals[2] >> 2));
+            out.push((vals[2] << 6) | vals[3]);
+            n = 0;
+        }
+    }
+    out
+}
+
+fn adb_read_slice(adb: &Path, serial: &str, remote_path: &str, offset: usize, len: usize) -> Option<Vec<u8>> {
+    let q = offset / 4096;
+    let r = offset % 4096;
+    let blocks = ((r + len) + 4095) / 4096;
+    let cmd = format!(
+        "dd if='{}' bs=4096 skip={} count={} 2>/dev/null | base64",
+        remote_path, q, blocks
+    );
+    let b64 = adb_shell(adb, serial, &cmd).ok()?;
+    let decoded = base64_decode(&b64);
+    if decoded.len() < r + len {
+        return None;
+    }
+    Some(decoded[r..r + len].to_vec())
+}
+
+fn is_safe_bundle_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.ends_with(".r")
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-')
+}
+
+struct RemoteVString {
+    file_name: String,
+    remote_path: String,
+    entry_count: usize,
+}
+
+struct RemoteStaticUi {
+    file_name: String,
+    remote_path: String,
+    sub_offset: usize,
+}
+
+fn discover_android_vstring_adb(adb: &Path, serial: &str) -> Result<Option<RemoteVString>, String> {
+    let cmd = format!(
+        "for f in '{}'/*.r; do [ -f \"$f\" ] || continue; sz=$(stat -c %s \"$f\" 2>/dev/null || echo 0); if [ \"$sz\" -ge 50000000 ]; then mt=$(stat -c %Y \"$f\" 2>/dev/null || echo 0); echo \"$sz $mt $f\"; fi; done",
+        REMOTE_RAW_BUNDLE_DIR
+    );
+    let out = adb_shell(adb, serial, &cmd)?;
+    let mut best: Option<(usize, u64, String, String)> = None;
+    for line in out.lines() {
+        let mut parts = line.split_whitespace();
+        let Some(sz_s) = parts.next() else { continue };
+        let Some(mt_s) = parts.next() else { continue };
+        let Some(rpath) = parts.next() else { continue };
+        let Ok(fsize) = sz_s.parse::<usize>() else { continue };
+        let mt = mt_s.parse::<u64>().unwrap_or(0);
+        let fname = rpath.rsplit('/').next().unwrap_or("");
+        if !is_safe_bundle_name(fname) {
+            continue;
+        }
+        let Some(mut h1) = adb_read_slice(adb, serial, rpath, 4120, 24) else { continue };
+        xor_mmap_in_place(&mut h1, 4120, EMBED_MMAP_KEY);
+        let hash_bytes = read_u32_le(&h1, 0) as usize;
+        let hash_start = read_u32_le(&h1, 4) as usize;
+        if hash_start != 4120 {
+            continue;
+        }
+        let Some(str_sec_off) = 4120usize.checked_add(hash_bytes) else { continue };
+        if str_sec_off + 20 > fsize {
+            continue;
+        }
+        let Some(mut sh) = adb_read_slice(adb, serial, rpath, str_sec_off, 20) else { continue };
+        xor_mmap_in_place(&mut sh, str_sec_off, EMBED_MMAP_KEY);
+        let count = read_u32_le(&sh, 16) as usize;
+        if count < 500_000 || str_sec_off + 20 + count.saturating_mul(4) >= fsize {
+            continue;
+        }
+        let better = match &best {
+            None => true,
+            Some((bc, bm, _, _)) => count > *bc || (count == *bc && mt > *bm),
+        };
+        if better {
+            best = Some((count, mt, fname.to_string(), rpath.to_string()));
+        }
+    }
+    Ok(best.map(|(entry_count, _, file_name, remote_path)| RemoteVString {
+        file_name,
+        remote_path,
+        entry_count,
+    }))
+}
+
+fn probe_remote_static_ui_file(
+    adb: &Path,
+    serial: &str,
+    bak_dir: &Path,
+    fname: &str,
+    state_file: &PatchStateFile,
+) -> Result<Option<RemoteStaticUi>, String> {
+    if !is_safe_bundle_name(fname) {
+        return Ok(None);
+    }
+    let remote_path = format!("{}/{}", REMOTE_DEFAULT_BUNDLE_DIR, fname);
+    let sz_out = adb_shell(adb, serial, &format!("stat -c %s '{}' 2>/dev/null || echo 0", remote_path))?;
+    let rsize = sz_out.trim().parse::<u64>().unwrap_or(0);
+    if rsize < 100_000 {
+        return Ok(None);
+    }
+    // Fast-path 1: cached filename + sub_offset in _ruza_state.json (zero pull!)
+    if state_file.static_ui.file_name == fname && state_file.static_ui.sub_offset > 0 {
+        return Ok(Some(RemoteStaticUi {
+            file_name: fname.to_string(),
+            remote_path,
+            sub_offset: state_file.static_ui.sub_offset,
+        }));
+    }
+    // Fast-path 2: local original backup exists (zero pull!)
+    let local_bak = bak_dir.join(format!("{}.original", fname));
+    if local_bak.is_file() {
+        if let Ok(buf) = fs::read(&local_bak) {
+            if let Some((sub_offset, _)) = patch_engine::find_static_ui_subbundle_in_bytes(&buf) {
+                return Ok(Some(RemoteStaticUi {
+                    file_name: fname.to_string(),
+                    remote_path,
+                    sub_offset,
+                }));
+            }
+        }
+    }
+    // Pull to temp file and inspect UnityCN CAB header
+    let tmp = bak_dir.join("_probe_static_ui.tmp");
+    if adb_pull(adb, serial, &remote_path, &tmp).is_ok() {
+        let res = fs::read(&tmp)
+            .ok()
+            .and_then(|buf| patch_engine::find_static_ui_subbundle_in_bytes(&buf));
+        let _ = fs::remove_file(&tmp);
+        if let Some((sub_offset, _)) = res {
+            return Ok(Some(RemoteStaticUi {
+                file_name: fname.to_string(),
+                remote_path,
+                sub_offset,
+            }));
+        }
+    }
+    let _ = fs::remove_file(&tmp);
+    Ok(None)
+}
+
+fn discover_android_static_ui_adb(
+    adb: &Path,
+    serial: &str,
+    bak_dir: &Path,
+    state_file: &mut PatchStateFile,
+) -> Result<Option<RemoteStaticUi>, String> {
+    let mut checked: HashSet<String> = HashSet::new();
+
+    // Tier 1: cached name + known Android Static UI names
+    let mut fast_names: Vec<String> = Vec::new();
+    if !state_file.static_ui.file_name.is_empty() {
+        fast_names.push(state_file.static_ui.file_name.clone());
+    }
+    for &k in KNOWN_ANDROID_STATIC_UI_NAMES {
+        fast_names.push(k.to_string());
+    }
+    for fname in fast_names {
+        if !checked.insert(fname.clone()) {
+            continue;
+        }
+        if let Some(found) = probe_remote_static_ui_file(adb, serial, bak_dir, &fname, state_file)? {
+            if state_file.static_ui.file_name != found.file_name
+                || state_file.static_ui.sub_offset != found.sub_offset
+            {
+                state_file.static_ui.file_name = found.file_name.clone();
+                state_file.static_ui.sub_offset = found.sub_offset;
+                patch_engine::save_patch_state(bak_dir, state_file);
+            }
+            return Ok(Some(found));
+        }
+    }
+
+    // Tier 2/3: list default_package/BundleFiles/*.r (2.5-10 MB newest-first, then 100 KB-30 MB)
+    let cmd = format!(
+        "for f in '{}'/*.r; do [ -f \"$f\" ] || continue; sz=$(stat -c %s \"$f\" 2>/dev/null || echo 0); if [ \"$sz\" -ge 100000 ] && [ \"$sz\" -le 30000000 ]; then mt=$(stat -c %Y \"$f\" 2>/dev/null || echo 0); echo \"$sz $mt $f\"; fi; done",
+        REMOTE_DEFAULT_BUNDLE_DIR
+    );
+    let out = adb_shell(adb, serial, &cmd)?;
+    let mut cands: Vec<(bool, u64, String)> = Vec::new();
+    for line in out.lines() {
+        let mut parts = line.split_whitespace();
+        let Some(sz_s) = parts.next() else { continue };
+        let Some(mt_s) = parts.next() else { continue };
+        let Some(rpath) = parts.next() else { continue };
+        let Ok(sz) = sz_s.parse::<u64>() else { continue };
+        let mt = mt_s.parse::<u64>().unwrap_or(0);
+        let fname = rpath.rsplit('/').next().unwrap_or("");
+        if !is_safe_bundle_name(fname) || checked.contains(fname) {
+            continue;
+        }
+        let in_sweet_spot = (2_500_000..=10_000_000).contains(&sz);
+        cands.push((!in_sweet_spot, u64::MAX - mt, fname.to_string()));
+    }
+    cands.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+    for (_, _, fname) in cands {
+        if let Some(found) = probe_remote_static_ui_file(adb, serial, bak_dir, &fname, state_file)? {
+            state_file.static_ui.file_name = found.file_name.clone();
+            state_file.static_ui.sub_offset = found.sub_offset;
+            patch_engine::save_patch_state(bak_dir, state_file);
+            return Ok(Some(found));
+        }
+    }
+    Ok(None)
 }
 
 fn remote_sha256(adb: &Path, serial: &str, remote_path: &str) -> Result<Option<String>, String> {
@@ -411,6 +650,7 @@ where
 {
     ensure_adb_server(adb)?;
     let bak_dir = android_backup_dir(serial);
+    let mut state_file = patch_engine::load_patch_state(&bak_dir);
     let pkg_check = adb_shell(
         adb,
         serial,
@@ -476,94 +716,142 @@ where
         .join("Library")
         .is_file();
 
-    let specs = [
-        (
-            "vstring",
-            "VStringPool",
-            "Story, Quests, Skills, Kibo, Settings",
-            REMOTE_VSTRING,
-            "1qnamndresrohzjhuvt2lw.r.original",
-            74055usize,
-            ANDROID_VSTRING_ORIG_SHA,
-            ANDROID_VSTRING_EN_SHA,
-            ANDROID_VSTRING_ID_SHA,
-        ),
-        (
-            "static_ui",
-            "Static UI KeyConfig",
-            "Prefab Buttons, Headers, Notices",
-            REMOTE_STATIC_UI,
-            "nibdvaxcnfh3en5bnvhtw.r.original",
-            3135usize,
-            ANDROID_STATIC_UI_ORIG_SHA,
-            ANDROID_STATIC_UI_EN_SHA,
-            ANDROID_STATIC_UI_ID_SHA,
-        ),
-    ];
+    let disc_vs = discover_android_vstring_adb(adb, serial)?;
+    let disc_ui = discover_android_static_ui_adb(adb, serial, &bak_dir, &mut state_file)?;
 
     let mut targets = Vec::with_capacity(2);
-    for (id, name, sub, remote, bak_name, count, orig_sha, en_sha, id_sha) in specs {
-        let bak = bak_dir.join(bak_name);
-        let has_backup = bak.is_file();
-        let sha_opt = remote_sha256(adb, serial, remote)?;
-        let Some(sha) = sha_opt else {
-            log(&format!("  [MISSING] Android {}", name), LogLevel::Warn);
+
+    // [1/2] VStringPool
+    match disc_vs {
+        Some(vs) => {
+            let bak_name = format!("{}.original", vs.file_name);
+            let bak = bak_dir.join(&bak_name);
+            let has_backup = bak.is_file();
+            let sha = remote_sha256(adb, serial, &vs.remote_path)?.unwrap_or_default();
+            let state = patch_engine::classify_bundle_state(
+                &vs.file_name,
+                &sha,
+                &bak,
+                &state_file.vstring,
+                ANDROID_VSTRING_ORIG_SHAS,
+                ANDROID_VSTRING_KNOWN_EN_SHAS,
+                ANDROID_VSTRING_KNOWN_ID_SHAS,
+                true,
+            );
+            let disp_cnt = if state_file.vstring.file_name == vs.file_name && state_file.vstring.matched_count > 0 {
+                state_file.vstring.matched_count
+            } else {
+                VSTRING_STRINGS
+            };
+            let state_lbl = match state.as_str() {
+                "patched_en" => "ENGLISH",
+                "patched_id" => "INDONESIAN",
+                "patched_custom" => "CUSTOM",
+                "original" => "ORIGINAL JP",
+                _ => "MODIFIED",
+            };
+            let lvl = if state.starts_with("patched_") { LogLevel::Ok } else { LogLevel::Info };
+            log(
+                &format!(
+                    "  [ANDROID {}] VStringPool [{}] ({} strings, pool={}, backup={})",
+                    state_lbl,
+                    vs.file_name,
+                    disp_cnt,
+                    vs.entry_count,
+                    if has_backup { "YES" } else { "NO" }
+                ),
+                lvl,
+            );
             targets.push(TargetStatus {
-                id: id.into(),
-                name: name.into(),
-                subtitle: sub.into(),
-                rel_path: remote.into(),
-                backup_name: bak_name.into(),
-                string_count: count,
-                state: "missing".into(),
+                id: "vstring".into(),
+                name: "VStringPool".into(),
+                subtitle: "Story, Quests, Skills, Kibo, Settings".into(),
+                rel_path: vs.remote_path,
+                backup_name: bak_name,
+                string_count: disp_cnt,
+                state,
                 has_backup,
+                sha256: sha,
+            });
+        }
+        None => {
+            log("  [MISSING] Android VStringPool", LogLevel::Warn);
+            targets.push(TargetStatus {
+                id: "vstring".into(),
+                name: "VStringPool".into(),
+                subtitle: "Story, Quests, Skills, Kibo, Settings".into(),
+                rel_path: REMOTE_RAW_BUNDLE_DIR.into(),
+                backup_name: String::new(),
+                string_count: VSTRING_STRINGS,
+                state: "missing".into(),
+                has_backup: false,
                 sha256: String::new(),
             });
-            continue;
-        };
+        }
+    }
 
-        let state = if sha_matches(&sha, id_sha) {
-            "patched_id"
-        } else if sha_matches(&sha, en_sha) {
-            "patched_en"
-        } else if sha_matches(&sha, orig_sha) {
-            "original"
-        } else {
-            "modified"
-        };
-        let state_lbl = match state {
-            "patched_en" => "ENGLISH",
-            "patched_id" => "INDONESIAN",
-            "original" => "ORIGINAL JP",
-            "modified" => "MODIFIED",
-            _ => "MISSING",
-        };
-        let lvl = if state == "patched_en" || state == "patched_id" {
-            LogLevel::Ok
-        } else {
-            LogLevel::Info
-        };
-        log(
-            &format!(
-                "  [ANDROID {}] {} ({} strings, backup={})",
-                state_lbl,
-                name,
-                count,
-                if has_backup { "YES" } else { "NO" }
-            ),
-            lvl,
-        );
-        targets.push(TargetStatus {
-            id: id.into(),
-            name: name.into(),
-            subtitle: sub.into(),
-            rel_path: remote.into(),
-            backup_name: bak_name.into(),
-            string_count: count,
-            state: state.into(),
-            has_backup,
-            sha256: sha,
-        });
+    // [2/2] Static UI KeyConfig
+    match disc_ui {
+        Some(ui) => {
+            let bak_name = format!("{}.original", ui.file_name);
+            let bak = bak_dir.join(&bak_name);
+            let has_backup = bak.is_file();
+            let sha = remote_sha256(adb, serial, &ui.remote_path)?.unwrap_or_default();
+            let state = patch_engine::classify_bundle_state(
+                &ui.file_name,
+                &sha,
+                &bak,
+                &state_file.static_ui,
+                ANDROID_STATIC_UI_ORIG_SHAS,
+                ANDROID_STATIC_UI_KNOWN_EN_SHAS,
+                ANDROID_STATIC_UI_KNOWN_ID_SHAS,
+                true,
+            );
+            let state_lbl = match state.as_str() {
+                "patched_en" => "ENGLISH",
+                "patched_id" => "INDONESIAN",
+                "patched_custom" => "CUSTOM",
+                "original" => "ORIGINAL JP",
+                _ => "MODIFIED",
+            };
+            let lvl = if state.starts_with("patched_") { LogLevel::Ok } else { LogLevel::Info };
+            log(
+                &format!(
+                    "  [ANDROID {}] Static UI KeyConfig [{}] ({} strings, off={}, backup={})",
+                    state_lbl,
+                    ui.file_name,
+                    STATIC_UI_STRINGS,
+                    ui.sub_offset,
+                    if has_backup { "YES" } else { "NO" }
+                ),
+                lvl,
+            );
+            targets.push(TargetStatus {
+                id: "static_ui".into(),
+                name: "Static UI KeyConfig".into(),
+                subtitle: "Prefab Buttons, Headers, Notices".into(),
+                rel_path: ui.remote_path,
+                backup_name: bak_name,
+                string_count: STATIC_UI_STRINGS,
+                state,
+                has_backup,
+                sha256: sha,
+            });
+        }
+        None => {
+            log("  [MISSING] Android Static UI KeyConfig", LogLevel::Warn);
+            targets.push(TargetStatus {
+                id: "static_ui".into(),
+                name: "Static UI KeyConfig".into(),
+                subtitle: "Prefab Buttons, Headers, Notices".into(),
+                rel_path: REMOTE_DEFAULT_BUNDLE_DIR.into(),
+                backup_name: String::new(),
+                string_count: STATIC_UI_STRINGS,
+                state: "missing".into(),
+                has_backup: false,
+                sha256: String::new(),
+            });
+        }
     }
 
     let mut reasons = Vec::new();
@@ -573,17 +861,18 @@ where
             detected_version, ANDROID_EXPECTED_VERSION
         ));
     }
-    if !detected_res_rev.is_empty() && detected_res_rev != ANDROID_EXPECTED_RES_REV {
-        reasons.push(format!(
-            "Android resource revision r{} != r{}",
-            detected_res_rev, ANDROID_EXPECTED_RES_REV
-        ));
-    }
     let modified_cnt = targets
         .iter()
         .filter(|t| t.state == "modified" && !t.has_backup)
         .count();
     let missing_cnt = targets.iter().filter(|t| t.state == "missing").count();
+    // Smart hotfix-proof sync: only complain about res_rev if bundles are actually missing!
+    if missing_cnt > 0 && !detected_res_rev.is_empty() && detected_res_rev != ANDROID_EXPECTED_RES_REV {
+        reasons.push(format!(
+            "Android resource revision r{} != r{}",
+            detected_res_rev, ANDROID_EXPECTED_RES_REV
+        ));
+    }
     if modified_cnt > 0 {
         reasons.push(format!(
             "{} Android bundle(s) differ from verified SHA-256 hashes",
@@ -660,54 +949,53 @@ fn push_atomic_verified(
     Ok(final_sha)
 }
 
-fn ensure_android_backup<L>(
+fn ensure_android_backup_v2<L>(
     adb: &Path,
     serial: &str,
+    file_name: &str,
     remote: &str,
     bak_path: &Path,
     lang: PatchLang,
     custom: Option<&patch_engine::CustomPack>,
-    en_sha: &str,
-    id_sha: &str,
+    state_entry: &BundlePatchState,
+    known_en: &[&str],
+    known_id: &[&str],
     label: &str,
     log: &mut L,
-) -> Result<bool, String>
+) -> Result<(bool, String), String>
 where
     L: FnMut(&str, LogLevel),
 {
     let cur_sha = remote_sha256(adb, serial, remote)?
         .ok_or_else(|| format!("Android {} not found on device: {}", label, remote))?;
 
+    let st_match = state_entry.file_name == file_name
+        && !state_entry.patched_sha.is_empty()
+        && cur_sha.eq_ignore_ascii_case(&state_entry.patched_sha);
+
     if !bak_path.is_file() {
-        let is_en = sha_matches(&cur_sha, en_sha);
-        let is_id = sha_matches(&cur_sha, id_sha);
-        if is_en || is_id {
+        let is_en = patch_engine::sha_in_list(&cur_sha, known_en)
+            || (st_match && state_entry.lang == "patched_en");
+        let is_id = patch_engine::sha_in_list(&cur_sha, known_id)
+            || (st_match && state_entry.lang == "patched_id");
+        let is_custom = st_match && state_entry.lang == "patched_custom";
+        if is_en || is_id || is_custom {
             if custom.is_some() {
                 return Err(format!(
                     "Android {} is already patched and original PC backup is missing. Restore Original JP first before applying a Custom Language Pack.",
                     label
                 ));
             }
-            match lang {
-                PatchLang::En if is_en => return Ok(true),
-                PatchLang::Id if is_id => return Ok(true),
-                PatchLang::En if is_id => {
-                    return Err(format!(
-                        "Android {} is patched in ID and original PC backup is missing. Restore Original JP first before switching to EN.",
-                        label
-                    ));
-                }
-                PatchLang::Id if is_en => {
-                    return Err(format!(
-                        "Android {} is patched in EN and original PC backup is missing. Restore Original JP first before switching to ID.",
-                        label
-                    ));
-                }
-                _ => {}
+            if st_match && ((lang == PatchLang::En && is_en) || (lang == PatchLang::Id && is_id)) {
+                return Ok((true, state_entry.orig_sha.clone()));
             }
+            return Err(format!(
+                "Android {} is already patched and original PC backup is missing. Restore Original JP first.",
+                label
+            ));
         }
         log(
-            &format!("  Pulling original Android {} for PC backup...", label),
+            &format!("  Pulling original Android {} [{}] for PC backup...", label, file_name),
             LogLevel::Info,
         );
         let tmp_bak = bak_path.with_extension("original.tmp");
@@ -730,23 +1018,26 @@ where
             ),
             LogLevel::Ok,
         );
-        return Ok(false);
+        return Ok((false, pulled_sha));
     }
 
-    // Never skip when a custom pack is active so edited custom JSON always repacks fresh from backup
-    if custom.is_some() {
-        return Ok(false);
-    }
-
-    // Backup exists; check if remote is already on desired language
-    let target_sha = match lang {
-        PatchLang::En => en_sha,
-        PatchLang::Id => id_sha,
+    let orig_sha = if state_entry.file_name == file_name && !state_entry.orig_sha.is_empty() {
+        state_entry.orig_sha.clone()
+    } else {
+        sha256_file(bak_path)?
     };
-    if sha_matches(&cur_sha, target_sha) {
-        return Ok(true);
+
+    if custom.is_some() {
+        return Ok((false, orig_sha));
     }
-    Ok(false)
+    let want_tag = match lang {
+        PatchLang::En => "patched_en",
+        PatchLang::Id => "patched_id",
+    };
+    if st_match && state_entry.lang == want_tag {
+        return Ok((true, orig_sha));
+    }
+    Ok((false, orig_sha))
 }
 
 pub fn apply_android_patch<L, P>(
@@ -765,6 +1056,7 @@ where
     ensure_android_not_running(adb, serial, "patching")?;
     let bak_dir = android_backup_dir(serial);
     fs::create_dir_all(&bak_dir).map_err(|e| format!("Create Android backup dir failed: {}", e))?;
+    let mut state_file = patch_engine::load_patch_state(&bak_dir);
 
     let active_label = match custom {
         Some(c) => format!("{} ({} · base={})", c.meta.name, c.meta.code, c.base.as_str().to_uppercase()),
@@ -796,34 +1088,42 @@ where
     on_progress(
         0,
         ANDROID_TOTAL_STRINGS,
-        &format!("Checking Android {} via ADB...", serial),
+        &format!("Discovering active Android bundles on {}...", serial),
     );
 
-    // [1/2] Android VStringPool (74,055 strings)
+    let disc_vs = discover_android_vstring_adb(adb, serial)?
+        .ok_or("Android VStringPool bundle not found on device. Finish in-game download first.")?;
+    let disc_ui = discover_android_static_ui_adb(adb, serial, &bak_dir, &mut state_file)?
+        .ok_or("Android Static UI bundle not found on device. Finish in-game download first.")?;
+
+    // [1/2] Android VStringPool (universal hash-keyed!)
     log(
-        &format!("=== [1/2] Patching Android VStringPool ({}) ===", active_code),
+        &format!("=== [1/2] Patching Android VStringPool [{} · {}] ===", disc_vs.file_name, active_code),
         LogLevel::Info,
     );
-    let vs_bak = bak_dir.join("1qnamndresrohzjhuvt2lw.r.original");
-    on_progress(0, ANDROID_TOTAL_STRINGS, "Checking / backing up Android VStringPool (130 MB)...");
-    let vs_already = ensure_android_backup(
+    let vs_bak = bak_dir.join(format!("{}.original", disc_vs.file_name));
+    on_progress(0, ANDROID_TOTAL_STRINGS, "Checking / backing up Android VStringPool...");
+    let (vs_already, vs_orig_sha) = ensure_android_backup_v2(
         adb,
         serial,
-        REMOTE_VSTRING,
+        &disc_vs.file_name,
+        &disc_vs.remote_path,
         &vs_bak,
         lang,
         custom,
-        ANDROID_VSTRING_EN_SHA,
-        ANDROID_VSTRING_ID_SHA,
+        &state_file.vstring,
+        ANDROID_VSTRING_KNOWN_EN_SHAS,
+        ANDROID_VSTRING_KNOWN_ID_SHAS,
         "VStringPool",
         &mut log,
     )?;
     if vs_already {
+        let cnt = state_file.vstring.matched_count.max(VSTRING_STRINGS);
         log(
-            &format!("  Android VStringPool already matches {} (74,055 strings).", active_code),
+            &format!("  Android VStringPool [{}] already matches {} ({} strings).", disc_vs.file_name, active_code, cnt),
             LogLevel::Ok,
         );
-        rewritten += 74055;
+        rewritten += cnt;
         on_progress(rewritten, ANDROID_TOTAL_STRINGS, "Android VStringPool already up-to-date");
     } else {
         let orig_buf = fs::read(&vs_bak).map_err(|e| format!("Read Android VStringPool backup failed: {}", e))?;
@@ -834,17 +1134,28 @@ where
             &mut log,
             &mut |delta, stg| on_progress(delta, ANDROID_TOTAL_STRINGS, stg),
         )?;
-        let staged = bak_dir.join("1qnamndresrohzjhuvt2lw.r.staged");
+        let staged = bak_dir.join(format!("{}.staged", disc_vs.file_name));
         fs::write(&staged, &out_buf).map_err(|e| format!("Write staged Android VStringPool failed: {}", e))?;
         let local_sha = sha256_file(&staged)?;
-        on_progress(count, ANDROID_TOTAL_STRINGS, "Pushing patched VStringPool to Android (130 MB)...");
+        on_progress(count, ANDROID_TOTAL_STRINGS, "Pushing patched VStringPool to Android...");
         log("  Pushing patched VStringPool to Android via ADB (atomic swap)...", LogLevel::Info);
-        let push_res = push_atomic_verified(adb, serial, &staged, REMOTE_VSTRING, &local_sha);
+        let push_res = push_atomic_verified(adb, serial, &staged, &disc_vs.remote_path, &local_sha);
         let _ = fs::remove_file(&staged);
         let final_sha = push_res?;
+        state_file.vstring = BundlePatchState {
+            file_name: disc_vs.file_name.clone(),
+            sub_offset: 0,
+            lang: patch_engine::state_tag_for(lang, custom),
+            custom_code: custom.map(|c| c.meta.code.clone()).unwrap_or_default(),
+            orig_sha: vs_orig_sha,
+            patched_sha: final_sha.clone(),
+            matched_count: count,
+        };
+        patch_engine::save_patch_state(&bak_dir, &state_file);
         log(
             &format!(
-                "  Android VStringPool [{}] installed & verified! Rewritten={}, SHA256={}",
+                "  Android VStringPool [{} · {}] installed & verified! Rewritten={}, SHA256={}",
+                disc_vs.file_name,
                 active_code,
                 count,
                 final_sha
@@ -854,57 +1165,73 @@ where
         rewritten += count;
     }
 
-    // [2/2] Android Static UI KeyConfig (3,135 strings)
+    // [2/2] Android Static UI KeyConfig (dynamically discovered!)
     log(
-        &format!("=== [2/2] Patching Android Static UI KeyConfig ({}) ===", active_code),
+        &format!("=== [2/2] Patching Android Static UI [{} · {}] ===", disc_ui.file_name, active_code),
         LogLevel::Info,
     );
-    let ui_bak = bak_dir.join("nibdvaxcnfh3en5bnvhtw.r.original");
-    on_progress(rewritten, ANDROID_TOTAL_STRINGS, "Checking / backing up Android Static UI (6 MB)...");
-    let ui_already = ensure_android_backup(
+    let ui_bak = bak_dir.join(format!("{}.original", disc_ui.file_name));
+    on_progress(rewritten, ANDROID_TOTAL_STRINGS, "Checking / backing up Android Static UI...");
+    let (ui_already, ui_orig_sha) = ensure_android_backup_v2(
         adb,
         serial,
-        REMOTE_STATIC_UI,
+        &disc_ui.file_name,
+        &disc_ui.remote_path,
         &ui_bak,
         lang,
         custom,
-        ANDROID_STATIC_UI_EN_SHA,
-        ANDROID_STATIC_UI_ID_SHA,
+        &state_file.static_ui,
+        ANDROID_STATIC_UI_KNOWN_EN_SHAS,
+        ANDROID_STATIC_UI_KNOWN_ID_SHAS,
         "Static UI KeyConfig",
         &mut log,
     )?;
     if ui_already {
         log(
-            &format!("  Android Static UI KeyConfig already matches {} (3,135 strings).", active_code),
+            &format!("  Android Static UI [{}] already matches {} ({} strings).", disc_ui.file_name, active_code, STATIC_UI_STRINGS),
             LogLevel::Ok,
         );
-        rewritten += 3135;
+        rewritten += STATIC_UI_STRINGS;
         on_progress(rewritten, ANDROID_TOTAL_STRINGS, "Android Static UI already up-to-date");
     } else {
         let orig_buf = fs::read(&ui_bak).map_err(|e| format!("Read Android Static UI backup failed: {}", e))?;
+        let sub_off = patch_engine::find_static_ui_subbundle_in_bytes(&orig_buf)
+            .map(|(off, _)| off)
+            .unwrap_or(disc_ui.sub_offset);
         let (out_buf, count) = patch_engine::patch_static_ui_bytes(
             &orig_buf,
-            ANDROID_STATIC_UI_SUB_OFFSET,
+            sub_off,
             lang,
             custom,
             &mut log,
             &mut |delta, stg| on_progress(rewritten + delta, ANDROID_TOTAL_STRINGS, stg),
         )?;
-        let staged = bak_dir.join("nibdvaxcnfh3en5bnvhtw.r.staged");
+        let staged = bak_dir.join(format!("{}.staged", disc_ui.file_name));
         fs::write(&staged, &out_buf).map_err(|e| format!("Write staged Android Static UI failed: {}", e))?;
         let local_sha = sha256_file(&staged)?;
         on_progress(
             rewritten + count,
             ANDROID_TOTAL_STRINGS,
-            "Pushing patched Static UI to Android (6 MB)...",
+            "Pushing patched Static UI to Android...",
         );
         log("  Pushing patched Static UI to Android via ADB (atomic swap)...", LogLevel::Info);
-        let push_res = push_atomic_verified(adb, serial, &staged, REMOTE_STATIC_UI, &local_sha);
+        let push_res = push_atomic_verified(adb, serial, &staged, &disc_ui.remote_path, &local_sha);
         let _ = fs::remove_file(&staged);
         let final_sha = push_res?;
+        state_file.static_ui = BundlePatchState {
+            file_name: disc_ui.file_name.clone(),
+            sub_offset: sub_off,
+            lang: patch_engine::state_tag_for(lang, custom),
+            custom_code: custom.map(|c| c.meta.code.clone()).unwrap_or_default(),
+            orig_sha: ui_orig_sha,
+            patched_sha: final_sha.clone(),
+            matched_count: count,
+        };
+        patch_engine::save_patch_state(&bak_dir, &state_file);
         log(
             &format!(
-                "  Android Static UI KeyConfig [{}] installed & verified! Rewritten={}, SHA256={}",
+                "  Android Static UI KeyConfig [{} · {}] installed & verified! Rewritten={}, SHA256={}",
+                disc_ui.file_name,
                 active_code,
                 count,
                 final_sha
@@ -916,7 +1243,7 @@ where
 
     on_progress(
         rewritten,
-        ANDROID_TOTAL_STRINGS,
+        rewritten.max(ANDROID_TOTAL_STRINGS),
         &format!("Android patch verified 100% ({})!", active_code),
     );
     log(
@@ -1029,9 +1356,46 @@ where
     ensure_adb_server(adb)?;
     ensure_android_not_running(adb, serial, "rollback")?;
     let bak_dir = android_backup_dir(serial);
+    let mut state_file = patch_engine::load_patch_state(&bak_dir);
+    let disc_vs = discover_android_vstring_adb(adb, serial)?;
+    let disc_ui = discover_android_static_ui_adb(adb, serial, &bak_dir, &mut state_file)?;
+
+    let vs_fname = disc_vs
+        .as_ref()
+        .map(|v| v.file_name.clone())
+        .or_else(|| {
+            if !state_file.vstring.file_name.is_empty() {
+                Some(state_file.vstring.file_name.clone())
+            } else {
+                Some("1qnamndresrohzjhuvt2lw.r".to_string())
+            }
+        })
+        .unwrap();
+    let ui_fname = disc_ui
+        .as_ref()
+        .map(|u| u.file_name.clone())
+        .or_else(|| {
+            if !state_file.static_ui.file_name.is_empty() {
+                Some(state_file.static_ui.file_name.clone())
+            } else {
+                Some("nibdvaxcnfh3en5bnvhtw.r".to_string())
+            }
+        })
+        .unwrap();
+
     let specs = [
-        ("VStringPool", REMOTE_VSTRING, "1qnamndresrohzjhuvt2lw.r.original"),
-        ("Static UI KeyConfig", REMOTE_STATIC_UI, "nibdvaxcnfh3en5bnvhtw.r.original"),
+        (
+            "vstring",
+            "VStringPool",
+            format!("{}/{}", REMOTE_RAW_BUNDLE_DIR, vs_fname),
+            format!("{}.original", vs_fname),
+        ),
+        (
+            "static_ui",
+            "Static UI KeyConfig",
+            format!("{}/{}", REMOTE_DEFAULT_BUNDLE_DIR, ui_fname),
+            format!("{}.original", ui_fname),
+        ),
     ];
     let total = specs.len();
     let mut restored = 0usize;
@@ -1040,7 +1404,7 @@ where
         LogLevel::Warn,
     );
 
-    for (i, (name, remote, bak_name)) in specs.iter().enumerate() {
+    for (i, (id, name, remote, bak_name)) in specs.iter().enumerate() {
         on_progress(i, total, &format!("Restoring Android {}...", name));
         let bak = bak_dir.join(bak_name);
         if !bak.is_file() {
@@ -1052,22 +1416,31 @@ where
         }
         let bak_sha = sha256_file(&bak)?;
         let cur_sha = remote_sha256(adb, serial, remote)?.unwrap_or_default();
-        if cur_sha.eq_ignore_ascii_case(&bak_sha) {
+        if !cur_sha.eq_ignore_ascii_case(&bak_sha) {
+            let post_sha = push_atomic_verified(adb, serial, &bak, remote, &bak_sha)?;
+            log(
+                &format!(
+                    "  [RESTORED] Android {} -> Original JP (SHA256={}...)",
+                    name,
+                    &post_sha[..16.min(post_sha.len())]
+                ),
+                LogLevel::Ok,
+            );
+        } else {
             log(&format!("  [OK] Android {} is already Original JP.", name), LogLevel::Ok);
-            restored += 1;
-            continue;
         }
-        let post_sha = push_atomic_verified(adb, serial, &bak, remote, &bak_sha)?;
-        log(
-            &format!(
-                "  [RESTORED] Android {} -> Original JP (SHA256={}...)",
-                name,
-                &post_sha[..16.min(post_sha.len())]
-            ),
-            LogLevel::Ok,
-        );
+        let st = if *id == "vstring" {
+            &mut state_file.vstring
+        } else {
+            &mut state_file.static_ui
+        };
+        st.lang = "original".into();
+        st.custom_code.clear();
+        st.patched_sha.clear();
+        st.orig_sha = bak_sha;
         restored += 1;
     }
+    patch_engine::save_patch_state(&bak_dir, &state_file);
 
     // Restore News cache if backed up locally
     let news_work = bak_dir.join("NewsWork");

@@ -3,6 +3,7 @@ package com.ruzalang.patcher.storage
 import androidx.annotation.Keep
 import com.ruzalang.patcher.IPatcherFileService
 import com.ruzalang.patcher.engine.CryptoLz4
+import com.ruzalang.patcher.engine.PatchEngine
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileInputStream
@@ -132,5 +133,26 @@ class PatcherFileService : IPatcherFileService.Stub() {
     override fun isPackageInstalled(packageName: String): Boolean {
         val out = runCmd("pm", "path", packageName)
         return out.contains("package:")
+    }
+
+    override fun findActiveVStringBundle(rawBundleDir: String, key4096: ByteArray): String {
+        return try {
+            val found = PatchEngine.discoverVStringInDir(File(rawBundleDir), key4096) ?: return ""
+            "${found.fileName}|${found.entryCount}"
+        } catch (_: Throwable) {
+            ""
+        }
+    }
+
+    override fun findActiveStaticUiBundle(defaultBundleDir: String, preferredName: String?): String {
+        return try {
+            val prefs = ArrayList<String>()
+            if (!preferredName.isNullOrBlank()) prefs.add(preferredName)
+            prefs.addAll(PatchEngine.KNOWN_ANDROID_STATIC_UI_NAMES)
+            val found = PatchEngine.discoverStaticUiInDir(File(defaultBundleDir), prefs) ?: return ""
+            "${found.fileName}|${found.subOffset}|${found.subSize}"
+        } catch (_: Throwable) {
+            ""
+        }
     }
 }

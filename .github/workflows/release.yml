@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build & publish (e.g. v0.8.1)"
+        description: "Release tag to build & publish (e.g. v0.9.0)"
         required: true
-        default: "v0.8.1"
+        default: "v0.9.0"
 
 permissions:
   contents: write
@@ -204,19 +204,24 @@ jobs:
           ![Settings Menu](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-en.jpg)
 
           ### Highlights / Fitur Utama
-          - **NEW — Live Process-Guard Button Locking (\`v0.8.1\`):**
+          - **NEW — Hotfix-Proof Universal Engine & Full \`r3273853\` / \`r3273851\` Support (\`v0.9.0\`):**
+            - **Dynamic Bundle Auto-Discovery (\`PC\` & \`Android\`):** Automatically finds active \`VStringPool\` and \`Static UI KeyConfig\` \`.r\` bundles with zero hardcoded filenames or sub-bundle offsets across PC, Android ADB, Shizuku, SAF, and Direct Storage.
+            - **Universal Content-Hash Matching (\`RZV2\`):** Matches all **\`76,180\`** \`VStringPool\` strings by \`FNV-1a64\` content hash + byte length with dynamic contiguous span repacking — works seamlessly across \`r3219596\`, \`r3219598\`, \`r3273851\`, \`r3273853\`, and future resource hotfixes!
+            - **Smart Hotfix Version Sync:** Eliminates false \`Client Version Mismatch\` popups on compatible resource hotfixes (\`r3273851\` / \`r3273853\`+) with per-bundle \`_ruza_state.json\` tracking (including \`Custom OK\` state for custom packs) and \`<bundle>.original\` backups.
+            - **+2,125 New Hotfix Strings (\`EN\` & \`ID\`):** Full translation of all \`2,125\` new \`r3273853\` strings (**\`79,786\` PC** / **\`79,315\` Android · \`99.4%\`**) + tightened Indonesian \`Static UI\` LZ4HC fit with verified free slack.
+          - **Live Process-Guard Button Locking (\`v0.8.1\`):**
             - Automatically disables **Install Patch**, **Translate News**, and **Rollback JP** (updating the CTA to **\`Close Game First\` / \`Tutup Game Dulu\`**) whenever the target game or launcher is detected running on **Windows PC**, **Android ADB**, or **Standalone Android APK**.
             - On **Windows PC**, buttons automatically re-enable within 2 seconds after closing the game; on **Android APK**, tapping the red running banner opens **App Info (Force Stop)** and returning to Ruza-Lang auto-rescans and unlocks immediately.
           - **Bring Your Own Language Pack (BYOL), Contributor Kit & Combat Terminology Fix (\`v0.8.0\`):**
-            - **Bring Your Own Language Pack (\`PC\`, \`Android ADB\`, & \`Standalone APK\`):** Load any custom \`.json\` language pack right inside **Files → Custom Language Pack → Load JSON** (with base inheritance \`en\`/\`id\`/\`jp\`, flat dictionary drop-in support, one-click starter template export on PC, and automatic PC → Android ID remapping — 100% offline!).
+            - **Bring Your Own Language Pack (\`PC\`, \`Android ADB\`, & \`Standalone APK\`):** Load any custom \`.json\` language pack right inside **Files → Custom Language Pack → Load JSON** (with base inheritance \`en\`/\`id\`/\`jp\`, flat dictionary drop-in support, one-click starter template export on PC, and universal content-hash matching across PC & Android — 100% offline!).
             - **Community Language Contribution Kit:** Added [\`CONTRIBUTING.md\`](https://github.com/notnedar/ruza-lang/blob/main/CONTRIBUTING.md), starter template [\`patches/custom-pack-template.json\`](https://github.com/notnedar/ruza-lang/blob/main/patches/custom-pack-template.json), and zero-dependency validator CLI \`node tools/validate-pack.mjs <pack.json>\` (checks placeholders, rich-text tags, UI wrap risks, and UTF-8 byte budget).
             - **Combat Timing Terminology Pass (\`EN\` & \`ID\`):** Replaced all \`62 EN + 73 ID\` literal \`Just Block / Guard / Parry / Dodge / Evade\` entries with natural action-RPG timing terms (**\`Perfect Guard\`**, **\`Perfect Parry\`**, **\`Perfect Dodge\`**, **\`Parry Window / Celah Parry\`**, **\`Dodge Counter\`**, **\`Perfect Guard: Counter\`**) and fixed \`Guard\` (\`ID\` previously \`"Penjaga"\`).
           - **Contextual Localization, Official Glossary & UI Fit Overhaul (\`v0.7.1\`):**
             - Repaired \`6\` off-by-one chunk shifts (\`424\` entries including the \`Equip\` button), aligned \`3,362\` official global terms & 9 elements, applied \`162\` anti-wrap UI overrides, fixed Android 15–17 Edge-to-Edge insets, added automatic **Download Shizuku** popup, and made the APK \`100%\` non-root.
-          - **Standalone Universal Android APK (\`RuzaLangPatcher.apk\`, \`v0.7.0\`):** Patch directly on your Android phone with **zero laptop, zero root, and zero APK re-signing** — responsive Portrait phone & Landscape tablet UI, **Shizuku** (Android 11–17 Wireless Debugging) + **SAF Folder Picker** + **Direct Storage**, **77,190 verified strings (\`99.4%\`)** + Cached News in ~3 seconds, automatic local backups, and one-click **Rollback JP**.
+          - **Standalone Universal Android APK (\`RuzaLangPatcher.apk\`, \`v0.7.0\`):** Patch directly on your Android phone with **zero laptop, zero root, and zero APK re-signing** — responsive Portrait phone & Landscape tablet UI, **Shizuku** (Android 11–17 Wireless Debugging) + **SAF Folder Picker** + **Direct Storage**, **79,315 verified strings (\`99.4%\`)** + Cached News in ~3 seconds, automatic local backups, and one-click **Rollback JP**.
           - **Desktop Launcher Platform Selector (\`PC\` | \`Android\`) & Built-In ADB Connect Guide (\`v0.6.1\`):** Switch between **PC Client** and **Android (ADB)** right from Home, with smart setup prompts, Wireless ADB (\`IP:Port\`), and a bilingual USB/Wi-Fi/Emulator ADB guide.
           - **Built-In SHA-256 Auto-Updater (\`v0.5.0\`):** Automatic update check on launch (plus manual **Check Updates** in **Files**), verified against official \`SHA256SUMS.txt\`.
-          - **PC 4-Store Localization Pipeline (\`77,661\` strings):** \`VStringPool\` (\`74,055\`), \`Static UI KeyConfig\` (\`3,135\`), \`StaticPackage CSV\` (\`113\`), \`resources.assets\` (\`358\`) + **Translate News (\`EN\` / \`ID\`)**.
+          - **PC 4-Store Localization Pipeline (\`79,786\` strings):** \`VStringPool\` (\`76,180\`), \`Static UI KeyConfig\` (\`3,135\`), \`StaticPackage CSV\` (\`113\`), \`resources.assets\` (\`358\`) + **Translate News (\`EN\` / \`ID\`)**.
           - **Safety & Verification:** Live process guard (PC & Android), exact byte-size preservation, automatic backups, SHA-256 verification, and one-click **Rollback to Original JP**.
 
           ### Verified GitHub Actions Builds & Provenance

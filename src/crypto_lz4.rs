@@ -47,6 +47,15 @@ fn hex_upper(bytes: &[u8]) -> String {
     s
 }
 
+pub fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &b in bytes {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
 pub fn xor_mmap_in_place(buf: &mut [u8], file_start_offset: usize, key4096: &[u8]) {
     for (i, byte) in buf.iter_mut().enumerate() {
         let pos = file_start_offset + i;
@@ -614,6 +623,7 @@ pub struct UnityCnDir {
 pub struct UnityCnBundle<'a> {
     pub src: &'a [u8],
     pub base_off: usize,
+    pub fsize: usize,
     pub fsize_off: usize,
     pub cinfo_off: usize,
     pub blocks_info_off: usize,
@@ -627,9 +637,13 @@ pub struct UnityCnBundle<'a> {
 
 impl<'a> UnityCnBundle<'a> {
     pub fn parse(src: &'a [u8], base_off: usize) -> Result<Self, String> {
+        if base_off + 64 > src.len() {
+            return Err("UnityFS header truncated".into());
+        }
         let mut o = base_off;
         let read_cstr = |o: &mut usize| -> Result<String, String> {
-            let end = src[*o..]
+            let max_end = (*o + 128).min(src.len());
+            let end = src[*o..max_end]
                 .iter()
                 .position(|&b| b == 0)
                 .ok_or("Missing null terminator in UnityFS header")?;
@@ -641,12 +655,22 @@ impl<'a> UnityCnBundle<'a> {
         if sig != "UnityFS" {
             return Err(format!("Expected UnityFS, got {}", sig));
         }
+        if o + 4 > src.len() {
+            return Err("UnityFS version truncated".into());
+        }
         let ver = read_u32_be(src, o);
         o += 4;
         let _pver = read_cstr(&mut o)?;
         let _ever = read_cstr(&mut o)?;
+        if o + 20 > src.len() {
+            return Err("UnityFS size/info header truncated".into());
+        }
         let fsize_off = o - base_off;
-        let _fsize = read_i64_be(src, o);
+        let fsize_i64 = read_i64_be(src, o);
+        if fsize_i64 <= 0 || (fsize_i64 as usize) > src.len() - base_off {
+            return Err(format!("UnityFS fsize out of range: {}", fsize_i64));
+        }
+        let fsize = fsize_i64 as usize;
         o += 8;
         let cinfo_off = o - base_off;
         let c_info = read_u32_be(src, o) as usize;
@@ -656,6 +680,9 @@ impl<'a> UnityCnBundle<'a> {
         o += 4; // flags
         if ver >= 7 {
             o = base_off + (((o - base_off) + 15) & !15);
+        }
+        if o + 65 > src.len() {
+            return Err("UnityCN key block truncated".into());
         }
 
         let info_bytes = &src[o..o + 16];
@@ -669,15 +696,24 @@ impl<'a> UnityCnBundle<'a> {
 
         let cipher = UnityCnCipher::new(info_bytes, info_key);
         let blocks_info_off = ((o - base_off) + 65 + 15) & !15;
+        if base_off + blocks_info_off + c_info > src.len() || u_info > 8 * 1024 * 1024 {
+            return Err("UnityFS blocksInfo out of bounds".into());
+        }
         let header_prefix = src[base_off..base_off + blocks_info_off].to_vec();
         let blocks_info = lz4_decompress(&src[base_off + blocks_info_off..base_off + blocks_info_off + c_info], u_info)?;
         let data_start = (blocks_info_off + c_info + 15) & !15;
+        if blocks_info.len() < 24 {
+            return Err("UnityFS blocksInfo too small".into());
+        }
 
         let mut data_hash = [0u8; 16];
         data_hash.copy_from_slice(&blocks_info[..16]);
         let mut bp = 16usize;
         let b_count = read_u32_be(&blocks_info, bp) as usize;
         bp += 4;
+        if bp + b_count * 10 + 4 > blocks_info.len() {
+            return Err("UnityFS block table truncated".into());
+        }
         let mut blocks = Vec::with_capacity(b_count);
         let mut cur_off = data_start;
         for _ in 0..b_count {
@@ -697,6 +733,9 @@ impl<'a> UnityCnBundle<'a> {
         bp += 4;
         let mut dirs = Vec::with_capacity(d_count);
         for _ in 0..d_count {
+            if bp + 20 > blocks_info.len() {
+                return Err("UnityFS dir table truncated".into());
+            }
             let offset = read_i64_be(&blocks_info, bp);
             bp += 8;
             let size = read_i64_be(&blocks_info, bp);
@@ -712,6 +751,7 @@ impl<'a> UnityCnBundle<'a> {
         Ok(Self {
             src,
             base_off,
+            fsize,
             fsize_off,
             cinfo_off,
             blocks_info_off,

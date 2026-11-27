@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Ruza-Lang v0.8.1 — EN / ID + Custom Packs</title>
+<title>Ruza-Lang v0.9.0 — EN / ID + Custom Packs</title>
 <style>
   :root {
     --rail-w: 68px;
@@ -592,6 +592,8 @@
   .pkg-state.patched_en .pkg-dot { background: var(--sky-deep); }
   .pkg-state.patched_id { color: var(--jade); }
   .pkg-state.patched_id .pkg-dot { background: var(--jade); }
+  .pkg-state.patched_custom { color: #5b48a8; }
+  .pkg-state.patched_custom .pkg-dot { background: #5b48a8; }
   .pkg-state.original { color: var(--ink-soft); }
   .pkg-state.modified { color: var(--amber); }
   .pkg-state.modified .pkg-dot { background: var(--amber); }
@@ -783,7 +785,7 @@
           <path d="M16.5 4.5L19.5 4.5L19.5 7.5" stroke="#e8d2a0" stroke-width="1.3"/>
         </svg>
       </div>
-      <span class="rail-ver">0.8.1</span>
+      <span class="rail-ver">0.9.0</span>
     </div>
     <nav class="rail-nav">
       <button class="nav-btn active" data-tab="home">
@@ -820,7 +822,7 @@
         </svg>
       </div>
       <span class="brand-name">Ruza-Lang</span>
-      <span class="brand-ver">0.8.1</span>
+      <span class="brand-ver">0.9.0</span>
     </div>
     <div class="lang-seg">
       <button class="lang-btn active" data-lang="en">EN</button>
@@ -851,7 +853,7 @@
             <div class="hero-ver-row">
               <button id="heroVerBtn" class="hero-ver-btn" type="button" style="display:none;">
                 <span class="hero-ver-dot"></span>
-                <span id="heroVerText">Android v1.0.0 (r3219596) &middot; Synced</span>
+                <span id="heroVerText">Android v1.0.0 (r3273851) &middot; Synced</span>
               </button>
             </div>
             <button id="heroCustomBtn" class="hero-custom-btn" type="button">
@@ -877,7 +879,7 @@
         <div class="dock-left-col">
           <div class="dock-status">
             <span id="progStage" class="dock-stage">Scanning storage access...</span>
-            <span id="progCount" class="dock-count">0 / 77,190</span>
+            <span id="progCount" class="dock-count">0 / 79,315</span>
           </div>
           <div class="dock-row" style="margin-top:4px;">
             <button id="btnAccessChip" class="access-chip" type="button">
@@ -930,7 +932,7 @@
             <div class="set-row">
               <div>
                 <div id="lblVerRow" class="set-label">Client Version Sync</div>
-                <div id="lblVerSub" class="set-sub">Verified for Android v1.0.0 (r3219596)</div>
+                <div id="lblVerSub" class="set-sub">Verified for Android v1.0.0 (r3273851 · Auto-Sync)</div>
               </div>
               <div class="set-right">
                 <span id="pkgVerDetected" class="pkg-count">&mdash;</span>
@@ -952,7 +954,7 @@
 
           <div class="sec-bar">
             <span id="lblPackagesSec">Android Localization Bundles</span>
-            <span id="pkgSummaryRight" class="sec-bar-right">77,190 verified strings (99.4%)</span>
+            <span id="pkgSummaryRight" class="sec-bar-right">79,315 verified strings (99.4%)</span>
           </div>
           <div id="targetsList" class="rows-block" style="margin-bottom:6px;"></div>
 
@@ -1100,7 +1102,7 @@
       btnShizuku: 'Shizuku', btnFolder: 'Folder',
       lblVerRow: 'Client Version Sync', lblVerSubSynced: (e) => `Verified for Android ${e} · Exact-size · No APK re-sign`,
       verSynced: 'Synced', verMismatch: 'Mismatch',
-      lblPackagesSec: 'Android Localization Bundles', pkgSummary: '77,190 verified strings (99.4%)',
+      lblPackagesSec: 'Android Localization Bundles', pkgSummary: '79,315 verified strings (99.4%)',
       sheetNote: 'Original backups saved locally · Exact byte sizes · Zero APK re-sign',
       lblNewsSec: 'Cached In-Game Announcements',
       newsRow1Title: 'Cache Format', newsRow1Sub: 'BestHTTP HTTPCache & Library v3 inside Android/data',
@@ -1110,7 +1112,7 @@
       newsNote: 'Rollback restores cached announcements automatically if a backup exists.',
       lblTerm: 'Execution & Verification Log', copyLog: 'Copy', clearLog: 'Clear', copied: 'Copied log to clipboard.',
       bakYes: 'Backup OK', bakNo: 'No Backup',
-      badges: { patched_en: 'English OK', patched_id: 'Indo OK', original: 'Original JP', modified: 'Modified', missing: 'Missing' },
+      badges: { patched_en: 'English OK', patched_id: 'Indo OK', patched_custom: 'Custom OK', original: 'Original JP', modified: 'Modified', missing: 'Missing' },
       stateScanning: 'Scanning Android installation...',
       stateNotInstalled: 'Android client not installed on this device',
       stateNoAccess: 'Storage access needed · Tap to set up Shizuku / SAF',
@@ -1118,11 +1120,12 @@
       stateDataMissing: 'In-game asset data missing · Finish download first',
       stateEnOk: 'English (EN) active · 2/2 bundles verified',
       stateIdOk: 'Indonesian (ID) active · 2/2 bundles verified',
+      stateCustomOk: 'Custom Language Pack active · 2/2 bundles verified',
       stateOrig: 'Original JP detected · Ready to patch',
       stateMixed: 'Partial patch state · Tap Files to inspect',
       stageNeedAccess: 'Tap Setup Access (Shizuku or SAF) to access Android/data.',
       stageNotInstalled: 'Target Android game not installed on this device.',
-      stageEnOk: 'Installed: English (EN)', stageIdOk: 'Installed: Bahasa Indonesia (ID)', stageOrig: 'Original JP — ready to patch.',
+      stageEnOk: 'Installed: English (EN)', stageIdOk: 'Installed: Bahasa Indonesia (ID)', stageCustomOk: 'Installed: Custom Language Pack', stageOrig: 'Original JP — ready to patch.',
       chipNeedAccess: 'Setup Access (Shizuku / SAF)',
       verHeroSynced: (v) => `Android ${v} · Synced`, verHeroMismatch: (v, e) => `Android ${v} ≠ ${e} — Update recommended`,
       updateBanner: (v) => `Update available: ${v} — Tap to download`,
@@ -1182,7 +1185,7 @@
       btnShizuku: 'Shizuku', btnFolder: 'Folder',
       lblVerRow: 'Sinkronisasi Versi Klien', lblVerSubSynced: (e) => `Terverifikasi untuk Android ${e} · Ukuran identik · Tanpa re-sign APK`,
       verSynced: 'Sinkron', verMismatch: 'Tidak Cocok',
-      lblPackagesSec: 'Bundle Lokalisasi Android', pkgSummary: '77.190 string terverifikasi (99,4%)',
+      lblPackagesSec: 'Bundle Lokalisasi Android', pkgSummary: '79.315 string terverifikasi (99,4%)',
       sheetNote: 'Backup asli tersimpan lokal · Ukuran byte identik · Tanpa re-sign APK',
       lblNewsSec: 'Cache Pengumuman In-Game',
       newsRow1Title: 'Format Cache', newsRow1Sub: 'BestHTTP HTTPCache & Library v3 di dalam Android/data',
@@ -1192,7 +1195,7 @@
       newsNote: 'Rollback otomatis mengembalikan cache berita jika backup tersedia.',
       lblTerm: 'Log Eksekusi & Verifikasi', copyLog: 'Salin', clearLog: 'Bersihkan', copied: 'Log disalin ke clipboard.',
       bakYes: 'Backup Siap', bakNo: 'Belum Backup',
-      badges: { patched_en: 'English OK', patched_id: 'Indo OK', original: 'Original JP', modified: 'Modifikasi', missing: 'Hilang' },
+      badges: { patched_en: 'English OK', patched_id: 'Indo OK', patched_custom: 'Custom OK', original: 'Original JP', modified: 'Modifikasi', missing: 'Hilang' },
       stateScanning: 'Memindai instalasi Android...',
       stateNotInstalled: 'Game Android belum terpasang di HP ini',
       stateNoAccess: 'Butuh izin akses storage · Ketuk untuk atur Shizuku / SAF',
@@ -1200,11 +1203,12 @@
       stateDataMissing: 'Data aset in-game belum lengkap · Selesaikan download dulu',
       stateEnOk: 'Bahasa Inggris (EN) aktif · 2/2 bundle terverifikasi',
       stateIdOk: 'Bahasa Indonesia (ID) aktif · 2/2 bundle terverifikasi',
+      stateCustomOk: 'Paket Bahasa Kustom aktif · 2/2 bundle terverifikasi',
       stateOrig: 'Original JP terdeteksi · Siap dipasang',
       stateMixed: 'Status patch campuran · Cek di tab Paket',
       stageNeedAccess: 'Ketuk Atur Akses (Shizuku atau SAF) untuk baca/tulis Android/data.',
       stageNotInstalled: 'Game Android target belum terpasang di perangkat ini.',
-      stageEnOk: 'Terpasang: Bahasa Inggris (EN)', stageIdOk: 'Terpasang: Bahasa Indonesia (ID)', stageOrig: 'Original JP — siap dipasang.',
+      stageEnOk: 'Terpasang: Bahasa Inggris (EN)', stageIdOk: 'Terpasang: Bahasa Indonesia (ID)', stageCustomOk: 'Terpasang: Paket Bahasa Kustom', stageOrig: 'Original JP — siap dipasang.',
       chipNeedAccess: 'Atur Akses (Shizuku / SAF)',
       verHeroSynced: (v) => `Android ${v} · Sinkron`, verHeroMismatch: (v, e) => `Android ${v} ≠ ${e} — Disarankan tunggu update`,
       updateBanner: (v) => `Update tersedia: ${v} — Ketuk untuk unduh`,
@@ -1355,7 +1359,7 @@
   }
 
   function renderProgress(cur, tot, stage) {
-    const safeTot = Math.max(1, tot || 77190);
+    const safeTot = Math.max(1, tot || 79315);
     const pct = Math.min(100, (cur * 100) / safeTot);
     $('barFill').style.width = pct.toFixed(2) + '%';
     $('progCount').textContent = `${fmt(cur)} / ${fmt(safeTot)} · ${pct.toFixed(0)}%`;
@@ -1398,7 +1402,7 @@
     const listBox = $('targetsList');
     listBox.innerHTML = '';
     const displayList = targets.length ? targets : [
-      { name: 'VStringPool', subtitle: 'Story, Quests, Skills, Kibo, Settings', string_count: 74055, state: 'original', has_backup: false },
+      { name: 'VStringPool', subtitle: 'Story, Quests, Skills, Kibo, Settings', string_count: 76180, state: 'original', has_backup: false },
       { name: 'Static UI KeyConfig', subtitle: 'Prefab Buttons, Headers, Notices', string_count: 3135, state: 'original', has_backup: false }
     ];
     for (const item of displayList) {
@@ -1430,7 +1434,7 @@
       $('pkgVerDetected').textContent = '—';
       $('pkgVerState').className = 'pkg-state missing';
       $('pkgVerState').innerHTML = `<span class="pkg-dot"></span>${tr.verMismatch}`;
-      renderProgress(0, 77190, tr.stageNotInstalled);
+      renderProgress(0, 79315, tr.stageNotInstalled);
       return;
     }
 
@@ -1438,7 +1442,7 @@
       dot.className = 'state-diamond warn';
       txt.textContent = tr.stateNoAccess;
       verBtn.style.display = 'none';
-      renderProgress(0, 77190, tr.stageNeedAccess);
+      renderProgress(0, 79315, tr.stageNeedAccess);
       return;
     }
 
@@ -1459,6 +1463,9 @@
     } else if (targets.some(x => x.state === 'missing')) {
       dot.className = 'state-diamond warn';
       txt.textContent = tr.stateDataMissing;
+    } else if (targets.length && targets.every(x => x.state === 'patched_custom')) {
+      dot.className = 'state-diamond id';
+      txt.textContent = tr.stateCustomOk;
     } else if (targets.length && targets.every(x => x.state === 'patched_en')) {
       dot.className = 'state-diamond en';
       txt.textContent = tr.stateEnOk;
@@ -1473,10 +1480,12 @@
       txt.textContent = tr.stateMixed;
     }
 
-    const activeCnt = targets.filter(x => x.state === 'patched_en' || x.state === 'patched_id').reduce((s, x) => s + x.string_count, 0);
+    const totalStr = targets.reduce((s, x) => s + x.string_count, 0) || 79315;
+    const activeCnt = targets.filter(x => x.state === 'patched_en' || x.state === 'patched_id' || x.state === 'patched_custom').reduce((s, x) => s + x.string_count, 0);
     const allId = targets.length && targets.every(x => x.state === 'patched_id');
     const allEn = targets.length && targets.every(x => x.state === 'patched_en');
-    renderProgress(activeCnt, 77190, allId ? tr.stageIdOk : (allEn ? tr.stageEnOk : tr.stageOrig));
+    const allCu = targets.length && targets.every(x => x.state === 'patched_custom');
+    renderProgress(activeCnt, totalStr, allCu ? tr.stageCustomOk : (allId ? tr.stageIdOk : (allEn ? tr.stageEnOk : tr.stageOrig)));
   }
 
   function applyUiLanguage() {
@@ -1559,7 +1568,7 @@
     switch (ev.type) {
       case 'log': addLog(ev.level, ev.message); break;
       case 'busy': setBusy(!!ev.value); break;
-      case 'progress': renderProgress(ev.current || 0, ev.total || 77190, ev.stage); break;
+      case 'progress': renderProgress(ev.current || 0, ev.total || 79315, ev.stage); break;
       case 'scan_result':
         scan = ev;
         renderScan();

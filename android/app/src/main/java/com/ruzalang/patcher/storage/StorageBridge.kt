@@ -8,13 +8,17 @@ import androidx.documentfile.provider.DocumentFile
 import com.ruzalang.patcher.IPatcherFileService
 import com.ruzalang.patcher.engine.CryptoLz4
 import com.ruzalang.patcher.engine.CustomPack
+import com.ruzalang.patcher.engine.DiscoveredStaticUi
+import com.ruzalang.patcher.engine.DiscoveredVString
 import com.ruzalang.patcher.engine.LogLevel
 import com.ruzalang.patcher.engine.PatchEngine
 import com.ruzalang.patcher.engine.PatchLang
 import com.ruzalang.patcher.engine.PayloadLoader
+import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.nio.ByteBuffer
 import java.security.MessageDigest
 
 enum class AccessMode(val id: String, val label: String) {
@@ -111,14 +115,270 @@ class StorageBridge(private val context: Context) {
         customPackNameFile.delete()
     }
 
+    private data class BundleState(
+        var fileName: String = "",
+        var subOffset: Int = 0,
+        var lang: String = "",
+        var customCode: String = "",
+        var origSha: String = "",
+        var patchedSha: String = "",
+        var matchedCount: Int = 0,
+    )
+
+    private data class PatchState(
+        var vstring: BundleState = BundleState(),
+        var staticUi: BundleState = BundleState(),
+    )
+
+    private fun loadPatchState(): PatchState {
+        val f = File(backupDir, "_ruza_state.json")
+        if (!f.isFile) return PatchState()
+        return try {
+            val root = JSONObject(f.readText(Charsets.UTF_8))
+            fun parseEntry(key: String): BundleState {
+                val o = root.optJSONObject(key) ?: return BundleState()
+                return BundleState(
+                    fileName = o.optString("file_name", ""),
+                    subOffset = o.optInt("sub_offset", 0),
+                    lang = o.optString("lang", ""),
+                    customCode = o.optString("custom_code", ""),
+                    origSha = o.optString("orig_sha", ""),
+                    patchedSha = o.optString("patched_sha", ""),
+                    matchedCount = o.optInt("matched_count", 0),
+                )
+            }
+            PatchState(parseEntry("vstring"), parseEntry("static_ui"))
+        } catch (_: Throwable) {
+            PatchState()
+        }
+    }
+
+    private fun savePatchState(st: PatchState) {
+        try {
+            fun toJson(e: BundleState): JSONObject = JSONObject().apply {
+                put("file_name", e.fileName)
+                put("sub_offset", e.subOffset)
+                put("lang", e.lang)
+                put("custom_code", e.customCode)
+                put("orig_sha", e.origSha)
+                put("patched_sha", e.patchedSha)
+                put("matched_count", e.matchedCount)
+            }
+            val root = JSONObject().apply {
+                put("schema", 1)
+                put("vstring", toJson(st.vstring))
+                put("static_ui", toJson(st.staticUi))
+            }
+            File(backupDir, "_ruza_state.json").writeText(root.toString(2), Charsets.UTF_8)
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun stateTagFor(lang: PatchLang, custom: CustomPack?): String = when {
+        custom != null -> "patched_custom"
+        lang == PatchLang.ID -> "patched_id"
+        else -> "patched_en"
+    }
+
     private fun isDirectFsWritable(): Boolean {
         return try {
+            val rawDir = File(PatchEngine.REMOTE_RAW_BUNDLE_DIR)
             val root = File(PatchEngine.REMOTE_FILES_ROOT)
-            val vs = File(PatchEngine.REMOTE_VSTRING)
-            (vs.isFile && vs.canRead() && vs.canWrite()) || (root.isDirectory && root.canRead() && root.canWrite())
+            (rawDir.isDirectory && rawDir.canRead() && rawDir.canWrite()) ||
+                (root.isDirectory && root.canRead() && root.canWrite())
         } catch (_: Throwable) {
             false
         }
+    }
+
+    private fun probeSafVString(doc: DocumentFile, key4096: ByteArray): Int? {
+        val fsize = doc.length()
+        if (fsize < 50_000_000L || fsize > Int.MAX_VALUE.toLong()) return null
+        return try {
+            context.contentResolver.openFileDescriptor(doc.uri, "r")?.use { pfd ->
+                FileInputStream(pfd.fileDescriptor).channel.use { ch ->
+                    fun readAt(off: Long, len: Int): ByteArray? {
+                        val bb = ByteBuffer.allocate(len)
+                        ch.position(off)
+                        while (bb.hasRemaining()) {
+                            val r = ch.read(bb)
+                            if (r <= 0) return null
+                        }
+                        return bb.array()
+                    }
+                    val h1 = readAt(4120L, 24) ?: return null
+                    CryptoLz4.xorMMapRangeInPlace(h1, 0, h1.size, 4120, key4096)
+                    val hashBytes = CryptoLz4.readI32Le(h1, 0)
+                    val hashStart = CryptoLz4.readI32Le(h1, 4)
+                    if (hashStart != 4120 || hashBytes <= 0) return null
+                    val strSecOff = 4120L + hashBytes.toLong()
+                    if (strSecOff + 20L > fsize) return null
+                    val sh = readAt(strSecOff, 20) ?: return null
+                    CryptoLz4.xorMMapRangeInPlace(sh, 0, sh.size, strSecOff.toInt(), key4096)
+                    val count = CryptoLz4.readI32Le(sh, 16)
+                    if (count < 500_000 || strSecOff + 20L + count.toLong() * 4L >= fsize) return null
+                    count
+                }
+            }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun discoverActiveVString(mode: AccessMode): DiscoveredVString? {
+        val key4096 = loader.load("mmap_key_4096.bin")
+        return when (mode) {
+            AccessMode.SHIZUKU -> {
+                val res = shizukuService?.findActiveVStringBundle(PatchEngine.REMOTE_RAW_BUNDLE_DIR, key4096).orEmpty()
+                val parts = res.split('|')
+                if (parts.size == 2 && parts[0].isNotBlank()) {
+                    DiscoveredVString(parts[0], parts[1].toIntOrNull() ?: 0)
+                } else {
+                    null
+                }
+            }
+            AccessMode.DIRECT -> PatchEngine.discoverVStringInDir(File(PatchEngine.REMOTE_RAW_BUNDLE_DIR), key4096)
+            AccessMode.SAF -> {
+                val dir = resolveSafPath(relFromRemote(PatchEngine.REMOTE_RAW_BUNDLE_DIR)) ?: return null
+                var bestName: String? = null
+                var bestCount = -1
+                var bestMtime = -1L
+                for (doc in dir.listFiles()) {
+                    val name = doc.name ?: continue
+                    if (!doc.isFile || !name.endsWith(".r") || doc.length() < 50_000_000L) continue
+                    val cnt = probeSafVString(doc, key4096) ?: continue
+                    val mt = doc.lastModified()
+                    if (cnt > bestCount || (cnt == bestCount && mt > bestMtime)) {
+                        bestCount = cnt
+                        bestMtime = mt
+                        bestName = name
+                    }
+                }
+                bestName?.let { DiscoveredVString(it, bestCount) }
+            }
+            AccessMode.NONE -> null
+        }
+    }
+
+    private fun discoverActiveStaticUi(mode: AccessMode, state: PatchState): DiscoveredStaticUi? {
+        val preferred = state.staticUi.fileName
+        return when (mode) {
+            AccessMode.SHIZUKU -> {
+                // Fast-path: if cached filename + subOffset exist and file is still present, zero scan!
+                if (preferred.isNotBlank() && state.staticUi.subOffset > 0 &&
+                    remoteExists(mode, "${PatchEngine.REMOTE_DEFAULT_BUNDLE_DIR}/$preferred")
+                ) {
+                    return DiscoveredStaticUi(preferred, state.staticUi.subOffset, 0)
+                }
+                val res = shizukuService?.findActiveStaticUiBundle(
+                    PatchEngine.REMOTE_DEFAULT_BUNDLE_DIR,
+                    preferred.ifBlank { null },
+                ).orEmpty()
+                val parts = res.split('|')
+                if (parts.size >= 3 && parts[0].isNotBlank()) {
+                    val found = DiscoveredStaticUi(
+                        parts[0],
+                        parts[1].toIntOrNull() ?: 0,
+                        parts[2].toIntOrNull() ?: 0,
+                    )
+                    if (state.staticUi.fileName != found.fileName || state.staticUi.subOffset != found.subOffset) {
+                        state.staticUi.fileName = found.fileName
+                        state.staticUi.subOffset = found.subOffset
+                        savePatchState(state)
+                    }
+                    found
+                } else {
+                    null
+                }
+            }
+            AccessMode.DIRECT -> {
+                val prefs = ArrayList<String>()
+                if (preferred.isNotBlank()) prefs.add(preferred)
+                prefs.addAll(PatchEngine.KNOWN_ANDROID_STATIC_UI_NAMES)
+                val found = PatchEngine.discoverStaticUiInDir(File(PatchEngine.REMOTE_DEFAULT_BUNDLE_DIR), prefs)
+                if (found != null && (state.staticUi.fileName != found.fileName || state.staticUi.subOffset != found.subOffset)) {
+                    state.staticUi.fileName = found.fileName
+                    state.staticUi.subOffset = found.subOffset
+                    savePatchState(state)
+                }
+                found
+            }
+            AccessMode.SAF -> {
+                val dir = resolveSafPath(relFromRemote(PatchEngine.REMOTE_DEFAULT_BUNDLE_DIR)) ?: return null
+                if (preferred.isNotBlank() && state.staticUi.subOffset > 0 && dir.findFile(preferred)?.isFile == true) {
+                    return DiscoveredStaticUi(preferred, state.staticUi.subOffset, 0)
+                }
+                val checked = HashSet<String>()
+                fun probeDoc(doc: DocumentFile): DiscoveredStaticUi? {
+                    val name = doc.name ?: return null
+                    if (!doc.isFile || !name.endsWith(".r") || doc.length() !in 100_000L..30_000_000L) return null
+                    val bytes = context.contentResolver.openInputStream(doc.uri)?.use { it.readBytes() } ?: return null
+                    val found = CryptoLz4.findStaticUiSubBundle(bytes) ?: return null
+                    return DiscoveredStaticUi(name, found.first, found.second)
+                }
+                val fastNames = ArrayList<String>()
+                if (preferred.isNotBlank()) fastNames.add(preferred)
+                fastNames.addAll(PatchEngine.KNOWN_ANDROID_STATIC_UI_NAMES)
+                for (name in fastNames) {
+                    if (!checked.add(name)) continue
+                    val doc = dir.findFile(name) ?: continue
+                    val found = probeDoc(doc)
+                    if (found != null) {
+                        state.staticUi.fileName = found.fileName
+                        state.staticUi.subOffset = found.subOffset
+                        savePatchState(state)
+                        return found
+                    }
+                }
+                val sorted = dir.listFiles()
+                    .filter { it.isFile && (it.name?.endsWith(".r") == true) && !checked.contains(it.name) && it.length() in 100_000L..30_000_000L }
+                    .sortedWith(
+                        compareBy<DocumentFile> { it.length() !in 2_500_000L..10_000_000L }
+                            .thenByDescending { it.lastModified() },
+                    )
+                for (doc in sorted) {
+                    val found = probeDoc(doc)
+                    if (found != null) {
+                        state.staticUi.fileName = found.fileName
+                        state.staticUi.subOffset = found.subOffset
+                        savePatchState(state)
+                        return found
+                    }
+                }
+                null
+            }
+            AccessMode.NONE -> null
+        }
+    }
+
+    private fun classifyBundleState(
+        fileName: String,
+        curSha: String,
+        bakFile: File,
+        entry: BundleState,
+        knownOrig: Set<String>,
+        knownEn: Set<String>,
+        knownId: Set<String>,
+    ): String {
+        val up = curSha.uppercase()
+        if (entry.fileName == fileName && entry.patchedSha.isNotEmpty() &&
+            up.equals(entry.patchedSha, ignoreCase = true) && entry.lang.isNotEmpty()
+        ) {
+            return entry.lang
+        }
+        if (knownId.contains(up)) return "patched_id"
+        if (knownEn.contains(up)) return "patched_en"
+        if (knownOrig.contains(up)) return "original"
+        if (entry.fileName == fileName && entry.origSha.isNotEmpty() && up.equals(entry.origSha, ignoreCase = true)) {
+            return "original"
+        }
+        if (bakFile.isFile) {
+            val bakSha = try { CryptoLz4.sha256File(bakFile) } catch (_: Throwable) { "" }
+            if (bakSha.isNotEmpty() && up.equals(bakSha, ignoreCase = true)) return "original"
+            return "modified"
+        }
+        // Newly discovered hotfix bundle (not yet backed up, not matching any known patched SHA) => Original JP!
+        return "original"
     }
 
     fun resolveAccessMode(): AccessMode {
@@ -384,66 +644,122 @@ class StorageBridge(private val context: Context) {
         val newsCacheBytes = remoteSize(mode, "${PatchEngine.REMOTE_FILES_ROOT}/Library").coerceAtLeast(0L)
         val hasNewsBackup = File(backupDir, "NewsWork/_NewsPatchBackup/Library").isFile
 
-        data class Spec(
-            val id: String,
-            val name: String,
-            val sub: String,
-            val remote: String,
-            val bakName: String,
-            val count: Int,
-            val origSha: String,
-            val enSha: String,
-            val idSha: String,
-        )
-
-        val specs = listOf(
-            Spec(
-                "vstring", "VStringPool", "Story, Quests, Skills, Kibo, Settings",
-                PatchEngine.REMOTE_VSTRING, "1qnamndresrohzjhuvt2lw.r.original", 74055,
-                PatchEngine.ANDROID_VSTRING_ORIG_SHA, PatchEngine.ANDROID_VSTRING_EN_SHA, PatchEngine.ANDROID_VSTRING_ID_SHA,
-            ),
-            Spec(
-                "static_ui", "Static UI KeyConfig", "Prefab Buttons, Headers, Notices",
-                PatchEngine.REMOTE_STATIC_UI, "nibdvaxcnfh3en5bnvhtw.r.original", 3135,
-                PatchEngine.ANDROID_STATIC_UI_ORIG_SHA, PatchEngine.ANDROID_STATIC_UI_EN_SHA, PatchEngine.ANDROID_STATIC_UI_ID_SHA,
-            ),
-        )
+        val stateFile = loadPatchState()
+        val discVs = discoverActiveVString(mode)
+        val discUi = discoverActiveStaticUi(mode, stateFile)
 
         val targets = ArrayList<AndroidTargetStatus>(2)
-        for (s in specs) {
-            val hasBak = File(backupDir, s.bakName).isFile
-            val sha = remoteSha256(mode, s.remote)
+
+        // [1/2] VStringPool (dynamically discovered!)
+        if (discVs == null) {
+            log("  [MISSING] VStringPool", LogLevel.WARN)
+            targets.add(
+                AndroidTargetStatus(
+                    "vstring", "VStringPool", "Story, Quests, Skills, Kibo, Settings",
+                    PatchEngine.VSTRING_STRINGS, "missing", false, "",
+                ),
+            )
+        } else {
+            val remote = "${PatchEngine.REMOTE_RAW_BUNDLE_DIR}/${discVs.fileName}"
+            val bak = File(backupDir, "${discVs.fileName}.original")
+            val hasBak = bak.isFile
+            val sha = remoteSha256(mode, remote)
             if (sha == null) {
-                log("  [MISSING] ${s.name}", LogLevel.WARN)
-                targets.add(AndroidTargetStatus(s.id, s.name, s.sub, s.count, "missing", hasBak, ""))
-                continue
+                log("  [MISSING] VStringPool [${discVs.fileName}]", LogLevel.WARN)
+                targets.add(
+                    AndroidTargetStatus(
+                        "vstring", "VStringPool", "Story, Quests, Skills, Kibo, Settings",
+                        PatchEngine.VSTRING_STRINGS, "missing", hasBak, "",
+                    ),
+                )
+            } else {
+                val st = classifyBundleState(
+                    discVs.fileName, sha, bak, stateFile.vstring,
+                    PatchEngine.ANDROID_VSTRING_ORIG_SHAS,
+                    PatchEngine.ANDROID_VSTRING_KNOWN_EN_SHAS,
+                    PatchEngine.ANDROID_VSTRING_KNOWN_ID_SHAS,
+                )
+                val dispCnt = if (stateFile.vstring.fileName == discVs.fileName && stateFile.vstring.matchedCount > 0) {
+                    stateFile.vstring.matchedCount
+                } else {
+                    PatchEngine.VSTRING_STRINGS
+                }
+                val lvl = if (st.startsWith("patched_")) LogLevel.OK else LogLevel.INFO
+                val lbl = when (st) {
+                    "patched_en" -> "ENGLISH"
+                    "patched_id" -> "INDONESIAN"
+                    "patched_custom" -> "CUSTOM"
+                    "original" -> "ORIGINAL JP"
+                    else -> "MODIFIED"
+                }
+                log("  [$lbl] VStringPool [${discVs.fileName}] ($dispCnt strings, pool=${discVs.entryCount}, backup=${if (hasBak) "YES" else "NO"})", lvl)
+                targets.add(
+                    AndroidTargetStatus(
+                        "vstring", "VStringPool", "Story, Quests, Skills, Kibo, Settings",
+                        dispCnt, st, hasBak, sha,
+                    ),
+                )
             }
-            val state = when {
-                sha.equals(s.idSha, ignoreCase = true) -> "patched_id"
-                sha.equals(s.enSha, ignoreCase = true) -> "patched_en"
-                sha.equals(s.origSha, ignoreCase = true) -> "original"
-                else -> "modified"
+        }
+
+        // [2/2] Static UI KeyConfig (dynamically discovered!)
+        if (discUi == null) {
+            log("  [MISSING] Static UI KeyConfig", LogLevel.WARN)
+            targets.add(
+                AndroidTargetStatus(
+                    "static_ui", "Static UI KeyConfig", "Prefab Buttons, Headers, Notices",
+                    PatchEngine.STATIC_UI_STRINGS, "missing", false, "",
+                ),
+            )
+        } else {
+            val remote = "${PatchEngine.REMOTE_DEFAULT_BUNDLE_DIR}/${discUi.fileName}"
+            val bak = File(backupDir, "${discUi.fileName}.original")
+            val hasBak = bak.isFile
+            val sha = remoteSha256(mode, remote)
+            if (sha == null) {
+                log("  [MISSING] Static UI KeyConfig [${discUi.fileName}]", LogLevel.WARN)
+                targets.add(
+                    AndroidTargetStatus(
+                        "static_ui", "Static UI KeyConfig", "Prefab Buttons, Headers, Notices",
+                        PatchEngine.STATIC_UI_STRINGS, "missing", hasBak, "",
+                    ),
+                )
+            } else {
+                val st = classifyBundleState(
+                    discUi.fileName, sha, bak, stateFile.staticUi,
+                    PatchEngine.ANDROID_STATIC_UI_ORIG_SHAS,
+                    PatchEngine.ANDROID_STATIC_UI_KNOWN_EN_SHAS,
+                    PatchEngine.ANDROID_STATIC_UI_KNOWN_ID_SHAS,
+                )
+                val lvl = if (st.startsWith("patched_")) LogLevel.OK else LogLevel.INFO
+                val lbl = when (st) {
+                    "patched_en" -> "ENGLISH"
+                    "patched_id" -> "INDONESIAN"
+                    "patched_custom" -> "CUSTOM"
+                    "original" -> "ORIGINAL JP"
+                    else -> "MODIFIED"
+                }
+                log("  [$lbl] Static UI KeyConfig [${discUi.fileName}] (${PatchEngine.STATIC_UI_STRINGS} strings, off=${discUi.subOffset}, backup=${if (hasBak) "YES" else "NO"})", lvl)
+                targets.add(
+                    AndroidTargetStatus(
+                        "static_ui", "Static UI KeyConfig", "Prefab Buttons, Headers, Notices",
+                        PatchEngine.STATIC_UI_STRINGS, st, hasBak, sha,
+                    ),
+                )
             }
-            val lvl = if (state == "patched_en" || state == "patched_id") LogLevel.OK else LogLevel.INFO
-            val lbl = when (state) {
-                "patched_en" -> "ENGLISH"
-                "patched_id" -> "INDONESIAN"
-                "original" -> "ORIGINAL JP"
-                else -> "MODIFIED"
-            }
-            log("  [$lbl] ${s.name} (${s.count} strings, backup=${if (hasBak) "YES" else "NO"})", lvl)
-            targets.add(AndroidTargetStatus(s.id, s.name, s.sub, s.count, state, hasBak, sha))
         }
 
         val reasons = mutableListOf<String>()
         if (detectedVersion.isNotEmpty() && detectedVersion != PatchEngine.ANDROID_EXPECTED_VERSION) {
             reasons.add("Android version $detectedVersion != ${PatchEngine.ANDROID_EXPECTED_VERSION}")
         }
-        if (detectedResRev.isNotEmpty() && detectedResRev != PatchEngine.ANDROID_EXPECTED_RES_REV) {
-            reasons.add("Resource revision r$detectedResRev != r${PatchEngine.ANDROID_EXPECTED_RES_REV}")
-        }
         val modCnt = targets.count { it.state == "modified" && !it.hasBackup }
         val missCnt = targets.count { it.state == "missing" }
+        // Hotfix-proof Smart Version Sync: resource hotfixes (r3219596 / r3273851 / r3300000+) stay Synced automatically
+        // whenever VStringPool & Static UI bundles are dynamically discovered and valid!
+        if (missCnt > 0 && detectedResRev.isNotEmpty() && detectedResRev != PatchEngine.ANDROID_EXPECTED_RES_REV) {
+            reasons.add("Resource revision r$detectedResRev != r${PatchEngine.ANDROID_EXPECTED_RES_REV}")
+        }
         if (modCnt > 0) reasons.add("$modCnt bundle(s) differ from verified SHA-256 hashes")
         if (missCnt > 0) reasons.add("$missCnt bundle(s) missing (finish in-game download first)")
 
@@ -467,31 +783,39 @@ class StorageBridge(private val context: Context) {
         )
     }
 
-    private fun ensureBackup(
+    private fun ensureBackupV2(
         mode: AccessMode,
+        fileName: String,
         remotePath: String,
         bakFile: File,
         lang: PatchLang,
         custom: CustomPack?,
-        enSha: String,
-        idSha: String,
+        entry: BundleState,
+        knownEn: Set<String>,
+        knownId: Set<String>,
         label: String,
         log: (String, LogLevel) -> Unit,
-    ): Boolean {
+    ): Pair<Boolean, String> {
         val curSha = remoteSha256(mode, remotePath)
             ?: error("$label not found on device. Finish in-game resource download first.")
+        val up = curSha.uppercase()
+        val stMatch = entry.fileName == fileName && entry.patchedSha.isNotEmpty() &&
+            up.equals(entry.patchedSha, ignoreCase = true)
+
         if (!bakFile.isFile) {
-            val isEn = curSha.equals(enSha, ignoreCase = true)
-            val isId = curSha.equals(idSha, ignoreCase = true)
-            if (isEn || isId) {
+            val isEn = knownEn.contains(up) || (stMatch && entry.lang == "patched_en")
+            val isId = knownId.contains(up) || (stMatch && entry.lang == "patched_id")
+            val isCustom = stMatch && entry.lang == "patched_custom"
+            if (isEn || isId || isCustom) {
                 if (custom != null) {
                     error("$label is already patched and original backup is missing. Restore Original JP first before applying a Custom Language Pack.")
                 }
-                if (lang == PatchLang.EN && isEn) return true
-                if (lang == PatchLang.ID && isId) return true
+                if (stMatch && ((lang == PatchLang.EN && isEn) || (lang == PatchLang.ID && isId))) {
+                    return Pair(true, entry.origSha)
+                }
                 error("$label is already patched and original backup is missing. Restore Original JP first.")
             }
-            log("  Backing up original $label...", LogLevel.INFO)
+            log("  Backing up original $label [$fileName]...", LogLevel.INFO)
             val tmpBak = File(backupDir, "${bakFile.name}.tmp")
             copyFromRemote(mode, remotePath, tmpBak)
             val pulledSha = CryptoLz4.sha256File(tmpBak)
@@ -504,11 +828,17 @@ class StorageBridge(private val context: Context) {
                 tmpBak.delete()
             }
             log("  Saved verified original backup: ${bakFile.name} (SHA256=${pulledSha.take(12)}...)", LogLevel.OK)
-            return false
+            return Pair(false, pulledSha)
         }
-        if (custom != null) return false
-        val wantSha = if (lang == PatchLang.ID) idSha else enSha
-        return curSha.equals(wantSha, ignoreCase = true)
+
+        val origSha = if (entry.fileName == fileName && entry.origSha.isNotEmpty()) {
+            entry.origSha
+        } else {
+            CryptoLz4.sha256File(bakFile)
+        }
+        if (custom != null) return Pair(false, origSha)
+        val wantTag = if (lang == PatchLang.ID) "patched_id" else "patched_en"
+        return Pair(stMatch && entry.lang == wantTag, origSha)
     }
 
     fun applyPatch(
@@ -524,6 +854,7 @@ class StorageBridge(private val context: Context) {
             error("Blocked: Game is currently running (PID ${pids.joinToString(", ")}). Force-close the game before patching!")
         }
 
+        val stateFile = loadPatchState()
         val activeLabel = custom?.let { "${it.meta.name} (${it.meta.code} · base=${it.meta.base.uppercase()})" } ?: lang.label
         val activeCode = custom?.meta?.code ?: lang.shortCode
 
@@ -532,69 +863,100 @@ class StorageBridge(private val context: Context) {
         if (custom != null) {
             log("  Custom Pack: ${custom.meta.fileName} (${custom.meta.vstringCount} vstring + ${custom.meta.staticUiCount} static_ui overrides)", LogLevel.INFO)
         }
-        onProgress(0, PatchEngine.ANDROID_TOTAL_STRINGS, "Checking Android bundles...")
+        onProgress(0, PatchEngine.ANDROID_TOTAL_STRINGS, "Discovering active Android bundles...")
 
-        // [1/2] VStringPool (74,055 strings)
-        log("=== [1/2] Patching VStringPool ($activeCode) ===", LogLevel.INFO)
-        val vsBak = File(backupDir, "1qnamndresrohzjhuvt2lw.r.original")
-        onProgress(0, PatchEngine.ANDROID_TOTAL_STRINGS, "Checking / backing up VStringPool (130 MB)...")
-        val vsUpToDate = ensureBackup(
-            mode, PatchEngine.REMOTE_VSTRING, vsBak, lang, custom,
-            PatchEngine.ANDROID_VSTRING_EN_SHA, PatchEngine.ANDROID_VSTRING_ID_SHA, "VStringPool", log,
+        val discVs = discoverActiveVString(mode)
+            ?: error("VStringPool bundle not found on device. Finish in-game resource download first.")
+        val discUi = discoverActiveStaticUi(mode, stateFile)
+            ?: error("Static UI bundle not found on device. Finish in-game resource download first.")
+
+        // [1/2] VStringPool (universal hash-keyed!)
+        log("=== [1/2] Patching VStringPool [${discVs.fileName} · $activeCode] ===", LogLevel.INFO)
+        val vsRemote = "${PatchEngine.REMOTE_RAW_BUNDLE_DIR}/${discVs.fileName}"
+        val vsBak = File(backupDir, "${discVs.fileName}.original")
+        onProgress(0, PatchEngine.ANDROID_TOTAL_STRINGS, "Checking / backing up VStringPool...")
+        val (vsUpToDate, vsOrigSha) = ensureBackupV2(
+            mode, discVs.fileName, vsRemote, vsBak, lang, custom, stateFile.vstring,
+            PatchEngine.ANDROID_VSTRING_KNOWN_EN_SHAS, PatchEngine.ANDROID_VSTRING_KNOWN_ID_SHAS,
+            "VStringPool", log,
         )
         if (vsUpToDate) {
-            log("  VStringPool already matches $activeCode (74,055 strings).", LogLevel.OK)
-            rewritten += 74055
+            val cnt = maxOf(stateFile.vstring.matchedCount, PatchEngine.VSTRING_STRINGS)
+            log("  VStringPool [${discVs.fileName}] already matches $activeCode ($cnt strings).", LogLevel.OK)
+            rewritten += cnt
             onProgress(rewritten, PatchEngine.ANDROID_TOTAL_STRINGS, "VStringPool already up-to-date")
         } else {
             val buf = vsBak.readBytes()
             val cnt = PatchEngine.patchAndroidVStringInPlace(buf, loader, lang, log, custom) { delta, stg ->
                 onProgress(delta, PatchEngine.ANDROID_TOTAL_STRINGS, stg)
             }
-            val staged = File(stageDir, "1qnamndresrohzjhuvt2lw.r.staged")
+            val staged = File(stageDir, "${discVs.fileName}.staged")
             staged.writeBytes(buf)
             val localSha = CryptoLz4.sha256File(staged)
-            onProgress(cnt, PatchEngine.ANDROID_TOTAL_STRINGS, "Writing & verifying VStringPool (130 MB)...")
+            onProgress(cnt, PatchEngine.ANDROID_TOTAL_STRINGS, "Writing & verifying VStringPool...")
             val finalSha = try {
-                pushToRemoteVerified(mode, staged, PatchEngine.REMOTE_VSTRING, localSha)
+                pushToRemoteVerified(mode, staged, vsRemote, localSha)
             } finally {
                 staged.delete()
             }
-            log("  VStringPool [$activeCode] installed & verified! Rewritten=$cnt, SHA256=$finalSha", LogLevel.OK)
+            stateFile.vstring = BundleState(
+                fileName = discVs.fileName,
+                subOffset = 0,
+                lang = stateTagFor(lang, custom),
+                customCode = custom?.meta?.code.orEmpty(),
+                origSha = vsOrigSha,
+                patchedSha = finalSha,
+                matchedCount = cnt,
+            )
+            savePatchState(stateFile)
+            log("  VStringPool [${discVs.fileName} · $activeCode] installed & verified! Rewritten=$cnt, SHA256=$finalSha", LogLevel.OK)
             rewritten += cnt
         }
 
-        // [2/2] Static UI KeyConfig (3,135 strings)
-        log("=== [2/2] Patching Static UI KeyConfig ($activeCode) ===", LogLevel.INFO)
-        val uiBak = File(backupDir, "nibdvaxcnfh3en5bnvhtw.r.original")
-        onProgress(rewritten, PatchEngine.ANDROID_TOTAL_STRINGS, "Checking / backing up Static UI (6 MB)...")
-        val uiUpToDate = ensureBackup(
-            mode, PatchEngine.REMOTE_STATIC_UI, uiBak, lang, custom,
-            PatchEngine.ANDROID_STATIC_UI_EN_SHA, PatchEngine.ANDROID_STATIC_UI_ID_SHA, "Static UI KeyConfig", log,
+        // [2/2] Static UI KeyConfig (dynamically discovered!)
+        log("=== [2/2] Patching Static UI [${discUi.fileName} · $activeCode] ===", LogLevel.INFO)
+        val uiRemote = "${PatchEngine.REMOTE_DEFAULT_BUNDLE_DIR}/${discUi.fileName}"
+        val uiBak = File(backupDir, "${discUi.fileName}.original")
+        onProgress(rewritten, PatchEngine.ANDROID_TOTAL_STRINGS, "Checking / backing up Static UI...")
+        val (uiUpToDate, uiOrigSha) = ensureBackupV2(
+            mode, discUi.fileName, uiRemote, uiBak, lang, custom, stateFile.staticUi,
+            PatchEngine.ANDROID_STATIC_UI_KNOWN_EN_SHAS, PatchEngine.ANDROID_STATIC_UI_KNOWN_ID_SHAS,
+            "Static UI KeyConfig", log,
         )
         if (uiUpToDate) {
-            log("  Static UI KeyConfig already matches $activeCode (3,135 strings).", LogLevel.OK)
-            rewritten += 3135
+            log("  Static UI [${discUi.fileName}] already matches $activeCode (${PatchEngine.STATIC_UI_STRINGS} strings).", LogLevel.OK)
+            rewritten += PatchEngine.STATIC_UI_STRINGS
             onProgress(rewritten, PatchEngine.ANDROID_TOTAL_STRINGS, "Static UI already up-to-date")
         } else {
             val origBytes = uiBak.readBytes()
-            val (outBytes, cnt) = PatchEngine.patchAndroidStaticUiBytes(origBytes, loader, lang, custom) { delta, stg ->
+            val subOff = CryptoLz4.findStaticUiSubBundle(origBytes)?.first ?: discUi.subOffset
+            val (outBytes, cnt) = PatchEngine.patchAndroidStaticUiBytes(origBytes, subOff, loader, lang, custom) { delta, stg ->
                 onProgress(rewritten + delta, PatchEngine.ANDROID_TOTAL_STRINGS, stg)
             }
-            val staged = File(stageDir, "nibdvaxcnfh3en5bnvhtw.r.staged")
+            val staged = File(stageDir, "${discUi.fileName}.staged")
             staged.writeBytes(outBytes)
             val localSha = CryptoLz4.sha256File(staged)
-            onProgress(rewritten + cnt, PatchEngine.ANDROID_TOTAL_STRINGS, "Writing & verifying Static UI (6 MB)...")
+            onProgress(rewritten + cnt, PatchEngine.ANDROID_TOTAL_STRINGS, "Writing & verifying Static UI...")
             val finalSha = try {
-                pushToRemoteVerified(mode, staged, PatchEngine.REMOTE_STATIC_UI, localSha)
+                pushToRemoteVerified(mode, staged, uiRemote, localSha)
             } finally {
                 staged.delete()
             }
-            log("  Static UI KeyConfig [$activeCode] installed & verified! Rewritten=$cnt, SHA256=$finalSha", LogLevel.OK)
+            stateFile.staticUi = BundleState(
+                fileName = discUi.fileName,
+                subOffset = subOff,
+                lang = stateTagFor(lang, custom),
+                customCode = custom?.meta?.code.orEmpty(),
+                origSha = uiOrigSha,
+                patchedSha = finalSha,
+                matchedCount = cnt,
+            )
+            savePatchState(stateFile)
+            log("  Static UI [${discUi.fileName} · $activeCode] installed & verified! Rewritten=$cnt, SHA256=$finalSha", LogLevel.OK)
             rewritten += cnt
         }
 
-        onProgress(rewritten, PatchEngine.ANDROID_TOTAL_STRINGS, "All targets verified 100% ($activeCode)!")
+        onProgress(rewritten, maxOf(rewritten, PatchEngine.ANDROID_TOTAL_STRINGS), "All targets verified 100% ($activeCode)!")
         log("=== COMPLETE [$activeLabel]! Rewritten & verified: $rewritten strings ===", LogLevel.OK)
         return rewritten
     }
@@ -654,31 +1016,42 @@ class StorageBridge(private val context: Context) {
             error("Blocked: Game is currently running (PID ${pids.joinToString(", ")}). Force-close it before rollback!")
         }
 
+        val stateFile = loadPatchState()
+        val discVs = discoverActiveVString(mode)
+        val discUi = discoverActiveStaticUi(mode, stateFile)
+        val vsName = discVs?.fileName ?: stateFile.vstring.fileName.ifBlank { "1qnamndresrohzjhuvt2lw.r" }
+        val uiName = discUi?.fileName ?: stateFile.staticUi.fileName.ifBlank { "nibdvaxcnfh3en5bnvhtw.r" }
+
+        data class RbSpec(val id: String, val name: String, val remote: String, val bakName: String)
         val specs = listOf(
-            Triple("VStringPool", PatchEngine.REMOTE_VSTRING, "1qnamndresrohzjhuvt2lw.r.original"),
-            Triple("Static UI KeyConfig", PatchEngine.REMOTE_STATIC_UI, "nibdvaxcnfh3en5bnvhtw.r.original"),
+            RbSpec("vstring", "VStringPool", "${PatchEngine.REMOTE_RAW_BUNDLE_DIR}/$vsName", "$vsName.original"),
+            RbSpec("static_ui", "Static UI KeyConfig", "${PatchEngine.REMOTE_DEFAULT_BUNDLE_DIR}/$uiName", "$uiName.original"),
         )
         var restored = 0
         log("=== Starting Rollback to Original JP ===", LogLevel.WARN)
         for ((i, spec) in specs.withIndex()) {
-            val (name, remote, bakName) = spec
-            onProgress(i, specs.size, "Restoring $name...")
-            val bak = File(backupDir, bakName)
+            onProgress(i, specs.size, "Restoring ${spec.name}...")
+            val bak = File(backupDir, spec.bakName)
             if (!bak.isFile) {
-                log("  [SKIP] No backup found for $name ($bakName)", LogLevel.WARN)
+                log("  [SKIP] No backup found for ${spec.name} (${spec.bakName})", LogLevel.WARN)
                 continue
             }
             val bakSha = CryptoLz4.sha256File(bak)
-            val curSha = remoteSha256(mode, remote).orEmpty()
-            if (curSha.equals(bakSha, ignoreCase = true)) {
-                log("  [OK] $name is already Original JP.", LogLevel.OK)
-                restored++
-                continue
+            val curSha = remoteSha256(mode, spec.remote).orEmpty()
+            if (!curSha.equals(bakSha, ignoreCase = true)) {
+                val postSha = pushToRemoteVerified(mode, bak, spec.remote, bakSha)
+                log("  [RESTORED] ${spec.name} -> Original JP (SHA256=${postSha.take(16)}...)", LogLevel.OK)
+            } else {
+                log("  [OK] ${spec.name} is already Original JP.", LogLevel.OK)
             }
-            val postSha = pushToRemoteVerified(mode, bak, remote, bakSha)
-            log("  [RESTORED] $name -> Original JP (SHA256=${postSha.take(16)}...)", LogLevel.OK)
+            val st = if (spec.id == "vstring") stateFile.vstring else stateFile.staticUi
+            st.lang = "original"
+            st.customCode = ""
+            st.patchedSha = ""
+            st.origSha = bakSha
             restored++
         }
+        savePatchState(stateFile)
 
         val newsWork = File(backupDir, "NewsWork")
         if (File(newsWork, "_NewsPatchBackup/Library").isFile) {

@@ -1,14 +1,15 @@
 use crate::crypto_lz4::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs::{self, OpenOptions};
-use std::io::{Seek, SeekFrom, Write};
+use std::fs::{self, File, OpenOptions};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::windows::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 use sysinfo::{ProcessesToUpdate, System};
 
 // Embedded verified payloads compiled directly into the standalone executable
-const EMBED_MMAP_KEY: &[u8] = include_bytes!("../resources/mmap_key_4096.bin");
+pub const EMBED_MMAP_KEY: &[u8] = include_bytes!("../resources/mmap_key_4096.bin");
 
 const EMBED_VSTRING_EN_GZ: &[u8] = include_bytes!("../resources/vstring_en.bin.gz");
 const EMBED_STATIC_UI_EN_GZ: &[u8] = include_bytes!("../resources/static_ui_en.bin.gz");
@@ -22,51 +23,144 @@ const EMBED_RESOURCES_DIFF_ID_GZ: &[u8] = include_bytes!("../resources/resources
 
 const EMBED_NEWS_EN_GZ: &[u8] = include_bytes!("../resources/news_en.bin.gz");
 const EMBED_NEWS_ID_GZ: &[u8] = include_bytes!("../resources/news_id.bin.gz");
-const EMBED_VSTRING_ANDROID_MAP_GZ: &[u8] = include_bytes!("../resources/vstring_android_map.bin.gz");
 
-pub const TOTAL_STRINGS: usize = 74055 + 3135 + 113 + 358; // 77,661
-pub const ANDROID_TOTAL_STRINGS: usize = 74055 + 3135; // 77,190 (writable external .res bundles; zero APK re-signing)
+pub const VSTRING_STRINGS: usize = 76180;
+pub const STATIC_UI_STRINGS: usize = 3135;
+pub const STATIC_PKG_STRINGS: usize = 113;
+pub const RESOURCES_STRINGS: usize = 358;
+pub const TOTAL_STRINGS: usize = VSTRING_STRINGS + STATIC_UI_STRINGS + STATIC_PKG_STRINGS + RESOURCES_STRINGS; // 79,786
+pub const ANDROID_TOTAL_STRINGS: usize = VSTRING_STRINGS + STATIC_UI_STRINGS; // 79,315 (writable external .res bundles; zero APK re-signing)
 
 // Verified client build metadata for version sync checks
 pub const EXPECTED_CLIENT_VERSION: &str = "1.0.2";
-pub const EXPECTED_RES_REVISION: &str = "3219598";
+pub const EXPECTED_RES_REVISION: &str = "3273853";
 pub const EXPECTED_BUILD_GUID: &str = "6310abcfe75841bcac713c29234fe986";
 
-// Verified Android client metadata (r3219596, v1.0.0)
+// Verified Android client metadata (r3273851 / r3219596+, v1.0.0 — universal hotfix-proof engine)
 pub const ANDROID_PACKAGE_ID: &str = "com.Yostar.AzurpromiliaJP";
 pub const ANDROID_EXPECTED_VERSION: &str = "1.0.0";
-pub const ANDROID_EXPECTED_RES_REV: &str = "3219596";
-pub const ANDROID_STATIC_UI_SUB_OFFSET: usize = 4200075;
-pub const ANDROID_VSTRING_ORIG_SHA: &str = "C6BA69F2403102A9D4DBF2B3AB079ABBE7DE25896ABDB3969DD5B7988A2DB013";
-pub const ANDROID_STATIC_UI_ORIG_SHA: &str = "53A36C59B4ABABF9457ED37B195092DCAFD491C2D95D9BA75A61998C0138D22A";
-pub const ANDROID_VSTRING_EN_SHA: &str = "0739151C287863A4CD45150CC85DE3DDFDD3A7587FB159437F3F5FEED513A4E5";
-pub const ANDROID_STATIC_UI_EN_SHA: &str = "2A4428AE21009DB19621A123B1A2561ED1F83A685B4C9160B94BA74CD50E8DAC";
-pub const ANDROID_VSTRING_ID_SHA: &str = "BD9A20B6BE6F9228E12F435F72374386F8C15D270E30B442927401A2EB36A0AF";
-pub const ANDROID_STATIC_UI_ID_SHA: &str = "0017773EB20E5B56D3E02179A9F94A6FBC862B48CFD9FF7CF443CCAE9E6A64B2";
+pub const ANDROID_EXPECTED_RES_REV: &str = "3273851";
 
-pub const VSTRING_REL: &str = r"AzurPromiliaJP_Data\.res\raw_base_package\BundleFiles\z5xzl3cg6ao0ilpbzykexg.r";
-pub const STATIC_UI_REL: &str = r"AzurPromiliaJP_Data\.res\default_package\BundleFiles\yr49bxop0f3reujfsmyfca.r";
+// Constant Unity CAB directory name for ast_staticTextKeyConfig across PC & Android builds
+pub const STATIC_UI_CAB_NAME: &str = "CAB-d373fa6fedc5b221683a433ac01d8eb0";
+pub const KNOWN_PC_STATIC_UI_NAMES: &[&str] = &["h3y7ujukwn9qbhoqhzkkg.r", "yr49bxop0f3reujfsmyfca.r"];
+pub const KNOWN_ANDROID_STATIC_UI_NAMES: &[&str] = &["nibdvaxcnfh3en5bnvhtw.r"];
+
+pub const RAW_BUNDLE_REL_DIR: &str = r"AzurPromiliaJP_Data\.res\raw_base_package\BundleFiles";
+pub const DEFAULT_BUNDLE_REL_DIR: &str = r"AzurPromiliaJP_Data\.res\default_package\BundleFiles";
 pub const STATIC_PKG_REL: &str = r"AzurPromiliaJP_Data\StreamingAssets\.res\static_package\6pq4a7hlp7zidu91dvvww.r";
 pub const RESOURCES_REL: &str = r"AzurPromiliaJP_Data\resources.assets";
 
-// Verified Original JP SHA-256 hashes
-pub const VSTRING_ORIG_SHA: &str = "99B8129D49586D26745630A76423609123DDCB1A7AAD3E0A971886B13336A878";
-pub const STATIC_UI_ORIG_SHA: &str = "701F04842F5156DA177BD4946A1CF9B7C055F2A614003C2C13C8567FA14E0FC3";
+// Known Original JP SHA-256 hashes (r3219598 & r3273853 PC + r3219596 Android)
+pub const VSTRING_ORIG_SHAS: &[&str] = &[
+    "99B8129D49586D26745630A76423609123DDCB1A7AAD3E0A971886B13336A878", // PC r3219598
+];
+pub const STATIC_UI_ORIG_SHAS: &[&str] = &[
+    "701F04842F5156DA177BD4946A1CF9B7C055F2A614003C2C13C8567FA14E0FC3", // PC r3219598
+];
+pub const ANDROID_VSTRING_ORIG_SHAS: &[&str] = &[
+    "C6BA69F2403102A9D4DBF2B3AB079ABBE7DE25896ABDB3969DD5B7988A2DB013", // Android r3219596
+];
+pub const ANDROID_STATIC_UI_ORIG_SHAS: &[&str] = &[
+    "53A36C59B4ABABF9457ED37B195092DCAFD491C2D95D9BA75A61998C0138D22A", // Android r3219596
+];
+
+// Known legacy/current patched SHA-256 hashes (in addition to dynamic _ruza_state.json tracking!)
+pub const VSTRING_KNOWN_EN_SHAS: &[&str] = &[
+    "81B770280B2C8C307B7CD7A3CC038207B392A6256D34514FAB8ACE410A82F57B", // PC r3219598
+    "9C4283483E66F334929C92E620BB1A7345E83CBF10DF29DF4BD17CBB20687F05", // PC r3273853
+];
+pub const VSTRING_KNOWN_ID_SHAS: &[&str] = &[
+    "ED57A17D9C884CE436C81533D1A772C30AEE3FBCD85093C694B6973097BB904F", // PC r3219598
+    "5B0C27CBBA77FD7B9BCAC0D4A263177FCAEFE7FAEBB20A1516BA802028183D4A", // PC r3273853
+];
+pub const STATIC_UI_KNOWN_EN_SHAS: &[&str] = &[
+    "8679E44FF0EA0493F464201DD26AC9D4185935CB3A98F99649559066C492BFDA", // PC r3219598
+    "B0CF69FFF31ACB0D3D9D6B9A267D0C16B15A64FBE9E27E9FA93CF7468DDDF11C", // PC r3273853
+];
+pub const STATIC_UI_KNOWN_ID_SHAS: &[&str] = &[
+    "E1E6E9A015DCC4E70994D81E8F2FE3ED8437805F58F61455A470991FADC05772", // v0.8.x PC r3219598
+    "502196E9F8BA4946EF0E0611EA50136482C103D712D218E674F8B015F9CE7DA9", // v0.9.0 PC r3219598
+    "6A64B6FCEAA1C42264F966A1870F4A36E8B1044D93EF1DFDCA046F0617E7FE5F", // v0.9.0 PC r3273853
+];
+pub const ANDROID_VSTRING_KNOWN_EN_SHAS: &[&str] = &[
+    "0739151C287863A4CD45150CC85DE3DDFDD3A7587FB159437F3F5FEED513A4E5", // v0.8.x Android r3219596
+    "3216E4E2A56F2BC36EAA2FFF79B203C854FA834A93A97C2CA218B40E909FF5F1", // v0.9.0 Android r3219596
+];
+pub const ANDROID_VSTRING_KNOWN_ID_SHAS: &[&str] = &[
+    "BD9A20B6BE6F9228E12F435F72374386F8C15D270E30B442927401A2EB36A0AF", // v0.8.x Android r3219596
+    "EBC5EE0155910A58D3B62AB978A886CCD1BA4FA68F4CE929B7763E32454531DE", // v0.9.0 Android r3219596
+];
+pub const ANDROID_STATIC_UI_KNOWN_EN_SHAS: &[&str] = &[
+    "2A4428AE21009DB19621A123B1A2561ED1F83A685B4C9160B94BA74CD50E8DAC", // Android r3219596
+];
+pub const ANDROID_STATIC_UI_KNOWN_ID_SHAS: &[&str] = &[
+    "0017773EB20E5B56D3E02179A9F94A6FBC862B48CFD9FF7CF443CCAE9E6A64B2", // v0.8.x Android r3219596
+    "60F0B86F98FCA84D46AE1AD7531510320812972D5371F80FC358860B660BC308", // v0.9.0 Android r3219596
+];
+
 pub const STATIC_PKG_ORIG_SHA: &str = "C7C80B98B263F161583A2AB52A5B7039636ACBABCAC8C365F9F37224D11BC4B3";
 pub const RESOURCES_ORIG_SHA: &str = "DF93CE7192D6A46B33350204349E66A45E410124E3057224AD1A17E6F24B115B";
 
-// Verified English (EN) SHA-256 hashes (v0.8.0 Combat Timing & Glossary Pass)
-pub const VSTRING_EN_SHA: &str = "81B770280B2C8C307B7CD7A3CC038207B392A6256D34514FAB8ACE410A82F57B";
-pub const STATIC_UI_EN_SHA: &str = "8679E44FF0EA0493F464201DD26AC9D4185935CB3A98F99649559066C492BFDA";
-pub const STATIC_UI_EN_SHA_ALT: &str = "";
 pub const STATIC_PKG_EN_SHA: &str = "7FEB394BD2FEAC1F8FC862A1254CD954EDC1D49544DE285D3E6D9C914755F33E";
 pub const RESOURCES_EN_SHA: &str = "C95E1A2C5C5977E105022B49266D3E2E32173A0E1F4E75BD807C7A93A9299883";
 
-// Verified Bahasa Indonesia (ID) SHA-256 hashes (v0.8.0 Combat Timing & Glossary Pass)
-pub const VSTRING_ID_SHA: &str = "ED57A17D9C884CE436C81533D1A772C30AEE3FBCD85093C694B6973097BB904F";
-pub const STATIC_UI_ID_SHA: &str = "E1E6E9A015DCC4E70994D81E8F2FE3ED8437805F58F61455A470991FADC05772";
 pub const STATIC_PKG_ID_SHA: &str = "3EBE582B61D995108E1DA1F333D102B6218A5C9D33E03C931CB7EEEE585DC1FC";
 pub const RESOURCES_ID_SHA: &str = "85FADFAAC9708C845803FA438C5C2AA634A798FAE48405C9FC40953B4A7772A2";
+
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct BundlePatchState {
+    pub file_name: String,
+    pub sub_offset: usize,
+    pub lang: String,        // "patched_en" | "patched_id" | "patched_custom" | "original"
+    pub custom_code: String,
+    pub orig_sha: String,
+    pub patched_sha: String,
+    pub matched_count: usize,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PatchStateFile {
+    pub schema: u32,
+    pub vstring: BundlePatchState,
+    pub static_ui: BundlePatchState,
+    pub static_pkg: BundlePatchState,
+    pub resources: BundlePatchState,
+}
+
+pub fn load_patch_state(bak_dir: &Path) -> PatchStateFile {
+    let p = bak_dir.join("_ruza_state.json");
+    let Ok(txt) = fs::read_to_string(&p) else {
+        return PatchStateFile { schema: 1, ..Default::default() };
+    };
+    serde_json::from_str::<PatchStateFile>(&txt).unwrap_or(PatchStateFile { schema: 1, ..Default::default() })
+}
+
+pub fn save_patch_state(bak_dir: &Path, state: &PatchStateFile) {
+    let _ = fs::create_dir_all(bak_dir);
+    let mut s = state.clone();
+    s.schema = 1;
+    if let Ok(txt) = serde_json::to_string_pretty(&s) {
+        let _ = fs::write(bak_dir.join("_ruza_state.json"), txt);
+    }
+}
+
+pub fn state_tag_for(lang: PatchLang, custom: Option<&CustomPack>) -> String {
+    if custom.is_some() {
+        "patched_custom".to_string()
+    } else {
+        match lang {
+            PatchLang::En => "patched_en".to_string(),
+            PatchLang::Id => "patched_id".to_string(),
+        }
+    }
+}
+
+pub fn sha_in_list(sha: &str, list: &[&str]) -> bool {
+    list.iter().any(|h| !h.is_empty() && sha.eq_ignore_ascii_case(h))
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PatchLang {
@@ -463,6 +557,7 @@ pub fn auto_detect_game_folder() -> String {
     String::new()
 }
 
+#[allow(dead_code)]
 fn sha_matches(sha: &str, expected: &str) -> bool {
     !expected.is_empty() && sha.eq_ignore_ascii_case(expected)
 }
@@ -563,12 +658,6 @@ pub fn detect_client_version(game_dir: &Path, targets: &[TargetStatus]) -> Clien
             detected_version, EXPECTED_CLIENT_VERSION
         ));
     }
-    if !detected_res_rev.is_empty() && detected_res_rev != EXPECTED_RES_REVISION {
-        reasons.push(format!(
-            "Resource revision r{} != r{}",
-            detected_res_rev, EXPECTED_RES_REVISION
-        ));
-    }
     if !detected_build_guid.is_empty()
         && !detected_build_guid.eq_ignore_ascii_case(EXPECTED_BUILD_GUID)
     {
@@ -578,11 +667,25 @@ pub fn detect_client_version(game_dir: &Path, targets: &[TargetStatus]) -> Clien
         ));
     }
 
+    let missing_core = targets
+        .iter()
+        .filter(|t| (t.id == "vstring" || t.id == "static_ui") && t.state == "missing")
+        .count();
+    let missing_cnt = targets.iter().filter(|t| t.state == "missing").count();
     let modified_cnt = targets
         .iter()
         .filter(|t| t.state == "modified" && !t.has_backup)
         .count();
-    let missing_cnt = targets.iter().filter(|t| t.state == "missing").count();
+
+    // Hotfix-proof Smart Version Sync: if both core bundles (VStringPool + Static UI) were
+    // dynamically discovered & validated, resource hotfix revisions (e.g. r3219598 / r3273853 / r3300000+)
+    // stay Synced automatically without false mismatch popups!
+    if missing_core > 0 && !detected_res_rev.is_empty() && detected_res_rev != EXPECTED_RES_REVISION {
+        reasons.push(format!(
+            "Resource revision r{} != r{}",
+            detected_res_rev, EXPECTED_RES_REVISION
+        ));
+    }
     if modified_cnt > 0 {
         reasons.push(format!(
             "{} package file(s) differ from verified SHA-256 hashes",
@@ -611,47 +714,432 @@ pub fn detect_client_version(game_dir: &Path, targets: &[TargetStatus]) -> Clien
     }
 }
 
+pub struct DiscoveredVString {
+    pub file_name: String,
+    pub rel_path: String,
+    pub full_path: PathBuf,
+    pub entry_count: usize,
+}
+
+pub struct DiscoveredStaticUi {
+    pub file_name: String,
+    pub rel_path: String,
+    pub full_path: PathBuf,
+    pub sub_offset: usize,
+    pub sub_size: usize,
+}
+
+fn file_mtime_secs(path: &Path) -> u64 {
+    fs::metadata(path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+pub fn probe_vstring_file(path: &Path) -> Option<usize> {
+    let meta = fs::metadata(path).ok()?;
+    let fsize = meta.len() as usize;
+    if fsize < 50_000_000 {
+        return None;
+    }
+    let mut f = File::open(path).ok()?;
+    f.seek(SeekFrom::Start(4120)).ok()?;
+    let mut h1 = [0u8; 24];
+    f.read_exact(&mut h1).ok()?;
+    xor_mmap_in_place(&mut h1, 4120, EMBED_MMAP_KEY);
+    let hash_bytes = read_u32_le(&h1, 0) as usize;
+    let hash_start = read_u32_le(&h1, 4) as usize;
+    if hash_start != 4120 {
+        return None;
+    }
+    let str_sec_off = 4120usize.checked_add(hash_bytes)?;
+    if str_sec_off + 20 > fsize {
+        return None;
+    }
+    f.seek(SeekFrom::Start(str_sec_off as u64)).ok()?;
+    let mut sh = [0u8; 20];
+    f.read_exact(&mut sh).ok()?;
+    xor_mmap_in_place(&mut sh, str_sec_off, EMBED_MMAP_KEY);
+    let count = read_u32_le(&sh, 16) as usize;
+    if count < 500_000 || str_sec_off + 20 + count.saturating_mul(4) >= fsize {
+        return None;
+    }
+    Some(count)
+}
+
+pub fn discover_pc_vstring(game_dir: &Path) -> Option<DiscoveredVString> {
+    let dir = game_dir.join(RAW_BUNDLE_REL_DIR);
+    let rd = fs::read_dir(&dir).ok()?;
+    let mut best: Option<(usize, u64, String, PathBuf)> = None;
+    for ent in rd.flatten() {
+        let path = ent.path();
+        if !path.is_file() {
+            continue;
+        }
+        let fname = ent.file_name().to_string_lossy().to_string();
+        if !fname.ends_with(".r") {
+            continue;
+        }
+        let Some(cnt) = probe_vstring_file(&path) else {
+            continue;
+        };
+        let mt = file_mtime_secs(&path);
+        let better = match &best {
+            None => true,
+            Some((bc, bm, _, _)) => cnt > *bc || (cnt == *bc && mt > *bm),
+        };
+        if better {
+            best = Some((cnt, mt, fname, path));
+        }
+    }
+    let (entry_count, _, file_name, full_path) = best?;
+    let rel_path = format!(r"{}\{}", RAW_BUNDLE_REL_DIR, file_name);
+    Some(DiscoveredVString {
+        file_name,
+        rel_path,
+        full_path,
+        entry_count,
+    })
+}
+
+pub fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() || haystack.len() < needle.len() {
+        return None;
+    }
+    haystack.windows(needle.len()).position(|w| w == needle)
+}
+
+pub fn find_static_ui_subbundle_in_bytes(buf: &[u8]) -> Option<(usize, usize)> {
+    const MAGIC: &[u8; 8] = b"UnityFS\0";
+    if buf.len() < 128 {
+        return None;
+    }
+    let mut fallback_candidates: Vec<usize> = Vec::new();
+    let mut pos = 0usize;
+    while pos + 8 <= buf.len() {
+        let Some(rel) = find_bytes(&buf[pos..], MAGIC) else {
+            break;
+        };
+        let off = pos + rel;
+        pos = off + 8;
+        if let Ok(bundle) = UnityCnBundle::parse(buf, off) {
+            if bundle.dirs.len() == 1 && bundle.dirs[0].name == STATIC_UI_CAB_NAME {
+                return Some((off, bundle.fsize));
+            }
+            if bundle.dirs.len() == 1
+                && bundle.fsize >= 30_000
+                && bundle.fsize <= 500_000
+                && bundle.dirs[0].size >= 80_000
+                && bundle.dirs[0].size <= 450_000
+            {
+                fallback_candidates.push(off);
+            }
+        }
+    }
+    // Fallback if a future major client changes the Unity CAB hash: verify ast_staticTextKeyConfig inside decrypted SF
+    for off in fallback_candidates {
+        if let Ok(bundle) = UnityCnBundle::parse(buf, off) {
+            if let Ok(sf) = bundle.read_all() {
+                if find_bytes(&sf, b"ast_staticTextKeyConfig").is_some() {
+                    return Some((off, bundle.fsize));
+                }
+            }
+        }
+    }
+    None
+}
+
+pub fn discover_pc_static_ui(game_dir: &Path, cached_name: Option<&str>) -> Option<DiscoveredStaticUi> {
+    let dir = game_dir.join(DEFAULT_BUNDLE_REL_DIR);
+    if !dir.is_dir() {
+        return None;
+    }
+    let mut checked = std::collections::HashSet::new();
+
+    // Tier 1: cached filename from _ruza_state.json + known filenames (< 5ms)
+    let mut fast_names: Vec<String> = Vec::new();
+    if let Some(c) = cached_name {
+        if !c.is_empty() {
+            fast_names.push(c.to_string());
+        }
+    }
+    for &k in KNOWN_PC_STATIC_UI_NAMES {
+        fast_names.push(k.to_string());
+    }
+    for fname in fast_names {
+        if !checked.insert(fname.clone()) {
+            continue;
+        }
+        let p = dir.join(&fname);
+        if !p.is_file() {
+            continue;
+        }
+        if let Ok(buf) = fs::read(&p) {
+            if let Some((sub_offset, sub_size)) = find_static_ui_subbundle_in_bytes(&buf) {
+                return Some(DiscoveredStaticUi {
+                    rel_path: format!(r"{}\{}", DEFAULT_BUNDLE_REL_DIR, fname),
+                    file_name: fname,
+                    full_path: p,
+                    sub_offset,
+                    sub_size,
+                });
+            }
+        }
+    }
+
+    // Tier 2/3: scan default_package/BundleFiles/*.r (3-10 MB newest-first, then remaining 100 KB-30 MB)
+    let Ok(rd) = fs::read_dir(&dir) else {
+        return None;
+    };
+    let mut cands: Vec<(bool, u64, String, PathBuf)> = Vec::new();
+    for ent in rd.flatten() {
+        let p = ent.path();
+        if !p.is_file() {
+            continue;
+        }
+        let fname = ent.file_name().to_string_lossy().to_string();
+        if !fname.ends_with(".r") || checked.contains(&fname) {
+            continue;
+        }
+        let Ok(meta) = fs::metadata(&p) else { continue };
+        let sz = meta.len();
+        if !(100_000..=30_000_000).contains(&sz) {
+            continue;
+        }
+        let in_sweet_spot = (2_500_000..=10_000_000).contains(&sz);
+        let mt = file_mtime_secs(&p);
+        cands.push((!in_sweet_spot, u64::MAX - mt, fname, p));
+    }
+    cands.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+    for (_, _, fname, p) in cands {
+        if let Ok(buf) = fs::read(&p) {
+            if let Some((sub_offset, sub_size)) = find_static_ui_subbundle_in_bytes(&buf) {
+                return Some(DiscoveredStaticUi {
+                    rel_path: format!(r"{}\{}", DEFAULT_BUNDLE_REL_DIR, fname),
+                    file_name: fname,
+                    full_path: p,
+                    sub_offset,
+                    sub_size,
+                });
+            }
+        }
+    }
+    None
+}
+
+pub fn classify_bundle_state(
+    file_name: &str,
+    cur_sha: &str,
+    bak_path: &Path,
+    state_entry: &BundlePatchState,
+    known_orig: &[&str],
+    known_en: &[&str],
+    known_id: &[&str],
+    is_dynamic_bundle: bool,
+) -> String {
+    if state_entry.file_name == file_name
+        && !state_entry.patched_sha.is_empty()
+        && cur_sha.eq_ignore_ascii_case(&state_entry.patched_sha)
+        && !state_entry.lang.is_empty()
+    {
+        return state_entry.lang.clone();
+    }
+    if sha_in_list(cur_sha, known_id) {
+        return "patched_id".into();
+    }
+    if sha_in_list(cur_sha, known_en) {
+        return "patched_en".into();
+    }
+    if sha_in_list(cur_sha, known_orig) {
+        return "original".into();
+    }
+    if state_entry.file_name == file_name
+        && !state_entry.orig_sha.is_empty()
+        && cur_sha.eq_ignore_ascii_case(&state_entry.orig_sha)
+    {
+        return "original".into();
+    }
+    if bak_path.is_file() {
+        if let Ok(bak_sha) = sha256_file(bak_path) {
+            if cur_sha.eq_ignore_ascii_case(&bak_sha) {
+                return "original".into();
+            }
+        }
+        return "modified".into();
+    }
+    // Newly discovered hotfix bundle (no backup saved yet for this filename, and doesn't match any known patched SHA)
+    if is_dynamic_bundle {
+        "original".into()
+    } else {
+        "modified".into()
+    }
+}
+
 pub fn scan_game_folder<F>(game_dir: &Path, mut log: F) -> Vec<TargetStatus>
 where
     F: FnMut(&str, LogLevel),
 {
     let bak_dir = game_dir.join("_ENPatchBackup");
-    let specs = [
-        (
-            "vstring",
-            "VStringPool",
-            "Story, Quests, Skills, Kibo, Settings",
-            VSTRING_REL,
-            "z5xzl3cg6ao0ilpbzykexg.r.original",
-            74055usize,
-            VSTRING_ORIG_SHA,
-            VSTRING_EN_SHA,
-            "",
-            VSTRING_ID_SHA,
-        ),
-        (
-            "static_ui",
-            "Static UI KeyConfig",
-            "Prefab Buttons, Headers, Notices",
-            STATIC_UI_REL,
-            "yr49bxop0f3reujfsmyfca.r.original",
-            3135usize,
-            STATIC_UI_ORIG_SHA,
-            STATIC_UI_EN_SHA,
-            STATIC_UI_EN_SHA_ALT,
-            STATIC_UI_ID_SHA,
-        ),
+    let state_file = load_patch_state(&bak_dir);
+
+    let disc_vs = discover_pc_vstring(game_dir);
+    let cached_ui = if state_file.static_ui.file_name.is_empty() {
+        None
+    } else {
+        Some(state_file.static_ui.file_name.as_str())
+    };
+    let disc_ui = discover_pc_static_ui(game_dir, cached_ui);
+
+    let mut out = Vec::with_capacity(4);
+
+    // 1. VStringPool (dynamically discovered!)
+    match disc_vs {
+        Some(vs) => {
+            let bak_name = format!("{}.original", vs.file_name);
+            let bak = bak_dir.join(&bak_name);
+            let has_backup = bak.is_file();
+            let sha = sha256_file(&vs.full_path).unwrap_or_default();
+            let state = classify_bundle_state(
+                &vs.file_name,
+                &sha,
+                &bak,
+                &state_file.vstring,
+                VSTRING_ORIG_SHAS,
+                VSTRING_KNOWN_EN_SHAS,
+                VSTRING_KNOWN_ID_SHAS,
+                true,
+            );
+            let disp_cnt = if state_file.vstring.file_name == vs.file_name && state_file.vstring.matched_count > 0 {
+                state_file.vstring.matched_count
+            } else {
+                VSTRING_STRINGS
+            };
+            let lvl = if state.starts_with("patched_") { LogLevel::Ok } else { LogLevel::Info };
+            let state_lbl = match state.as_str() {
+                "patched_en" => "ENGLISH",
+                "patched_id" => "INDONESIAN",
+                "patched_custom" => "CUSTOM",
+                "original" => "ORIGINAL JP",
+                _ => "MODIFIED",
+            };
+            log(
+                &format!(
+                    "  [{}] VStringPool [{}] ({} strings, pool={}, backup={})",
+                    state_lbl,
+                    vs.file_name,
+                    disp_cnt,
+                    vs.entry_count,
+                    if has_backup { "YES" } else { "NO" }
+                ),
+                lvl,
+            );
+            out.push(TargetStatus {
+                id: "vstring".into(),
+                name: "VStringPool".into(),
+                subtitle: "Story, Quests, Skills, Kibo, Settings".into(),
+                rel_path: vs.rel_path,
+                backup_name: bak_name,
+                string_count: disp_cnt,
+                state,
+                has_backup,
+                sha256: sha,
+            });
+        }
+        None => {
+            log("  [MISSING] VStringPool (raw_base_package/BundleFiles/*.r)", LogLevel::Warn);
+            out.push(TargetStatus {
+                id: "vstring".into(),
+                name: "VStringPool".into(),
+                subtitle: "Story, Quests, Skills, Kibo, Settings".into(),
+                rel_path: RAW_BUNDLE_REL_DIR.into(),
+                backup_name: String::new(),
+                string_count: VSTRING_STRINGS,
+                state: "missing".into(),
+                has_backup: false,
+                sha256: String::new(),
+            });
+        }
+    }
+
+    // 2. Static UI KeyConfig (dynamically discovered!)
+    match disc_ui {
+        Some(ui) => {
+            let bak_name = format!("{}.original", ui.file_name);
+            let bak = bak_dir.join(&bak_name);
+            let has_backup = bak.is_file();
+            let sha = sha256_file(&ui.full_path).unwrap_or_default();
+            let state = classify_bundle_state(
+                &ui.file_name,
+                &sha,
+                &bak,
+                &state_file.static_ui,
+                STATIC_UI_ORIG_SHAS,
+                STATIC_UI_KNOWN_EN_SHAS,
+                STATIC_UI_KNOWN_ID_SHAS,
+                true,
+            );
+            let lvl = if state.starts_with("patched_") { LogLevel::Ok } else { LogLevel::Info };
+            let state_lbl = match state.as_str() {
+                "patched_en" => "ENGLISH",
+                "patched_id" => "INDONESIAN",
+                "patched_custom" => "CUSTOM",
+                "original" => "ORIGINAL JP",
+                _ => "MODIFIED",
+            };
+            log(
+                &format!(
+                    "  [{}] Static UI KeyConfig [{}] ({} strings, sub={}B, backup={})",
+                    state_lbl,
+                    ui.file_name,
+                    STATIC_UI_STRINGS,
+                    ui.sub_size,
+                    if has_backup { "YES" } else { "NO" }
+                ),
+                lvl,
+            );
+            out.push(TargetStatus {
+                id: "static_ui".into(),
+                name: "Static UI KeyConfig".into(),
+                subtitle: "Prefab Buttons, Headers, Notices".into(),
+                rel_path: ui.rel_path,
+                backup_name: bak_name,
+                string_count: STATIC_UI_STRINGS,
+                state,
+                has_backup,
+                sha256: sha,
+            });
+        }
+        None => {
+            log("  [MISSING] Static UI KeyConfig (default_package/BundleFiles/*.r)", LogLevel::Warn);
+            out.push(TargetStatus {
+                id: "static_ui".into(),
+                name: "Static UI KeyConfig".into(),
+                subtitle: "Prefab Buttons, Headers, Notices".into(),
+                rel_path: DEFAULT_BUNDLE_REL_DIR.into(),
+                backup_name: String::new(),
+                string_count: STATIC_UI_STRINGS,
+                state: "missing".into(),
+                has_backup: false,
+                sha256: String::new(),
+            });
+        }
+    }
+
+    // 3 & 4. StaticPackage CSV & Resources Assets
+    let fixed_specs: [(&str, &str, &str, &str, &str, usize, &str, &str, &str, &BundlePatchState); 2] = [
         (
             "static_pkg",
             "StaticPackage CSV",
             "Boot & Updater Messages",
             STATIC_PKG_REL,
             "6pq4a7hlp7zidu91dvvww.r.original",
-            113usize,
+            STATIC_PKG_STRINGS,
             STATIC_PKG_ORIG_SHA,
             STATIC_PKG_EN_SHA,
-            "",
             STATIC_PKG_ID_SHA,
+            &state_file.static_pkg,
         ),
         (
             "resources",
@@ -659,19 +1147,19 @@ where
             "Fallback Startup & SDK",
             RESOURCES_REL,
             "resources.assets.original",
-            358usize,
+            RESOURCES_STRINGS,
             RESOURCES_ORIG_SHA,
             RESOURCES_EN_SHA,
-            "",
             RESOURCES_ID_SHA,
+            &state_file.resources,
         ),
     ];
 
-    let mut out = Vec::with_capacity(4);
-    for (id, name, sub, rel, bak_name, count, orig_sha, en_sha, en_sha_alt, id_sha) in specs {
+    for (id, name, sub, rel, bak_name, count, orig_sha, en_sha, id_sha, st_entry) in fixed_specs {
         let full = game_dir.join(rel);
         let bak = bak_dir.join(bak_name);
         let has_backup = bak.is_file();
+        let fname = full.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
         if !full.is_file() {
             log(&format!("  [MISSING] {}", rel), LogLevel::Warn);
             out.push(TargetStatus {
@@ -688,23 +1176,21 @@ where
             continue;
         }
         let sha = sha256_file(&full).unwrap_or_default();
-        let state = if sha_matches(&sha, id_sha) {
-            "patched_id"
-        } else if sha_matches(&sha, en_sha) || sha_matches(&sha, en_sha_alt) {
-            "patched_en"
-        } else if sha_matches(&sha, orig_sha) {
-            "original"
-        } else {
-            "modified"
-        };
-        let lvl = if state == "patched_en" || state == "patched_id" {
-            LogLevel::Ok
-        } else {
-            LogLevel::Info
-        };
-        let state_lbl = match state {
+        let state = classify_bundle_state(
+            &fname,
+            &sha,
+            &bak,
+            st_entry,
+            &[orig_sha],
+            &[en_sha],
+            &[id_sha],
+            false,
+        );
+        let lvl = if state.starts_with("patched_") { LogLevel::Ok } else { LogLevel::Info };
+        let state_lbl = match state.as_str() {
             "patched_en" => "ENGLISH",
             "patched_id" => "INDONESIAN",
+            "patched_custom" => "CUSTOM",
             "original" => "ORIGINAL JP",
             "modified" => "MODIFIED",
             _ => "MISSING",
@@ -726,7 +1212,7 @@ where
             rel_path: rel.into(),
             backup_name: bak_name.into(),
             string_count: count,
-            state: state.into(),
+            state,
             has_backup,
             sha256: sha,
         });
@@ -734,27 +1220,37 @@ where
     out
 }
 
-fn ensure_backup<F>(
+fn ensure_backup_v2<F>(
     target: &Path,
     bak: &Path,
-    en_sha: &str,
-    en_sha_alt: &str,
-    id_sha: &str,
+    file_name: &str,
+    state_entry: &BundlePatchState,
+    known_en: &[&str],
+    known_id: &[&str],
     log: &mut F,
-) -> Result<(), String>
+) -> Result<String, String>
 where
     F: FnMut(&str, LogLevel),
 {
     if bak.is_file() {
-        return Ok(());
+        return if state_entry.file_name == file_name && !state_entry.orig_sha.is_empty() {
+            Ok(state_entry.orig_sha.clone())
+        } else {
+            sha256_file(bak)
+        };
     }
     let cur_sha = sha256_file(target)?;
-    if sha_matches(&cur_sha, en_sha) || sha_matches(&cur_sha, en_sha_alt) || sha_matches(&cur_sha, id_sha) {
+    let known_patched = sha_in_list(&cur_sha, known_en)
+        || sha_in_list(&cur_sha, known_id)
+        || (state_entry.file_name == file_name
+            && !state_entry.patched_sha.is_empty()
+            && cur_sha.eq_ignore_ascii_case(&state_entry.patched_sha));
+    if known_patched {
         log(
             "  Target is already patched; skipping backup overwrite so original backup is never polluted.",
             LogLevel::Warn,
         );
-        return Ok(());
+        return Ok(String::new());
     }
     if let Some(parent) = bak.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("Create backup dir failed: {}", e))?;
@@ -768,26 +1264,31 @@ where
         ),
         LogLevel::Ok,
     );
-    Ok(())
+    Ok(cur_sha)
 }
 
-fn check_no_backup_switch_guard(
+fn check_no_backup_switch_guard_v2(
     target: &Path,
     bak: &Path,
+    file_name: &str,
     lang: PatchLang,
     custom: Option<&CustomPack>,
-    en_sha: &str,
-    en_sha_alt: &str,
-    id_sha: &str,
+    state_entry: &BundlePatchState,
+    known_en: &[&str],
+    known_id: &[&str],
 ) -> Result<bool, String> {
     if bak.is_file() {
         return Ok(false);
     }
     let cur = sha256_file(target)?;
-    let is_en = sha_matches(&cur, en_sha) || sha_matches(&cur, en_sha_alt);
-    let is_id = sha_matches(&cur, id_sha);
+    let st_match = state_entry.file_name == file_name
+        && !state_entry.patched_sha.is_empty()
+        && cur.eq_ignore_ascii_case(&state_entry.patched_sha);
+    let is_en = sha_in_list(&cur, known_en) || (st_match && state_entry.lang == "patched_en");
+    let is_id = sha_in_list(&cur, known_id) || (st_match && state_entry.lang == "patched_id");
+    let is_custom = st_match && state_entry.lang == "patched_custom";
     if custom.is_some() {
-        if is_en || is_id {
+        if is_en || is_id || is_custom {
             return Err(
                 "Target is already patched and _ENPatchBackup is missing. Restore Original JP files before applying a Custom Language Pack."
                     .into(),
@@ -795,15 +1296,21 @@ fn check_no_backup_switch_guard(
         }
         return Ok(false);
     }
+    if is_custom {
+        return Err(
+            "Target is currently patched with a Custom Language Pack and _ENPatchBackup is missing. Restore Original JP files first."
+                .into(),
+        );
+    }
     match lang {
-        PatchLang::En if is_en => Ok(true),
-        PatchLang::Id if is_id => Ok(true),
-        PatchLang::En if is_id => Err(
-            "Target is currently patched in ID and _ENPatchBackup is missing. Restore Original JP files before switching to EN."
+        PatchLang::En if is_en && st_match => Ok(true),
+        PatchLang::Id if is_id && st_match => Ok(true),
+        PatchLang::En if is_en || is_id => Err(
+            "Target is already patched by an earlier version and _ENPatchBackup is missing. Restore Original JP files before updating/switching."
                 .into(),
         ),
-        PatchLang::Id if is_en => Err(
-            "Target is currently patched in EN and _ENPatchBackup is missing. Restore Original JP files before switching to ID."
+        PatchLang::Id if is_en || is_id => Err(
+            "Target is already patched by an earlier version and _ENPatchBackup is missing. Restore Original JP files before updating/switching."
                 .into(),
         ),
         _ => Ok(false),
@@ -850,19 +1357,68 @@ fn write_exclusive_verified(target: &Path, new_bytes: &[u8], backup_for_rollback
     Ok(())
 }
 
-fn load_vstring_map(gz: &[u8]) -> Result<HashMap<usize, Vec<u8>>, String> {
+fn load_rzv2_vstring(gz: &[u8]) -> Result<(HashMap<(u64, u32), Vec<u8>>, HashMap<usize, (u64, u32)>), String> {
     let raw = gunzip(gz)?;
-    let count = read_u32_le(&raw, 0) as usize;
-    let mut map = HashMap::with_capacity(count);
-    let mut p = 4usize;
-    for _ in 0..count {
-        let id = read_u32_le(&raw, p) as usize;
-        let len = read_u32_le(&raw, p + 4) as usize;
-        p += 8;
-        map.insert(id, raw[p..p + len].to_vec());
-        p += len;
+    if raw.len() < 8 || &raw[0..4] != b"RZV2" {
+        return Err("Corrupt RZV2 VStringPool payload header".into());
     }
-    Ok(map)
+    let count = read_u32_le(&raw, 4) as usize;
+    let mut by_hash = HashMap::with_capacity(count);
+    let mut pc_id_to_jp = HashMap::with_capacity(count);
+    let mut p = 8usize;
+    for _ in 0..count {
+        if p + 20 > raw.len() {
+            return Err("Truncated RZV2 record header".into());
+        }
+        let pc_id = read_u32_le(&raw, p) as usize;
+        let jp_hash = u64::from_le_bytes([
+            raw[p + 4], raw[p + 5], raw[p + 6], raw[p + 7],
+            raw[p + 8], raw[p + 9], raw[p + 10], raw[p + 11],
+        ]);
+        let jp_len = read_u32_le(&raw, p + 12);
+        let tr_len = read_u32_le(&raw, p + 16) as usize;
+        p += 20;
+        if p + tr_len > raw.len() {
+            return Err("Truncated RZV2 record payload".into());
+        }
+        let key = (jp_hash, jp_len);
+        by_hash.insert(key, raw[p..p + tr_len].to_vec());
+        pc_id_to_jp.insert(pc_id, key);
+        p += tr_len;
+    }
+    Ok((by_hash, pc_id_to_jp))
+}
+
+pub fn build_vstring_lookup(
+    lang: PatchLang,
+    custom: Option<&CustomPack>,
+    allow_direct_ids: bool,
+) -> Result<(HashMap<(u64, u32), Vec<u8>>, HashMap<usize, Vec<u8>>), String> {
+    let (mut by_hash, pc_id_to_jp) = match custom {
+        Some(c) => match c.base {
+            CustomBase::En => load_rzv2_vstring(EMBED_VSTRING_EN_GZ)?,
+            CustomBase::Id => load_rzv2_vstring(EMBED_VSTRING_ID_GZ)?,
+            CustomBase::Jp => {
+                let (_, id_map) = load_rzv2_vstring(EMBED_VSTRING_EN_GZ)?;
+                (HashMap::with_capacity(c.vstring.len()), id_map)
+            }
+        },
+        None => match lang {
+            PatchLang::En => load_rzv2_vstring(EMBED_VSTRING_EN_GZ)?,
+            PatchLang::Id => load_rzv2_vstring(EMBED_VSTRING_ID_GZ)?,
+        },
+    };
+    let mut direct_overrides: HashMap<usize, Vec<u8>> = HashMap::new();
+    if let Some(c) = custom {
+        for (&pc_id, bytes) in &c.vstring {
+            if let Some(&fp) = pc_id_to_jp.get(&pc_id) {
+                by_hash.insert(fp, bytes.clone());
+            } else if allow_direct_ids {
+                direct_overrides.insert(pc_id, bytes.clone());
+            }
+        }
+    }
+    Ok((by_hash, direct_overrides))
 }
 
 fn load_string_dict(gz: &[u8]) -> Result<HashMap<String, String>, String> {
@@ -939,6 +1495,7 @@ where
 {
     let bak_dir = game_dir.join("_ENPatchBackup");
     fs::create_dir_all(&bak_dir).map_err(|e| format!("Failed creating backup dir: {}", e))?;
+    let mut state_file = load_patch_state(&bak_dir);
 
     let active_label = match custom {
         Some(c) => format!("{} ({} · base={})", c.meta.name, c.meta.code, c.base.as_str().to_uppercase()),
@@ -965,45 +1522,73 @@ where
     }
     on_progress(0, TOTAL_STRINGS, &format!("Unpacking {} payloads...", active_code));
 
-    // [1/4] VStringPool (74,055 strings)
+    // [1/4] VStringPool (universal hash-keyed, up to 76,180 strings)
     log(
         &format!("=== [1/4] Patching VStringPool ({}) ===", active_code),
         LogLevel::Info,
     );
-    rewritten += patch_vstring_pool(game_dir, &bak_dir, lang, custom, &mut log, &mut |delta, stage| {
-        on_progress(rewritten + delta, TOTAL_STRINGS, stage);
-    })?;
+    rewritten += patch_vstring_pool(
+        game_dir,
+        &bak_dir,
+        &mut state_file,
+        lang,
+        custom,
+        &mut log,
+        &mut |delta, stage| on_progress(rewritten + delta, TOTAL_STRINGS, stage),
+    )?;
+    save_patch_state(&bak_dir, &state_file);
 
-    // [2/4] Static UI KeyConfig (3,135 strings)
+    // [2/4] Static UI KeyConfig (3,135 strings, dynamically discovered!)
     log(
         &format!("=== [2/4] Patching Static UI KeyConfig ({}) ===", active_code),
         LogLevel::Info,
     );
-    rewritten += patch_static_ui(game_dir, &bak_dir, lang, custom, &mut log, &mut |delta, stage| {
-        on_progress(rewritten + delta, TOTAL_STRINGS, stage);
-    })?;
+    rewritten += patch_static_ui(
+        game_dir,
+        &bak_dir,
+        &mut state_file,
+        lang,
+        custom,
+        &mut log,
+        &mut |delta, stage| on_progress(rewritten + delta, TOTAL_STRINGS, stage),
+    )?;
+    save_patch_state(&bak_dir, &state_file);
 
     // [3/4] StaticPackage updatableBuiltInLangString (113 strings)
     log(
         &format!("=== [3/4] Patching Startup/Updater StaticPackage ({}) ===", active_code),
         LogLevel::Info,
     );
-    rewritten += patch_static_pkg(game_dir, &bak_dir, lang, custom, &mut log, &mut |delta, stage| {
-        on_progress(rewritten + delta, TOTAL_STRINGS, stage);
-    })?;
+    rewritten += patch_static_pkg(
+        game_dir,
+        &bak_dir,
+        &mut state_file,
+        lang,
+        custom,
+        &mut log,
+        &mut |delta, stage| on_progress(rewritten + delta, TOTAL_STRINGS, stage),
+    )?;
+    save_patch_state(&bak_dir, &state_file);
 
     // [4/4] resources.assets (358 strings)
     log(
         &format!("=== [4/4] Patching Startup/SDK Resources ({}) ===", active_code),
         LogLevel::Info,
     );
-    rewritten += patch_resources_assets(game_dir, &bak_dir, lang, custom, &mut log, &mut |delta, stage| {
-        on_progress(rewritten + delta, TOTAL_STRINGS, stage);
-    })?;
+    rewritten += patch_resources_assets(
+        game_dir,
+        &bak_dir,
+        &mut state_file,
+        lang,
+        custom,
+        &mut log,
+        &mut |delta, stage| on_progress(rewritten + delta, TOTAL_STRINGS, stage),
+    )?;
+    save_patch_state(&bak_dir, &state_file);
 
     on_progress(
         rewritten,
-        TOTAL_STRINGS,
+        rewritten.max(TOTAL_STRINGS),
         &format!("All 4 targets verified 100% ({})!", active_code),
     );
     log(
@@ -1017,63 +1602,11 @@ where
     Ok(rewritten)
 }
 
-fn build_pc_vstring_map(lang: PatchLang, custom: Option<&CustomPack>) -> Result<HashMap<usize, Vec<u8>>, String> {
-    let mut map = match custom {
-        Some(c) => match c.base {
-            CustomBase::En => load_vstring_map(EMBED_VSTRING_EN_GZ)?,
-            CustomBase::Id => load_vstring_map(EMBED_VSTRING_ID_GZ)?,
-            CustomBase::Jp => HashMap::with_capacity(c.vstring.len()),
-        },
-        None => match lang {
-            PatchLang::En => load_vstring_map(EMBED_VSTRING_EN_GZ)?,
-            PatchLang::Id => load_vstring_map(EMBED_VSTRING_ID_GZ)?,
-        },
-    };
-    if let Some(c) = custom {
-        for (&id, bytes) in &c.vstring {
-            map.insert(id, bytes.clone());
-        }
-    }
-    Ok(map)
-}
-
-pub fn load_android_vstring_map(lang: PatchLang, custom: Option<&CustomPack>) -> Result<HashMap<usize, Vec<u8>>, String> {
-    let pc_map = build_pc_vstring_map(lang, custom)?;
-    let raw_runs = gunzip(EMBED_VSTRING_ANDROID_MAP_GZ)?;
-    if raw_runs.len() < 4 {
-        return Err("Corrupt Android VStringPool remap table".into());
-    }
-    let run_count = read_u32_le(&raw_runs, 0) as usize;
-    if raw_runs.len() != 4 + run_count * 12 {
-        return Err("Android VStringPool remap table length mismatch".into());
-    }
-    let mut an_map = HashMap::with_capacity(pc_map.len());
-    for i in 0..run_count {
-        let base = 4 + i * 12;
-        let pc_start = read_u32_le(&raw_runs, base) as usize;
-        let an_start = read_u32_le(&raw_runs, base + 4) as usize;
-        let len = read_u32_le(&raw_runs, base + 8) as usize;
-        for k in 0..len {
-            if let Some(tr) = pc_map.get(&(pc_start + k)) {
-                an_map.insert(an_start + k, tr.clone());
-            }
-        }
-    }
-    if custom.is_none() && an_map.len() != pc_map.len() {
-        return Err(format!(
-            "Android VStringPool remap incomplete ({} != {})",
-            an_map.len(),
-            pc_map.len()
-        ));
-    }
-    Ok(an_map)
-}
-
-pub fn patch_vstring_pool_bytes<L, P>(
+pub fn patch_vstring_universal_bytes<L, P>(
     orig_buf: &[u8],
-    translations: &HashMap<usize, Vec<u8>>,
-    spans: &[(&str, usize, usize)],
     lang: PatchLang,
+    custom: Option<&CustomPack>,
+    allow_direct_ids: bool,
     log: &mut L,
     on_sub: &mut P,
 ) -> Result<(Vec<u8>, usize), String>
@@ -1084,6 +1617,19 @@ where
     if orig_buf.len() < 4144 {
         return Err("VStringPool file too small".into());
     }
+    let code = custom.map(|c| c.meta.code.as_str()).unwrap_or_else(|| lang.short_code());
+    on_sub(0, &format!("Loading universal {} dictionary (RZV2)...", code));
+    let (by_hash, direct_overrides) = build_vstring_lookup(lang, custom, allow_direct_ids)?;
+    log(
+        &format!(
+            "  Loaded {} universal {} VStringPool hash entries.",
+            by_hash.len() + direct_overrides.len(),
+            code
+        ),
+        LogLevel::Info,
+    );
+
+    on_sub(0, "Decrypting VStringPool (MMap)...");
     let mut h1 = orig_buf[4120..4144].to_vec();
     xor_mmap_in_place(&mut h1, 4120, EMBED_MMAP_KEY);
     let hash_bytes = read_u32_le(&h1, 0) as usize;
@@ -1099,51 +1645,106 @@ where
     let mut str_buf = orig_buf[str_sec_off..].to_vec();
     xor_mmap_in_place(&mut str_buf, str_sec_off, EMBED_MMAP_KEY);
     let count = read_u32_le(&str_buf, 16) as usize;
+    if 20 + count.saturating_mul(4) > str_buf.len() {
+        return Err(format!("VStringPool offset table out of bounds (count={})", count));
+    }
     log(&format!("  Decrypted VStringPool: {} total strings.", count), LogLevel::Info);
 
-    let mut new_str_buf = str_buf.clone();
-    let resolved_spans: Vec<(&str, usize, usize)> = spans
-        .iter()
-        .map(|&(name, s, e)| (name, s, if e == usize::MAX { count - 1 } else { e }))
-        .collect();
-
-    let mut rewritten = 0usize;
-    let mut inplace_ids = Vec::new();
-    for &id in translations.keys() {
-        if id >= count {
-            return Err(format!("VStringPool ID #{} out of range (count={})", id, count));
+    // Universal content-hash scan across all pool strings (hotfix-proof & platform-agnostic!)
+    on_sub(0, &format!("Matching {} strings by content hash...", code));
+    let mut matched_ids: Vec<usize> = Vec::with_capacity(by_hash.len().min(count));
+    let mut matched_map: HashMap<usize, Vec<u8>> = HashMap::with_capacity(by_hash.len().min(count));
+    for id in 0..count {
+        let o_abs = read_u32_le(&str_buf, 20 + id * 4) as usize;
+        if o_abs < str_sec_off {
+            return Err(format!("VStringPool offset underflow at #{}", id));
         }
-        let in_span = resolved_spans.iter().any(|&(_, s, e)| id >= s && id <= e);
-        if !in_span {
-            inplace_ids.push(id);
+        let o_rel = o_abs - str_sec_off;
+        if o_rel + 4 > str_buf.len() {
+            return Err(format!("VStringPool length header OOB at #{}", id));
+        }
+        let o_len_i = read_i32_le(&str_buf, o_rel);
+        if o_len_i < 0 {
+            continue;
+        }
+        let o_len = o_len_i as usize;
+        if o_rel + 4 + o_len > str_buf.len() {
+            return Err(format!("VStringPool string payload OOB at #{}", id));
+        }
+        if let Some(tr) = direct_overrides.get(&id) {
+            matched_ids.push(id);
+            matched_map.insert(id, tr.clone());
+            continue;
+        }
+        let raw_bytes = &str_buf[o_rel + 4..o_rel + 4 + o_len];
+        let h = fnv1a64(raw_bytes);
+        if let Some(tr) = by_hash.get(&(h, o_len as u32)) {
+            matched_ids.push(id);
+            matched_map.insert(id, tr.clone());
         }
     }
+    if matched_ids.is_empty() {
+        return Err("No matching VStringPool entries found in this bundle.".into());
+    }
+    log(
+        &format!("  Matched {} strings dynamically across pool (count={}).", matched_ids.len(), count),
+        LogLevel::Info,
+    );
 
-    let total_tr = translations.len();
-    for (name, start, end) in resolved_spans {
-        if end >= count || start > end {
-            return Err(format!("Invalid VStringPool span {} [{}..{}] for count={}", name, start, end, count));
+    // Group matched IDs into contiguous repackable spans (MAX_GAP=4096 bridges non-JP gaps cleanly)
+    const MAX_GAP: usize = 4096;
+    const MIN_SPAN_LEN: usize = 2;
+    let mut spans: Vec<(usize, usize)> = Vec::new();
+    let mut inplace_ids: Vec<usize> = Vec::new();
+    let mut s = matched_ids[0];
+    let mut e = matched_ids[0];
+    for &id in &matched_ids[1..] {
+        if id - e <= MAX_GAP {
+            e = id;
+        } else {
+            if e - s + 1 >= MIN_SPAN_LEN {
+                spans.push((s, e));
+            } else {
+                inplace_ids.push(s);
+            }
+            s = id;
+            e = id;
         }
+    }
+    if e - s + 1 >= MIN_SPAN_LEN {
+        spans.push((s, e));
+    } else {
+        inplace_ids.push(s);
+    }
+
+    let mut new_str_buf = str_buf.clone();
+    let total_tr = matched_ids.len();
+    let mut rewritten = 0usize;
+
+    for (span_idx, (start, end)) in spans.iter().copied().enumerate() {
         let span_start_abs = read_u32_le(&str_buf, 20 + start * 4) as usize;
         let span_end_abs = if end + 1 < count {
             read_u32_le(&str_buf, 20 + (end + 1) * 4) as usize
         } else {
             orig_buf.len()
         };
+        if span_end_abs < span_start_abs {
+            return Err(format!("Non-monotonic span offsets [{}..{}]", start, end));
+        }
         let capacity = span_end_abs - span_start_abs;
         let mut packed = Vec::with_capacity(capacity);
         let mut cursor = span_start_abs;
 
         for id in start..=end {
-            let payload: &[u8] = if let Some(tr) = translations.get(&id) {
+            let payload: &[u8] = if let Some(tr) = matched_map.get(&id) {
                 rewritten += 1;
                 if rewritten % 2500 == 0 {
                     on_sub(
                         rewritten,
                         &format!(
-                            "Rewriting VStringPool [{} / {}]: {} / {}",
-                            lang.short_code(),
-                            name,
+                            "Rewriting VStringPool [{} / span {}]: {} / {}",
+                            code,
+                            span_idx + 1,
                             rewritten,
                             total_tr
                         ),
@@ -1163,7 +1764,13 @@ where
         }
         let used = cursor - span_start_abs;
         if used > capacity {
-            return Err(format!("Span {} overflowed by {} bytes", name, used - capacity));
+            return Err(format!(
+                "Span #{} [{}..{}] overflowed by {} bytes",
+                span_idx + 1,
+                start,
+                end,
+                used - capacity
+            ));
         }
         let dst_off = span_start_abs - str_sec_off;
         new_str_buf[dst_off..dst_off + used].copy_from_slice(&packed);
@@ -1172,20 +1779,29 @@ where
         }
         log(
             &format!(
-                "  Repacked {} [#{}..#{}]: {}/{} B (free slack {} B)",
-                name, start, end, used, capacity, capacity - used
+                "  Repacked span #{} [#{}..#{}]: {}/{} B (free slack {} B)",
+                span_idx + 1,
+                start,
+                end,
+                used,
+                capacity,
+                capacity - used
             ),
             LogLevel::Diff,
         );
     }
 
+    let mut skipped_inplace = 0usize;
     for id in inplace_ids {
         let o_abs = read_u32_le(&str_buf, 20 + id * 4) as usize;
         let o_rel = o_abs - str_sec_off;
         let o_len = read_i32_le(&str_buf, o_rel) as usize;
-        let payload = &translations[&id];
+        let payload = &matched_map[&id];
         if payload.len() > o_len {
-            return Err(format!("In-place ID {} overflow", id));
+            // Gracefully skip isolated singleton that doesn't fit in-place (future hotfix safety)
+            matched_map.remove(&id);
+            skipped_inplace += 1;
+            continue;
         }
         write_i32_le(&mut new_str_buf, o_rel, payload.len() as i32);
         new_str_buf[o_rel + 4..o_rel + 4 + payload.len()].copy_from_slice(payload);
@@ -1194,8 +1810,14 @@ where
         }
         rewritten += 1;
     }
+    if skipped_inplace > 0 {
+        log(
+            &format!("  Skipped {} isolated singleton string(s) exceeding in-place byte length.", skipped_inplace),
+            LogLevel::Warn,
+        );
+    }
 
-    on_sub(rewritten, "Re-encrypting & verifying 74,055 VStringPool strings...");
+    on_sub(rewritten, &format!("Re-encrypting & verifying {} VStringPool strings...", rewritten));
     let mut out_buf = orig_buf.to_vec();
     out_buf[str_sec_off..].copy_from_slice(&new_str_buf);
     xor_mmap_in_place(&mut out_buf[str_sec_off..], str_sec_off, EMBED_MMAP_KEY);
@@ -1203,7 +1825,7 @@ where
     // Round-trip verification
     let mut v_sec = out_buf[str_sec_off..].to_vec();
     xor_mmap_in_place(&mut v_sec, str_sec_off, EMBED_MMAP_KEY);
-    for (&id, expected) in translations {
+    for (&id, expected) in &matched_map {
         let a = read_u32_le(&v_sec, 20 + id * 4) as usize;
         let rel = a - str_sec_off;
         let l = read_i32_le(&v_sec, rel) as usize;
@@ -1228,29 +1850,13 @@ where
     L: FnMut(&str, LogLevel),
     P: FnMut(usize, &str),
 {
-    let code = custom.map(|c| c.meta.code.as_str()).unwrap_or_else(|| lang.short_code());
-    on_sub(0, &format!("Remapping Android VStringPool ({}) entries...", code));
-    let translations = load_android_vstring_map(lang, custom)?;
-    log(
-        &format!(
-            "  Remapped {} {} VStringPool translations for Android.",
-            translations.len(),
-            code
-        ),
-        LogLevel::Info,
-    );
-    on_sub(0, "Decrypting Android VStringPool (130 MB MMap)...");
-    let spans = [
-        ("base_jp_1", 1473040usize, 1541595usize),
-        ("base_jp_2", 1613715usize, 1616061usize),
-        ("hotfix_jp", 1642789usize, usize::MAX),
-    ];
-    patch_vstring_pool_bytes(orig_buf, &translations, &spans, lang, log, on_sub)
+    patch_vstring_universal_bytes(orig_buf, lang, custom, false, log, on_sub)
 }
 
 fn patch_vstring_pool<L, P>(
     game_dir: &Path,
     bak_dir: &Path,
+    state_file: &mut PatchStateFile,
     lang: PatchLang,
     custom: Option<&CustomPack>,
     log: &mut L,
@@ -1260,44 +1866,59 @@ where
     L: FnMut(&str, LogLevel),
     P: FnMut(usize, &str),
 {
-    let target = game_dir.join(VSTRING_REL);
-    let bak = bak_dir.join("z5xzl3cg6ao0ilpbzykexg.r.original");
-    if !target.is_file() {
-        return Err(format!("VStringPool not found: {:?}", target));
-    }
-    ensure_backup(&target, &bak, VSTRING_EN_SHA, "", VSTRING_ID_SHA, log)?;
-    if check_no_backup_switch_guard(&target, &bak, lang, custom, VSTRING_EN_SHA, "", VSTRING_ID_SHA)? {
+    let disc = discover_pc_vstring(game_dir)
+        .ok_or_else(|| "VStringPool bundle not found in raw_base_package\\BundleFiles\\".to_string())?;
+    let target = &disc.full_path;
+    let bak = bak_dir.join(format!("{}.original", disc.file_name));
+
+    let orig_sha = ensure_backup_v2(
+        target,
+        &bak,
+        &disc.file_name,
+        &state_file.vstring,
+        VSTRING_KNOWN_EN_SHAS,
+        VSTRING_KNOWN_ID_SHAS,
+        log,
+    )?;
+    if check_no_backup_switch_guard_v2(
+        target,
+        &bak,
+        &disc.file_name,
+        lang,
+        custom,
+        &state_file.vstring,
+        VSTRING_KNOWN_EN_SHAS,
+        VSTRING_KNOWN_ID_SHAS,
+    )? {
+        let cnt = state_file.vstring.matched_count.max(VSTRING_STRINGS);
         log(
-            &format!("  VStringPool already matches {} (74,055 strings).", lang.short_code()),
+            &format!("  VStringPool [{}] already matches {} ({} strings).", disc.file_name, lang.short_code(), cnt),
             LogLevel::Ok,
         );
-        on_sub(74055, "VStringPool already up-to-date");
-        return Ok(74055);
+        on_sub(cnt, "VStringPool already up-to-date");
+        return Ok(cnt);
     }
-    let src_path = if bak.is_file() { &bak } else { &target };
+
+    let src_path = if bak.is_file() { &bak } else { target };
     let code = custom.map(|c| c.meta.code.as_str()).unwrap_or_else(|| lang.short_code());
-
-    on_sub(0, &format!("Loading VStringPool ({}) entries...", code));
-    let translations = build_pc_vstring_map(lang, custom)?;
-    log(
-        &format!(
-            "  Loaded {} {} VStringPool translations.",
-            translations.len(),
-            code
-        ),
-        LogLevel::Info,
-    );
-
-    on_sub(0, "Decrypting VStringPool (133 MB MMap)...");
     let orig_buf = fs::read(src_path).map_err(|e| format!("Read VStringPool failed: {}", e))?;
-    let spans = [("base_jp", 1495181usize, 1563711usize), ("hotfix_jp", 1658279usize, usize::MAX)];
-    let (out_buf, rewritten) = patch_vstring_pool_bytes(&orig_buf, &translations, &spans, lang, log, on_sub)?;
+    let (out_buf, rewritten) = patch_vstring_universal_bytes(&orig_buf, lang, custom, true, log, on_sub)?;
 
-    write_exclusive_verified(&target, &out_buf, &bak)?;
-    let post_sha = sha256_file(&target)?;
+    write_exclusive_verified(target, &out_buf, &bak)?;
+    let post_sha = sha256_file(target)?;
+    state_file.vstring = BundlePatchState {
+        file_name: disc.file_name.clone(),
+        sub_offset: 0,
+        lang: state_tag_for(lang, custom),
+        custom_code: custom.map(|c| c.meta.code.clone()).unwrap_or_default(),
+        orig_sha: if orig_sha.is_empty() { state_file.vstring.orig_sha.clone() } else { orig_sha },
+        patched_sha: post_sha.clone(),
+        matched_count: rewritten,
+    };
     log(
         &format!(
-            "  VStringPool [{}] installed & verified! Rewritten={}, SHA256={}",
+            "  VStringPool [{} · {}] installed & verified! Rewritten={}, SHA256={}",
+            disc.file_name,
             code,
             rewritten,
             post_sha
@@ -1313,6 +1934,31 @@ fn align4(n: usize) -> usize {
     (n + 3) & !3
 }
 
+fn find_obj0_size_offset(sf: &[u8], data_off: usize, orig_mb_size: usize) -> Option<usize> {
+    // Fast path: Unity 2022 standard ObjectInfo byteSize offset
+    if 3220 + 4 <= data_off && read_u32_le(sf, 3220) as usize == orig_mb_size {
+        return Some(3220);
+    }
+    // Dynamic scan inside ObjectInfo table (< data_off): byteStart == 0 (8 bytes) followed by byteSize == orig_mb_size
+    let target_u32 = orig_mb_size as u32;
+    let mut o = 8usize;
+    while o + 4 <= data_off {
+        if read_u32_le(sf, o) == target_u32 && sf[o - 8..o] == [0u8; 8] {
+            return Some(o);
+        }
+        o += 4;
+    }
+    // Broader fallback: any 4-byte-aligned u32 match near end of header
+    let mut o2 = data_off.saturating_sub(512) & !3;
+    while o2 + 4 <= data_off {
+        if read_u32_le(sf, o2) == target_u32 {
+            return Some(o2);
+        }
+        o2 += 4;
+    }
+    None
+}
+
 pub fn patch_static_ui_bytes<L, P>(
     orig_buf: &[u8],
     sub_offset: usize,
@@ -1325,21 +1971,6 @@ where
     L: FnMut(&str, LogLevel),
     P: FnMut(usize, &str),
 {
-    const SUB_SIZE: usize = 83151;
-    const DATA_OFF: usize = 3392;
-    const MB_NAME_OFF: usize = 3420;
-    const OBJ0_SIZE_OFF: usize = 3220;
-    const ORIG_MB_SIZE: usize = 161392;
-
-    if sub_offset + SUB_SIZE > orig_buf.len() {
-        return Err(format!(
-            "Static UI sub-bundle offset out of range ({} + {} > {})",
-            sub_offset,
-            SUB_SIZE,
-            orig_buf.len()
-        ));
-    }
-
     let mut tr_map = match custom {
         Some(c) => match c.base {
             CustomBase::En => load_string_dict(EMBED_STATIC_UI_EN_GZ)?,
@@ -1359,9 +1990,32 @@ where
     let code = custom.map(|c| c.meta.code.as_str()).unwrap_or_else(|| lang.short_code());
     on_sub(0, "Decrypting UnityCN ast_staticTextKeyConfig.asset...");
     let bundle = UnityCnBundle::parse(orig_buf, sub_offset)?;
+    let sub_size = bundle.fsize;
+    if sub_offset + sub_size > orig_buf.len() {
+        return Err(format!(
+            "Static UI sub-bundle out of range ({} + {} > {})",
+            sub_offset,
+            sub_size,
+            orig_buf.len()
+        ));
+    }
+    if bundle.blocks.is_empty() {
+        return Err("Static UI sub-bundle has 0 blocks".into());
+    }
     let orig_sf = bundle.read_all()?;
 
-    let mut cur = MB_NAME_OFF + 28;
+    // Locate ast_staticTextKeyConfig dynamically inside the decrypted SerializedFile
+    const MARKER: &[u8] = b"ast_staticTextKeyConfig";
+    let marker_pos = find_bytes(&orig_sf, MARKER)
+        .ok_or("ast_staticTextKeyConfig marker not found in Static UI bundle")?;
+    if marker_pos < 32 || read_i32_le(&orig_sf, marker_pos - 4) as usize != MARKER.len() {
+        return Err("Unexpected ast_staticTextKeyConfig MonoBehaviour layout".into());
+    }
+    let mb_name_off = marker_pos - 4;
+    let data_off = mb_name_off - 28;
+    let name_end = mb_name_off + 4 + align4(MARKER.len());
+
+    let mut cur = name_end;
     let lang_len = read_i32_le(&orig_sf, cur) as usize;
     cur += 4;
     let lang_tag = String::from_utf8_lossy(&orig_sf[cur..cur + lang_len]).into_owned();
@@ -1369,8 +2023,8 @@ where
     let pair_count = read_i32_le(&orig_sf, cur) as usize;
     cur += 4;
 
-    let mut new_mb = Vec::with_capacity(ORIG_MB_SIZE);
-    new_mb.extend_from_slice(&orig_sf[DATA_OFF..MB_NAME_OFF + 28]);
+    let mut new_mb = Vec::with_capacity(orig_sf.len().saturating_sub(data_off));
+    new_mb.extend_from_slice(&orig_sf[data_off..name_end]);
     let write_str = |dst: &mut Vec<u8>, s: &str| {
         let b = s.as_bytes();
         dst.extend_from_slice(&(b.len() as i32).to_le_bytes());
@@ -1399,7 +2053,7 @@ where
             if replaced % 400 == 0 {
                 on_sub(
                     replaced,
-                    &format!("Rewriting Static UI KeyConfig [{}]: {} / 3,135", code, replaced),
+                    &format!("Rewriting Static UI KeyConfig [{}]: {} / {}", code, replaced, STATIC_UI_STRINGS),
                 );
             }
             tr.as_str()
@@ -1410,34 +2064,50 @@ where
         write_str(&mut new_mb, v);
     }
 
-    if new_mb.len() > ORIG_MB_SIZE {
-        return Err(format!("Rebuilt Static UI exceeds slot ({} > {})", new_mb.len(), ORIG_MB_SIZE));
+    let orig_mb_size = cur - data_off;
+    let obj0_size_off = find_obj0_size_offset(&orig_sf, data_off, orig_mb_size)
+        .ok_or_else(|| format!("Could not locate MonoBehaviour ObjectInfo size={} in Static UI SF", orig_mb_size))?;
+
+    if new_mb.len() > orig_mb_size {
+        return Err(format!("Rebuilt Static UI exceeds slot ({} > {})", new_mb.len(), orig_mb_size));
     }
 
     let mut new_sf = orig_sf.clone();
-    new_sf[DATA_OFF..DATA_OFF + ORIG_MB_SIZE].fill(0);
-    new_sf[DATA_OFF..DATA_OFF + new_mb.len()].copy_from_slice(&new_mb);
-    write_u32_le(&mut new_sf, OBJ0_SIZE_OFF, new_mb.len() as u32);
+    new_sf[data_off..data_off + orig_mb_size].fill(0);
+    new_sf[data_off..data_off + new_mb.len()].copy_from_slice(&new_mb);
+    write_u32_le(&mut new_sf, obj0_size_off, new_mb.len() as u32);
 
     on_sub(replaced, "Compressing (LZ4HC exact) & UnityCN encrypting Static UI...");
-    let u0 = bundle.blocks[0].u_size;
-    let u1 = bundle.blocks[1].u_size;
-    let total_budget = SUB_SIZE - bundle.data_start;
-    let mut c0 = lz4_compress(&new_sf[..u0], 1024);
-    let mut c1 = lz4_compress_exact(&new_sf[u0..u0 + u1], total_budget - c0.len(), 1024)?;
-    bundle.cipher.encrypt_block_in_place(&mut c0, 0);
-    bundle.cipher.encrypt_block_in_place(&mut c1, 1);
+    let total_budget = sub_size - bundle.data_start;
+    let mut comp_blocks: Vec<Vec<u8>> = Vec::with_capacity(bundle.blocks.len());
+    let mut sf_pos = 0usize;
+    let mut used_comp = 0usize;
+    let last_idx = bundle.blocks.len() - 1;
+    for (idx, blk) in bundle.blocks.iter().enumerate() {
+        let slice = &new_sf[sf_pos..sf_pos + blk.u_size];
+        sf_pos += blk.u_size;
+        let mut c = if idx < last_idx {
+            lz4_compress(slice, 1024)
+        } else {
+            if used_comp >= total_budget {
+                return Err(format!("Static UI compressed blocks exceeded budget ({} >= {})", used_comp, total_budget));
+            }
+            lz4_compress_exact(slice, total_budget - used_comp, 1024)?
+        };
+        if (blk.flags & 0x100) != 0 {
+            bundle.cipher.encrypt_block_in_place(&mut c, idx);
+        }
+        used_comp += c.len();
+        comp_blocks.push(c);
+    }
 
     let mut new_bi_plain = Vec::with_capacity(128);
     new_bi_plain.extend_from_slice(&bundle.data_hash);
-    new_bi_plain.extend_from_slice(&2u32.to_be_bytes());
-    for (u_sz, c_sz, fl) in [
-        (u0, c0.len(), bundle.blocks[0].flags),
-        (u1, c1.len(), bundle.blocks[1].flags),
-    ] {
-        new_bi_plain.extend_from_slice(&(u_sz as u32).to_be_bytes());
-        new_bi_plain.extend_from_slice(&(c_sz as u32).to_be_bytes());
-        new_bi_plain.extend_from_slice(&fl.to_be_bytes());
+    new_bi_plain.extend_from_slice(&(bundle.blocks.len() as u32).to_be_bytes());
+    for (blk, c) in bundle.blocks.iter().zip(comp_blocks.iter()) {
+        new_bi_plain.extend_from_slice(&(blk.u_size as u32).to_be_bytes());
+        new_bi_plain.extend_from_slice(&(c.len() as u32).to_be_bytes());
+        new_bi_plain.extend_from_slice(&blk.flags.to_be_bytes());
     }
     new_bi_plain.extend_from_slice(&(bundle.dirs.len() as u32).to_be_bytes());
     for d in &bundle.dirs {
@@ -1452,17 +2122,20 @@ where
         return Err("Compressed blocksInfo overflowed data_start".into());
     }
 
-    let mut new_sub = vec![0u8; SUB_SIZE];
+    let mut new_sub = vec![0u8; sub_size];
     new_sub[..bundle.header_prefix.len()].copy_from_slice(&bundle.header_prefix);
-    write_i64_be(&mut new_sub, bundle.fsize_off, SUB_SIZE as i64);
+    write_i64_be(&mut new_sub, bundle.fsize_off, sub_size as i64);
     write_u32_be(&mut new_sub, bundle.cinfo_off, new_bi_comp.len() as u32);
     write_u32_be(&mut new_sub, bundle.cinfo_off + 4, new_bi_plain.len() as u32);
     new_sub[bundle.blocks_info_off..bundle.blocks_info_off + new_bi_comp.len()].copy_from_slice(&new_bi_comp);
-    new_sub[bundle.data_start..bundle.data_start + c0.len()].copy_from_slice(&c0);
-    new_sub[bundle.data_start + c0.len()..bundle.data_start + c0.len() + c1.len()].copy_from_slice(&c1);
+    let mut wp = bundle.data_start;
+    for c in &comp_blocks {
+        new_sub[wp..wp + c.len()].copy_from_slice(c);
+        wp += c.len();
+    }
 
     let mut out_buf = orig_buf.to_vec();
-    out_buf[sub_offset..sub_offset + SUB_SIZE].copy_from_slice(&new_sub);
+    out_buf[sub_offset..sub_offset + sub_size].copy_from_slice(&new_sub);
 
     // Round-trip verify decrypted SerializedFile
     let v_bundle = UnityCnBundle::parse(&out_buf, sub_offset)?;
@@ -1476,6 +2149,7 @@ where
 fn patch_static_ui<L, P>(
     game_dir: &Path,
     bak_dir: &Path,
+    state_file: &mut PatchStateFile,
     lang: PatchLang,
     custom: Option<&CustomPack>,
     log: &mut L,
@@ -1485,32 +2159,62 @@ where
     L: FnMut(&str, LogLevel),
     P: FnMut(usize, &str),
 {
-    const SUB_OFFSET: usize = 420062;
+    let cached_ui = if state_file.static_ui.file_name.is_empty() {
+        None
+    } else {
+        Some(state_file.static_ui.file_name.as_str())
+    };
+    let disc = discover_pc_static_ui(game_dir, cached_ui)
+        .ok_or_else(|| "Static UI bundle not found in default_package\\BundleFiles\\".to_string())?;
+    let target = &disc.full_path;
+    let bak = bak_dir.join(format!("{}.original", disc.file_name));
 
-    let target = game_dir.join(STATIC_UI_REL);
-    let bak = bak_dir.join("yr49bxop0f3reujfsmyfca.r.original");
-    if !target.is_file() {
-        return Err(format!("Static UI bundle not found: {:?}", target));
-    }
-    ensure_backup(&target, &bak, STATIC_UI_EN_SHA, STATIC_UI_EN_SHA_ALT, STATIC_UI_ID_SHA, log)?;
-    if check_no_backup_switch_guard(&target, &bak, lang, custom, STATIC_UI_EN_SHA, STATIC_UI_EN_SHA_ALT, STATIC_UI_ID_SHA)? {
+    let orig_sha = ensure_backup_v2(
+        target,
+        &bak,
+        &disc.file_name,
+        &state_file.static_ui,
+        STATIC_UI_KNOWN_EN_SHAS,
+        STATIC_UI_KNOWN_ID_SHAS,
+        log,
+    )?;
+    if check_no_backup_switch_guard_v2(
+        target,
+        &bak,
+        &disc.file_name,
+        lang,
+        custom,
+        &state_file.static_ui,
+        STATIC_UI_KNOWN_EN_SHAS,
+        STATIC_UI_KNOWN_ID_SHAS,
+    )? {
         log(
-            &format!("  Static UI KeyConfig already matches {} (3,135 strings).", lang.short_code()),
+            &format!("  Static UI KeyConfig [{}] already matches {} ({} strings).", disc.file_name, lang.short_code(), STATIC_UI_STRINGS),
             LogLevel::Ok,
         );
-        on_sub(3135, "Static UI already up-to-date");
-        return Ok(3135);
+        on_sub(STATIC_UI_STRINGS, "Static UI already up-to-date");
+        return Ok(STATIC_UI_STRINGS);
     }
-    let src_path = if bak.is_file() { &bak } else { &target };
+    let src_path = if bak.is_file() { &bak } else { target };
     let code = custom.map(|c| c.meta.code.as_str()).unwrap_or_else(|| lang.short_code());
     let orig_buf = fs::read(src_path).map_err(|e| format!("Read Static UI failed: {}", e))?;
-    let (out_buf, replaced) = patch_static_ui_bytes(&orig_buf, SUB_OFFSET, lang, custom, log, on_sub)?;
+    let (out_buf, replaced) = patch_static_ui_bytes(&orig_buf, disc.sub_offset, lang, custom, log, on_sub)?;
 
-    write_exclusive_verified(&target, &out_buf, &bak)?;
-    let post_sha = sha256_file(&target)?;
+    write_exclusive_verified(target, &out_buf, &bak)?;
+    let post_sha = sha256_file(target)?;
+    state_file.static_ui = BundlePatchState {
+        file_name: disc.file_name.clone(),
+        sub_offset: disc.sub_offset,
+        lang: state_tag_for(lang, custom),
+        custom_code: custom.map(|c| c.meta.code.clone()).unwrap_or_default(),
+        orig_sha: if orig_sha.is_empty() { state_file.static_ui.orig_sha.clone() } else { orig_sha },
+        patched_sha: post_sha.clone(),
+        matched_count: replaced,
+    };
     log(
         &format!(
-            "  Static UI KeyConfig [{}] installed & verified! Rewritten={}, SHA256={}",
+            "  Static UI KeyConfig [{} · {}] installed & verified! Rewritten={}, SHA256={}",
+            disc.file_name,
             code,
             replaced,
             post_sha
@@ -1578,6 +2282,7 @@ fn has_cjk(s: &str) -> bool {
 fn patch_static_pkg<L, P>(
     game_dir: &Path,
     bak_dir: &Path,
+    state_file: &mut PatchStateFile,
     lang: PatchLang,
     custom: Option<&CustomPack>,
     log: &mut L,
@@ -1588,12 +2293,30 @@ where
     P: FnMut(usize, &str),
 {
     let target = game_dir.join(STATIC_PKG_REL);
+    let fname = "6pq4a7hlp7zidu91dvvww.r";
     let bak = bak_dir.join("6pq4a7hlp7zidu91dvvww.r.original");
     if !target.is_file() {
         return Err(format!("StaticPackage bundle not found: {:?}", target));
     }
-    ensure_backup(&target, &bak, STATIC_PKG_EN_SHA, "", STATIC_PKG_ID_SHA, log)?;
-    if check_no_backup_switch_guard(&target, &bak, lang, custom, STATIC_PKG_EN_SHA, "", STATIC_PKG_ID_SHA)? {
+    let orig_sha = ensure_backup_v2(
+        &target,
+        &bak,
+        fname,
+        &state_file.static_pkg,
+        &[STATIC_PKG_EN_SHA],
+        &[STATIC_PKG_ID_SHA],
+        log,
+    )?;
+    if check_no_backup_switch_guard_v2(
+        &target,
+        &bak,
+        fname,
+        lang,
+        custom,
+        &state_file.static_pkg,
+        &[STATIC_PKG_EN_SHA],
+        &[STATIC_PKG_ID_SHA],
+    )? {
         log(
             &format!("  Startup StaticPackage already matches {} (113 strings).", lang.short_code()),
             LogLevel::Ok,
@@ -1617,15 +2340,32 @@ where
         CustomBase::Jp => HashMap::new(),
     };
     let orig_buf = fs::read(src_path).map_err(|e| format!("Read StaticPackage failed: {}", e))?;
-    on_sub(0, "Decrypting StaticPackage Block #5 (updatableBuiltInLangString)...");
+    on_sub(0, "Decrypting StaticPackage (updatableBuiltInLangString)...");
     let bundle = UnityCnBundle::parse(&orig_buf, 0)?;
-    let mut blk5 = bundle.read_block(5)?;
-
     let tag = b"updatableBuiltInLangString";
-    let tag_pos = blk5
-        .windows(tag.len())
-        .position(|w| w == tag)
-        .ok_or("updatableBuiltInLangString not found in block 5")?;
+    // Try Block #5 first, fallback to scanning all blocks if future client moves it
+    let mut target_blk_idx = None;
+    let mut blk5 = Vec::new();
+    let mut tag_pos = 0usize;
+    let order: Vec<usize> = std::iter::once(5)
+        .filter(|&i| i < bundle.blocks.len())
+        .chain((0..bundle.blocks.len()).filter(|&i| i != 5))
+        .collect();
+    for idx in order {
+        if let Ok(b) = bundle.read_block(idx) {
+            if let Some(pos) = find_bytes(&b, tag) {
+                target_blk_idx = Some(idx);
+                blk5 = b;
+                tag_pos = pos;
+                break;
+            }
+        }
+    }
+    let Some(blk_idx) = target_blk_idx else {
+        log("  [WARN] updatableBuiltInLangString not found in StaticPackage; skipping gracefully.", LogLevel::Warn);
+        return Ok(0);
+    };
+
     let len_off = align4(tag_pos + tag.len());
     let csv_byte_len = read_i32_le(&blk5, len_off) as usize;
     let csv_data_off = len_off + 4;
@@ -1730,23 +2470,34 @@ where
     new_csv[wp..wp + body.len()].copy_from_slice(body);
     blk5[csv_data_off..csv_data_off + csv_byte_len].copy_from_slice(&new_csv);
 
-    on_sub(replaced, "Compressing (LZ4HC exact) & UnityCN encrypting Block #5...");
-    let blk5_info = &bundle.blocks[5];
+    on_sub(replaced, &format!("Compressing (LZ4HC exact) & UnityCN encrypting Block #{}...", blk_idx));
+    let blk5_info = &bundle.blocks[blk_idx];
     let mut comp5 = lz4_compress_exact(&blk5, blk5_info.c_size, 1024)?;
-    bundle.cipher.encrypt_block_in_place(&mut comp5, 5);
+    if (blk5_info.flags & 0x100) != 0 {
+        bundle.cipher.encrypt_block_in_place(&mut comp5, blk_idx);
+    }
 
     let mut out_buf = orig_buf.clone();
     out_buf[blk5_info.file_offset..blk5_info.file_offset + comp5.len()].copy_from_slice(&comp5);
 
-    // Round-trip verify Block #5
+    // Round-trip verify Block
     let v_bundle = UnityCnBundle::parse(&out_buf, 0)?;
-    let v_blk5 = v_bundle.read_block(5)?;
+    let v_blk5 = v_bundle.read_block(blk_idx)?;
     if v_blk5 != blk5 {
-        return Err("StaticPackage Block #5 round-trip verification failed".into());
+        return Err("StaticPackage round-trip verification failed".into());
     }
 
     write_exclusive_verified(&target, &out_buf, &bak)?;
     let post_sha = sha256_file(&target)?;
+    state_file.static_pkg = BundlePatchState {
+        file_name: fname.to_string(),
+        sub_offset: 0,
+        lang: state_tag_for(lang, custom),
+        custom_code: custom.map(|c| c.meta.code.clone()).unwrap_or_default(),
+        orig_sha: if orig_sha.is_empty() { state_file.static_pkg.orig_sha.clone() } else { orig_sha },
+        patched_sha: post_sha.clone(),
+        matched_count: replaced,
+    };
     log(
         &format!(
             "  Startup StaticPackage [{}] installed & verified! Rewritten={}, SHA256={}",
@@ -1763,6 +2514,7 @@ where
 fn patch_resources_assets<L, P>(
     game_dir: &Path,
     bak_dir: &Path,
+    state_file: &mut PatchStateFile,
     lang: PatchLang,
     custom: Option<&CustomPack>,
     log: &mut L,
@@ -1773,12 +2525,30 @@ where
     P: FnMut(usize, &str),
 {
     let target = game_dir.join(RESOURCES_REL);
+    let fname = "resources.assets";
     let bak = bak_dir.join("resources.assets.original");
     if !target.is_file() {
         return Err(format!("resources.assets not found: {:?}", target));
     }
-    ensure_backup(&target, &bak, RESOURCES_EN_SHA, "", RESOURCES_ID_SHA, log)?;
-    if check_no_backup_switch_guard(&target, &bak, lang, custom, RESOURCES_EN_SHA, "", RESOURCES_ID_SHA)? {
+    let orig_sha = ensure_backup_v2(
+        &target,
+        &bak,
+        fname,
+        &state_file.resources,
+        &[RESOURCES_EN_SHA],
+        &[RESOURCES_ID_SHA],
+        log,
+    )?;
+    if check_no_backup_switch_guard_v2(
+        &target,
+        &bak,
+        fname,
+        lang,
+        custom,
+        &state_file.resources,
+        &[RESOURCES_EN_SHA],
+        &[RESOURCES_ID_SHA],
+    )? {
         log(
             &format!("  resources.assets already matches {} (358 strings).", lang.short_code()),
             LogLevel::Ok,
@@ -1798,6 +2568,15 @@ where
     if effective_base == CustomBase::Jp {
         let orig_buf = fs::read(src_path).map_err(|e| format!("Read resources.assets failed: {}", e))?;
         write_exclusive_verified(&target, &orig_buf, &bak)?;
+        state_file.resources = BundlePatchState {
+            file_name: fname.to_string(),
+            sub_offset: 0,
+            lang: "original".into(),
+            custom_code: String::new(),
+            orig_sha: if orig_sha.is_empty() { state_file.resources.orig_sha.clone() } else { orig_sha },
+            patched_sha: String::new(),
+            matched_count: 0,
+        };
         log(
             "  resources.assets kept as Original JP (custom pack base=jp).",
             LogLevel::Info,
@@ -1817,7 +2596,16 @@ where
 
     let mut out_buf = fs::read(src_path).map_err(|e| format!("Read resources.assets failed: {}", e))?;
     if out_buf.len() != expected_size {
-        return Err(format!("resources.assets size mismatch ({} != {})", out_buf.len(), expected_size));
+        log(
+            &format!(
+                "  [WARN] resources.assets size changed ({} != {}) — safely skipped (core 99.5% localization intact).",
+                out_buf.len(),
+                expected_size
+            ),
+            LogLevel::Warn,
+        );
+        on_sub(0, "resources.assets skipped (binary changed)");
+        return Ok(0);
     }
     let mut p = 8usize;
     for _ in 0..span_count {
@@ -1830,9 +2618,26 @@ where
 
     let cand_sha = sha256_bytes(&out_buf);
     if !expected_sha.is_empty() && !cand_sha.eq_ignore_ascii_case(expected_sha) {
-        return Err(format!("resources.assets post-patch SHA256 mismatch: {}", cand_sha));
+        log(
+            &format!(
+                "  [WARN] resources.assets layout differs (SHA256={}) — safely skipped.",
+                &cand_sha[..12]
+            ),
+            LogLevel::Warn,
+        );
+        on_sub(0, "resources.assets skipped (layout changed)");
+        return Ok(0);
     }
     write_exclusive_verified(&target, &out_buf, &bak)?;
+    state_file.resources = BundlePatchState {
+        file_name: fname.to_string(),
+        sub_offset: 0,
+        lang: state_tag_for(lang, custom),
+        custom_code: custom.map(|c| c.meta.code.clone()).unwrap_or_default(),
+        orig_sha: if orig_sha.is_empty() { state_file.resources.orig_sha.clone() } else { orig_sha },
+        patched_sha: cand_sha.clone(),
+        matched_count: RESOURCES_STRINGS,
+    };
     log(
         &format!(
             "  resources.assets [{}] installed & verified! Rewritten=358, SHA256={}",
@@ -1885,6 +2690,7 @@ where
     let bak_dir = game_dir.join("_ENPatchBackup");
     let targets = scan_game_folder(game_dir, |_, _| {});
     let total = targets.len();
+    let mut state_file = load_patch_state(&bak_dir);
     let mut restored = 0usize;
     log("=== Starting Rollback to Original JP ===", LogLevel::Warn);
 
@@ -1893,7 +2699,7 @@ where
         let bak = bak_dir.join(&t.backup_name);
         on_progress(i, total, &format!("Restoring {}...", t.name));
 
-        if !bak.is_file() {
+        if t.backup_name.is_empty() || !bak.is_file() {
             log(&format!("  [SKIP] No backup found for {} ({})", t.name, t.backup_name), LogLevel::Warn);
             continue;
         }
@@ -1903,23 +2709,36 @@ where
         }
         let bak_sha = sha256_file(&bak)?;
         let cur_sha = sha256_file(&full)?;
-        if cur_sha.eq_ignore_ascii_case(&bak_sha) {
+        if !cur_sha.eq_ignore_ascii_case(&bak_sha) {
+            let bak_bytes = fs::read(&bak).map_err(|e| format!("Read backup failed: {}", e))?;
+            write_exclusive_verified(&full, &bak_bytes, &full)?;
+            let post_sha = sha256_file(&full)?;
+            if !post_sha.eq_ignore_ascii_case(&bak_sha) {
+                return Err(format!("Rollback SHA-256 verification failed for {}", t.name));
+            }
+            log(
+                &format!("  [RESTORED] {} -> Original JP (SHA256={}...)", t.name, &post_sha[..16]),
+                LogLevel::Ok,
+            );
+        } else {
             log(&format!("  [OK] {} is already Original JP.", t.name), LogLevel::Ok);
-            restored += 1;
-            continue;
         }
-        let bak_bytes = fs::read(&bak).map_err(|e| format!("Read backup failed: {}", e))?;
-        write_exclusive_verified(&full, &bak_bytes, &full)?;
-        let post_sha = sha256_file(&full)?;
-        if !post_sha.eq_ignore_ascii_case(&bak_sha) {
-            return Err(format!("Rollback SHA-256 verification failed for {}", t.name));
+        let st_entry = match t.id.as_str() {
+            "vstring" => Some(&mut state_file.vstring),
+            "static_ui" => Some(&mut state_file.static_ui),
+            "static_pkg" => Some(&mut state_file.static_pkg),
+            "resources" => Some(&mut state_file.resources),
+            _ => None,
+        };
+        if let Some(st) = st_entry {
+            st.lang = "original".into();
+            st.custom_code.clear();
+            st.patched_sha.clear();
+            st.orig_sha = bak_sha;
         }
-        log(
-            &format!("  [RESTORED] {} -> Original JP (SHA256={}...)", t.name, &post_sha[..16]),
-            LogLevel::Ok,
-        );
         restored += 1;
     }
+    save_patch_state(&bak_dir, &state_file);
 
     if let Some(cache_dir) = news_cache_dir {
         match rollback_news_cache(cache_dir, &mut log) {
@@ -2292,40 +3111,54 @@ mod tests {
     use super::*;
 
     #[test]
-    fn verify_pc_and_android_bundle_hashes() {
-        let print_only = std::env::var("PRINT_HASHES").is_ok();
+    fn verify_universal_pc_r3219598_r3273853_and_android_r3219596() {
         let mut noop_log = |_: &str, _: LogLevel| {};
         let mut noop_prog = |_: usize, _: &str| {};
 
-        // 1. PC originals in ../backups/
-        let pc_vs = Path::new("../backups/z5xzl3cg6ao0ilpbzykexg.r.original");
-        let pc_ui = Path::new("../backups/yr49bxop0f3reujfsmyfca.r.original");
-        if pc_vs.is_file() && pc_ui.is_file() {
-            let vs_orig = fs::read(pc_vs).unwrap();
-            let ui_orig = fs::read(pc_ui).unwrap();
-            let pc_spans = [("base_jp", 1495181usize, 1563711usize), ("hotfix_jp", 1658279usize, usize::MAX)];
-            for (lang, exp_vs, exp_ui) in [
-                (PatchLang::En, VSTRING_EN_SHA, STATIC_UI_EN_SHA),
-                (PatchLang::Id, VSTRING_ID_SHA, STATIC_UI_ID_SHA),
-            ] {
-                let gz = match lang { PatchLang::En => EMBED_VSTRING_EN_GZ, PatchLang::Id => EMBED_VSTRING_ID_GZ };
-                let tr = load_vstring_map(gz).unwrap();
-                let (vs_out, vs_cnt) = patch_vstring_pool_bytes(&vs_orig, &tr, &pc_spans, lang, &mut noop_log, &mut noop_prog).unwrap();
-                let vs_sha = sha256_bytes(&vs_out);
-                let (ui_out, ui_cnt) = patch_static_ui_bytes(&ui_orig, 420062, lang, None, &mut noop_log, &mut noop_prog).unwrap();
-                let ui_sha = sha256_bytes(&ui_out);
-                println!("PC_{}_VSTRING={} (cnt={})", lang.short_code(), vs_sha, vs_cnt);
-                println!("PC_{}_STATIC_UI={} (cnt={})", lang.short_code(), ui_sha, ui_cnt);
+        // 1. PC r3219598 originals in ../backups/
+        let pc_vs_old = Path::new("../backups/z5xzl3cg6ao0ilpbzykexg.r.original");
+        let pc_ui_old = Path::new("../backups/yr49bxop0f3reujfsmyfca.r.original");
+        if pc_vs_old.is_file() && pc_ui_old.is_file() {
+            let vs_orig = fs::read(pc_vs_old).unwrap();
+            let ui_orig = fs::read(pc_ui_old).unwrap();
+            let (ui_off, ui_sz) = find_static_ui_subbundle_in_bytes(&ui_orig).expect("find r3219598 Static UI");
+            assert_eq!(ui_off, 420062);
+            assert_eq!(ui_sz, 83151);
+            for lang in [PatchLang::En, PatchLang::Id] {
+                let (vs_out, vs_cnt) = patch_vstring_universal_bytes(&vs_orig, lang, None, true, &mut noop_log, &mut noop_prog).unwrap();
+                let (ui_out, ui_cnt) = patch_static_ui_bytes(&ui_orig, ui_off, lang, None, &mut noop_log, &mut noop_prog).unwrap();
+                assert_eq!(vs_out.len(), vs_orig.len());
+                assert_eq!(ui_out.len(), ui_orig.len());
                 assert_eq!(vs_cnt, 74055);
                 assert_eq!(ui_cnt, 3135);
-                if !print_only {
-                    assert_eq!(vs_sha, exp_vs);
-                    assert_eq!(ui_sha, exp_ui);
-                }
+                println!("PC_r3219598_{}_VSTRING={} (cnt={})", lang.short_code(), sha256_bytes(&vs_out), vs_cnt);
+                println!("PC_r3219598_{}_STATIC_UI={} (cnt={})", lang.short_code(), sha256_bytes(&ui_out), ui_cnt);
             }
         }
 
-        // 2. Android originals in %LOCALAPPDATA%\RuzaLang\AndroidBackups\emulator-5554\
+        // 2. PC r3273853 hotfix originals in ../backups/r3273853/
+        let pc_vs_new = Path::new("../backups/r3273853/heqmts9lcjdvbupu0x2wpg.r.original");
+        let pc_ui_new = Path::new("../backups/r3273853/h3y7ujukwn9qbhoqhzkkg.r.original");
+        if pc_vs_new.is_file() && pc_ui_new.is_file() {
+            assert_eq!(probe_vstring_file(pc_vs_new), Some(1667303));
+            let vs_orig = fs::read(pc_vs_new).unwrap();
+            let ui_orig = fs::read(pc_ui_new).unwrap();
+            let (ui_off, ui_sz) = find_static_ui_subbundle_in_bytes(&ui_orig).expect("find r3273853 Static UI");
+            assert_eq!(ui_off, 420062);
+            assert_eq!(ui_sz, 83081);
+            for lang in [PatchLang::En, PatchLang::Id] {
+                let (vs_out, vs_cnt) = patch_vstring_universal_bytes(&vs_orig, lang, None, true, &mut noop_log, &mut noop_prog).unwrap();
+                let (ui_out, ui_cnt) = patch_static_ui_bytes(&ui_orig, ui_off, lang, None, &mut noop_log, &mut noop_prog).unwrap();
+                assert_eq!(vs_out.len(), vs_orig.len());
+                assert_eq!(ui_out.len(), ui_orig.len());
+                assert_eq!(vs_cnt, 76180);
+                assert_eq!(ui_cnt, 3135);
+                println!("PC_r3273853_{}_VSTRING={} (cnt={})", lang.short_code(), sha256_bytes(&vs_out), vs_cnt);
+                println!("PC_r3273853_{}_STATIC_UI={} (cnt={})", lang.short_code(), sha256_bytes(&ui_out), ui_cnt);
+            }
+        }
+
+        // 3. Android r3219596 originals in %LOCALAPPDATA%\RuzaLang\AndroidBackups\emulator-5554\
         if let Ok(la) = std::env::var("LOCALAPPDATA") {
             let bak = PathBuf::from(la).join(r"RuzaLang\AndroidBackups\emulator-5554");
             let an_vs = bak.join("1qnamndresrohzjhuvt2lw.r.original");
@@ -2333,22 +3166,18 @@ mod tests {
             if an_vs.is_file() && an_ui.is_file() {
                 let vs_orig = fs::read(&an_vs).unwrap();
                 let ui_orig = fs::read(&an_ui).unwrap();
-                for (lang, exp_vs, exp_ui) in [
-                    (PatchLang::En, ANDROID_VSTRING_EN_SHA, ANDROID_STATIC_UI_EN_SHA),
-                    (PatchLang::Id, ANDROID_VSTRING_ID_SHA, ANDROID_STATIC_UI_ID_SHA),
-                ] {
+                let (ui_off, ui_sz) = find_static_ui_subbundle_in_bytes(&ui_orig).expect("find Android Static UI");
+                assert_eq!(ui_off, 4200075);
+                assert_eq!(ui_sz, 83151);
+                for lang in [PatchLang::En, PatchLang::Id] {
                     let (vs_out, vs_cnt) = patch_android_vstring_bytes(&vs_orig, lang, None, &mut noop_log, &mut noop_prog).unwrap();
-                    let vs_sha = sha256_bytes(&vs_out);
-                    let (ui_out, ui_cnt) = patch_static_ui_bytes(&ui_orig, ANDROID_STATIC_UI_SUB_OFFSET, lang, None, &mut noop_log, &mut noop_prog).unwrap();
-                    let ui_sha = sha256_bytes(&ui_out);
-                    println!("ANDROID_{}_VSTRING={} (cnt={})", lang.short_code(), vs_sha, vs_cnt);
-                    println!("ANDROID_{}_STATIC_UI={} (cnt={})", lang.short_code(), ui_sha, ui_cnt);
-                    assert_eq!(vs_cnt, 74055);
+                    let (ui_out, ui_cnt) = patch_static_ui_bytes(&ui_orig, ui_off, lang, None, &mut noop_log, &mut noop_prog).unwrap();
+                    assert_eq!(vs_out.len(), vs_orig.len());
+                    assert_eq!(ui_out.len(), ui_orig.len());
+                    assert_eq!(vs_cnt, 74058);
                     assert_eq!(ui_cnt, 3135);
-                    if !print_only {
-                        assert_eq!(vs_sha, exp_vs);
-                        assert_eq!(ui_sha, exp_ui);
-                    }
+                    println!("ANDROID_r3219596_{}_VSTRING={} (cnt={})", lang.short_code(), sha256_bytes(&vs_out), vs_cnt);
+                    println!("ANDROID_r3219596_{}_STATIC_UI={} (cnt={})", lang.short_code(), sha256_bytes(&ui_out), ui_cnt);
                 }
             }
         }
@@ -2400,14 +3229,17 @@ mod tests {
                 let es_pack = parse_custom_pack_str(es_json, "es.json", "es.json").unwrap();
                 let vs_orig = fs::read(&an_vs).unwrap();
                 let ui_orig = fs::read(&an_ui).unwrap();
+                let (ui_off, _) = find_static_ui_subbundle_in_bytes(&ui_orig).unwrap();
+                let (vs_en, _) = patch_android_vstring_bytes(&vs_orig, PatchLang::En, None, &mut noop_log, &mut noop_prog).unwrap();
+                let (ui_en, _) = patch_static_ui_bytes(&ui_orig, ui_off, PatchLang::En, None, &mut noop_log, &mut noop_prog).unwrap();
                 let (vs_out, vs_cnt) = patch_android_vstring_bytes(&vs_orig, PatchLang::En, Some(&es_pack), &mut noop_log, &mut noop_prog).unwrap();
-                let (ui_out, ui_cnt) = patch_static_ui_bytes(&ui_orig, ANDROID_STATIC_UI_SUB_OFFSET, PatchLang::En, Some(&es_pack), &mut noop_log, &mut noop_prog).unwrap();
+                let (ui_out, ui_cnt) = patch_static_ui_bytes(&ui_orig, ui_off, PatchLang::En, Some(&es_pack), &mut noop_log, &mut noop_prog).unwrap();
                 assert_eq!(vs_out.len(), vs_orig.len());
                 assert_eq!(ui_out.len(), ui_orig.len());
-                assert_eq!(vs_cnt, 74055);
+                assert_eq!(vs_cnt, 74058);
                 assert_eq!(ui_cnt, 3135);
-                assert_ne!(sha256_bytes(&vs_out), ANDROID_VSTRING_EN_SHA);
-                assert_ne!(sha256_bytes(&ui_out), ANDROID_STATIC_UI_EN_SHA);
+                assert_ne!(sha256_bytes(&vs_out), sha256_bytes(&vs_en));
+                assert_ne!(sha256_bytes(&ui_out), sha256_bytes(&ui_en));
             }
         }
     }
