@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build & publish (e.g. v0.4.0)"
+        description: "Release tag to build & publish (e.g. v0.4.1)"
         required: true
-        default: "v0.4.0"
+        default: "v0.4.1"
 
 permissions:
   contents: write
@@ -101,6 +101,7 @@ jobs:
           ![Settings Menu](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-en.jpg)
 
           ### Highlights / Fitur Utama
+          - **Live Home Activity Log & Client Version Sync (`v0.4.1`):** Streams live operation logs right inside the lower-left Home hero canvas during & after **Install Patch** / **Translate News** / **Rollback JP**, and checks client version + resource revision sync (`v1.0.2 · r3219598`) with a non-blocking update recommendation if a newer client build is detected.
           - **Frameless PC Game Launcher UI (`v0.4.0`):** Rebuilt from scratch as a clean `960×580` frameless desktop launcher with Windows 11 native rounded corners, custom draggable top bar (`—` / geometric `✕`), slim frosted left rail (`Home` · `Files` · `News` · `Log` + `EN`/`ID`), original painted scenic hero canvas, bottom action dock with prominent **Install Patch** CTA + **Translate News**, and frosted-glass sub-pages.
           - **UI Fit Pass (`v0.2.1`):** Tightened quick-menu labels, event sidebar tabs, chapter headers, and banner descriptions + conservative TextMeshPro `<size=80%>` scaling on ultra-wide short prefab labels (`EN` & `ID`) to prevent overlap and `...` truncation.
           - **Bilingual Toggle (`EN` / `ID`):** Switch between English and Bahasa Indonesia anytime right inside the GUI.

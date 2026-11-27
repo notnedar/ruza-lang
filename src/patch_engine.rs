@@ -25,6 +25,11 @@ const EMBED_NEWS_ID_GZ: &[u8] = include_bytes!("../resources/news_id.bin.gz");
 
 pub const TOTAL_STRINGS: usize = 74055 + 3135 + 113 + 358; // 77,661
 
+// Verified client build metadata for version sync checks
+pub const EXPECTED_CLIENT_VERSION: &str = "1.0.2";
+pub const EXPECTED_RES_REVISION: &str = "3219598";
+pub const EXPECTED_BUILD_GUID: &str = "6310abcfe75841bcac713c29234fe986";
+
 pub const VSTRING_REL: &str = r"AzurPromiliaJP_Data\.res\raw_base_package\BundleFiles\z5xzl3cg6ao0ilpbzykexg.r";
 pub const STATIC_UI_REL: &str = r"AzurPromiliaJP_Data\.res\default_package\BundleFiles\yr49bxop0f3reujfsmyfca.r";
 pub const STATIC_PKG_REL: &str = r"AzurPromiliaJP_Data\StreamingAssets\.res\static_package\6pq4a7hlp7zidu91dvvww.r";
@@ -95,6 +100,18 @@ pub struct TargetStatus {
     pub state: String, // "patched_en" | "patched_id" | "original" | "modified" | "missing"
     pub has_backup: bool,
     pub sha256: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct ClientVersionInfo {
+    pub detected_version: String,
+    pub expected_version: String,
+    pub detected_res_rev: String,
+    pub expected_res_rev: String,
+    pub detected_build_guid: String,
+    pub expected_build_guid: String,
+    pub status: String, // "synced" | "mismatch"
+    pub reasons: Vec<String>,
 }
 
 #[derive(Clone, Copy)]
@@ -170,6 +187,147 @@ pub fn auto_detect_game_folder() -> String {
 
 fn sha_matches(sha: &str, expected: &str) -> bool {
     !expected.is_empty() && sha.eq_ignore_ascii_case(expected)
+}
+
+fn read_client_version(game_dir: &Path) -> String {
+    // 1. Primary: game-launcher-config.json ("version": "1.0.2")
+    let cfg = game_dir.join("game-launcher-config.json");
+    if let Ok(text) = fs::read_to_string(&cfg) {
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&text) {
+            if let Some(v) = val.get("version").and_then(|x| x.as_str()) {
+                let trimmed = v.trim();
+                if !trimmed.is_empty() {
+                    return trimmed.to_string();
+                }
+            }
+        }
+    }
+    // 2. Fallback: header of manifest.json (read only first 1 KB)
+    let man = game_dir.join("manifest.json");
+    if let Ok(mut f) = fs::File::open(&man) {
+        use std::io::Read;
+        let mut buf = [0u8; 1024];
+        if let Ok(n) = f.read(&mut buf) {
+            let head = String::from_utf8_lossy(&buf[..n]);
+            if let Some(idx) = head.find("\"version\"") {
+                let rest = &head[idx + 9..];
+                if let Some(colon) = rest.find(':') {
+                    let after = rest[colon + 1..].trim_start();
+                    if let Some(stripped) = after.strip_prefix('"') {
+                        if let Some(endq) = stripped.find('"') {
+                            let v = stripped[..endq].trim();
+                            if !v.is_empty() {
+                                return v.to_string();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn read_res_revision(game_dir: &Path) -> String {
+    let dirs = [
+        game_dir.join(r"AzurPromiliaJP_Data\.res\raw_base_package\ManifestFiles"),
+        game_dir.join(r"AzurPromiliaJP_Data\.res\default_package\ManifestFiles"),
+    ];
+    let mut best_num: Option<u64> = None;
+    let mut best_str = String::new();
+    for d in dirs {
+        let Ok(rd) = fs::read_dir(&d) else { continue };
+        for entry in rd.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let Some(stem) = name.strip_suffix(".bytes") else { continue };
+            if !stem.contains("_package_") {
+                continue;
+            }
+            if let Some(rev) = stem.rsplit('_').next() {
+                if !rev.is_empty() && rev.bytes().all(|b| b.is_ascii_digit()) {
+                    if let Ok(num) = rev.parse::<u64>() {
+                        if best_num.map(|b| num > b).unwrap_or(true) {
+                            best_num = Some(num);
+                            best_str = rev.to_string();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    best_str
+}
+
+fn read_build_guid(game_dir: &Path) -> String {
+    let boot = game_dir.join(r"AzurPromiliaJP_Data\boot.config");
+    if let Ok(text) = fs::read_to_string(&boot) {
+        for line in text.lines() {
+            if let Some(v) = line.trim().strip_prefix("build-guid=") {
+                let g = v.trim();
+                if !g.is_empty() {
+                    return g.to_string();
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+pub fn detect_client_version(game_dir: &Path, targets: &[TargetStatus]) -> ClientVersionInfo {
+    let detected_version = read_client_version(game_dir);
+    let detected_res_rev = read_res_revision(game_dir);
+    let detected_build_guid = read_build_guid(game_dir);
+
+    let mut reasons = Vec::new();
+    if !detected_version.is_empty() && detected_version != EXPECTED_CLIENT_VERSION {
+        reasons.push(format!(
+            "Client version {} != {}",
+            detected_version, EXPECTED_CLIENT_VERSION
+        ));
+    }
+    if !detected_res_rev.is_empty() && detected_res_rev != EXPECTED_RES_REVISION {
+        reasons.push(format!(
+            "Resource revision r{} != r{}",
+            detected_res_rev, EXPECTED_RES_REVISION
+        ));
+    }
+    if !detected_build_guid.is_empty()
+        && !detected_build_guid.eq_ignore_ascii_case(EXPECTED_BUILD_GUID)
+    {
+        reasons.push(format!(
+            "Build GUID {}... differs from verified build",
+            &detected_build_guid[..8.min(detected_build_guid.len())]
+        ));
+    }
+
+    let modified_cnt = targets.iter().filter(|t| t.state == "modified").count();
+    let missing_cnt = targets.iter().filter(|t| t.state == "missing").count();
+    if modified_cnt > 0 {
+        reasons.push(format!(
+            "{} package file(s) differ from verified SHA-256 hashes",
+            modified_cnt
+        ));
+    }
+    if missing_cnt > 0 {
+        reasons.push(format!("{} package file(s) missing", missing_cnt));
+    }
+
+    let status = if reasons.is_empty() {
+        "synced".to_string()
+    } else {
+        "mismatch".to_string()
+    };
+
+    ClientVersionInfo {
+        detected_version,
+        expected_version: EXPECTED_CLIENT_VERSION.to_string(),
+        detected_res_rev,
+        expected_res_rev: EXPECTED_RES_REVISION.to_string(),
+        detected_build_guid,
+        expected_build_guid: EXPECTED_BUILD_GUID.to_string(),
+        status,
+        reasons,
+    }
 }
 
 pub fn scan_game_folder<F>(game_dir: &Path, mut log: F) -> Vec<TargetStatus>

@@ -171,6 +171,26 @@ fn run_selftest(mock_dir: &str) -> i32 {
             lines.push(format!("[OK] NEWS SELFTEST PASSED 100%! ({} announcements EN -> ID -> Rollback JP)", en_n));
         }
 
+        // 7. Client version sync detector self-test (synced vs mismatch)
+        let _ = std::fs::write(
+            dir.join("game-launcher-config.json"),
+            r#"{"version":"1.0.2"}"#,
+        );
+        let ver_ok = patch_engine::detect_client_version(&dir, &s4);
+        if ver_ok.status != "synced" || ver_ok.detected_version != "1.0.2" {
+            return Err(format!("Version sync check failed on 1.0.2: status={}", ver_ok.status));
+        }
+        let _ = std::fs::write(
+            dir.join("game-launcher-config.json"),
+            r#"{"version":"1.0.3"}"#,
+        );
+        let ver_bad = patch_engine::detect_client_version(&dir, &s4);
+        if ver_bad.status != "mismatch" || ver_bad.reasons.is_empty() {
+            return Err("Version sync check failed to detect 1.0.3 mismatch!".into());
+        }
+        let _ = std::fs::remove_file(dir.join("game-launcher-config.json"));
+        lines.push("[OK] VERSION SYNC SELFTEST PASSED 100%! (1.0.2 synced -> 1.0.3 mismatch detected)".into());
+
         lines.push("[OK] BILINGUAL SELFTEST PASSED 100%! (Original -> EN -> ID -> EN -> Rollback JP)".into());
         Ok(())
     })();
@@ -242,7 +262,7 @@ fn main() {
     let proxy = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
-        .with_title("Ruza-Lang Patcher v0.4.0 — EN / ID")
+        .with_title("Ruza-Lang Patcher v0.4.1 — EN / ID")
         .with_inner_size(LogicalSize::new(960.0, 580.0))
         .with_decorations(false)
         .with_resizable(false)
@@ -288,7 +308,7 @@ fn main() {
                 "init" | "auto_detect" => {
                     thread::spawn(move || {
                         if parsed.cmd == "init" {
-                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.4.0 (EN / ID) initialized.");
+                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.4.1 (EN / ID) initialized.");
                             push_log(&p, LogLevel::Info, "Safety: Exact byte sizes preserved with SHA-256 verification.");
                         }
                         let procs = patch_engine::find_running_game_processes();
@@ -552,6 +572,32 @@ fn do_scan(proxy: &tao::event_loop::EventLoopProxy<UserEvent>, dir_str: &str) {
     push_event(proxy, json!({ "type": "busy", "value": true }));
     push_log(proxy, LogLevel::Info, &format!("Scanning {}...", dir_str));
     let targets: Vec<TargetStatus> = patch_engine::scan_game_folder(&dir, |m, l| push_log(proxy, l, m));
+    let ver = patch_engine::detect_client_version(&dir, &targets);
+    let ver_display = match (ver.detected_version.is_empty(), ver.detected_res_rev.is_empty()) {
+        (false, false) => format!("v{} (r{})", ver.detected_version, ver.detected_res_rev),
+        (false, true) => format!("v{}", ver.detected_version),
+        (true, false) => format!("r{}", ver.detected_res_rev),
+        (true, true) => format!("v{} (hash-verified)", ver.expected_version),
+    };
+    if ver.status == "synced" {
+        push_log(
+            proxy,
+            LogLevel::Ok,
+            &format!("Client version check: {} — Synced with patcher.", ver_display),
+        );
+    } else {
+        push_log(
+            proxy,
+            LogLevel::Warn,
+            &format!(
+                "Client version mismatch ({}) vs verified v{} (r{}): {}. Waiting for a patcher update is recommended (install remains allowed).",
+                ver_display,
+                ver.expected_version,
+                ver.expected_res_rev,
+                ver.reasons.join("; ")
+            ),
+        );
+    }
     let en_sum: usize = targets.iter().filter(|t| t.state == "patched_en").map(|t| t.string_count).sum();
     let id_sum: usize = targets.iter().filter(|t| t.state == "patched_id").map(|t| t.string_count).sum();
     let summary = if id_sum > 0 && en_sum == 0 {
@@ -564,5 +610,5 @@ fn do_scan(proxy: &tao::event_loop::EventLoopProxy<UserEvent>, dir_str: &str) {
         format!("Scan done: Original JP (0 / {} strings translated).", patch_engine::TOTAL_STRINGS)
     };
     push_log(proxy, LogLevel::Ok, &summary);
-    push_event(proxy, json!({ "type": "scan_result", "targets": targets }));
+    push_event(proxy, json!({ "type": "scan_result", "targets": targets, "version": ver }));
 }

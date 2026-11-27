@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.4.0`)
+# Ruza-Lang (`v0.4.1`)
 
 [![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
 
@@ -13,9 +13,11 @@ An educational desktop localization & asset-repacking study project demonstratin
 
 ---
 
-## What's New in `v0.4.0`
+## What's New in `v0.4.1`
 
-- **Frameless PC Game Launcher Overhaul:** Rebuilt from scratch as a clean `960×580` frameless desktop launcher with Windows 11 native rounded corners, custom draggable top bar (`—` / geometric `✕`), slim frosted navigation rail (`Home` · `Files` · `News` · `Log` + `EN`/`ID` switch), original painted scenic sky-observatory hero canvas, seamless bottom action dock with prominent **Install Patch** CTA + **Translate News**, and serene frosted-glass sub-pages for package verification, news cache info, and execution logs.
+- **Live Home Activity Log Feed:** Clicking **Install Patch**, **Translate News**, or **Rollback JP** now streams real-time verification logs directly in the open lower-left space on the Home launcher canvas (and stays visible afterward so you can inspect every step without switching tabs, with a quick dismiss `×` or `Full Log` jump).
+- **Client Version Sync Check (Non-Blocking):** Automatically reads the installed client version, resource manifest revision, and build GUID (`v1.0.2 · r3219598`) alongside package SHA-256 verification. Displays a clean sync status on Home & **Files**; if a future game update introduces a version mismatch, it recommends waiting for a patcher update via a soft confirmation dialog while still letting you choose **Install Anyway**.
+- **Frameless PC Game Launcher UI (`v0.4.0`):** `960×580` frameless desktop launcher with Windows 11 native rounded corners, custom draggable top bar (`—` / geometric `✕`), slim frosted left rail (`Home` · `Files` · `News` · `Log` + `EN`/`ID`), original painted scenic hero canvas, bottom action dock, and frosted-glass sub-pages.
 - **Includes all `v0.2.1` & `v0.2.0` upgrades:**
   - **UI Fit Pass (`EN` & `ID`):** Tightened quick-menu labels, event sidebar tabs, chapter headers, and banner descriptions + conservative TextMeshPro `<size=80%>` scaling on ultra-wide short prefab labels (`116` EN / `50` ID) to prevent overlap and `...` truncation.
   - **Dedicated `Translate News (EN / ID)` Button:** Translates **16 cached in-game announcement HTML pages** (`AppData\LocalLow\...\HTTPCache`) with automatic `_NewsPatchBackup\` rollback and `ETag`/`Last-Modified` preservation.
