@@ -51,6 +51,9 @@ class MainActivity : AppCompatActivity() {
 
     private val shizukuReqCode = 7001
     private var shizukuBound = false
+    @Volatile private var hasScannedOnce = false
+    @Volatile private var lastDetectedRunning = false
+    @Volatile private var scanBusy = false
 
     private val userServiceArgs by lazy {
         Shizuku.UserServiceArgs(ComponentName(packageName, PatcherFileService::class.java.name))
@@ -228,6 +231,14 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl("https://appassets.androidplatform.net/assets/ui/index.html")
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Auto re-check after returning from App Info (Force Stop) so Install Patch unlocks immediately
+        if (hasScannedOnce && lastDetectedRunning && !scanBusy) {
+            triggerScanAsync()
+        }
+    }
+
     override fun onDestroy() {
         Shizuku.removeRequestPermissionResultListener(shizukuPermListener)
         Shizuku.removeBinderReceivedListener(shizukuBinderReceived)
@@ -346,6 +357,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun triggerScanAsync() {
         worker.execute {
+            scanBusy = true
             pushBusy(true)
             try {
                 if (isShizukuGranted() && bridge.shizukuService == null) {
@@ -358,10 +370,13 @@ class MainActivity : AppCompatActivity() {
                     shizukuGranted = isShizukuGranted(),
                     log = { m, l -> pushLog(l, m) },
                 )
+                lastDetectedRunning = snap.runningPids.isNotEmpty()
+                hasScannedOnce = true
                 pushEvent(snapshotToJson(snap))
             } catch (e: Throwable) {
                 pushLog(LogLevel.ERR, "Scan failed: ${e.message}")
             } finally {
+                scanBusy = false
                 pushBusy(false)
             }
         }

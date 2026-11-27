@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.8.0`)
+# Ruza-Lang (`v0.8.1`)
 
 [![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
 
@@ -13,9 +13,12 @@ An educational localization & asset-repacking suite demonstrating exact-size str
 
 ---
 
-## What's New in `v0.8.0`
+## What's New in `v0.8.1`
 
-- **Bring Your Own Language Pack (`BYOL` · PC, Android ADB & Standalone APK):**
+- **Live Process-Guard Button Locking (`PC` & `Android`):**
+  - Automatically disables **Install Patch**, **Translate News**, and **Rollback JP** (showing **`Close Game First` / `Tutup Game Dulu`**) whenever the target game or launcher is running — preventing accidental clicks before closing the game.
+  - On **PC**, buttons re-enable automatically within 2 seconds the moment the game closes. On **Android APK**, tap the red running banner to jump straight to **App Info (Force Stop)**, and returning to Ruza-Lang auto-rescans and unlocks immediately.
+- **Bring Your Own Language Pack (`BYOL` · `v0.8.0`):**
   - Load any custom `.json` language pack directly inside **Files → Custom Language Pack → Load JSON** on **Windows PC**, **PC-to-Android ADB**, or **Standalone Android APK** (100% offline — no compiling required!).
   - Supports **base inheritance** (`meta.base`: `"en"`, `"id"`, or `"jp"`), flat dictionary drop-ins, and **automatic PC → Android ID remapping** so one single `.json` pack works everywhere.
   - Export a ready-to-edit starter template directly from the Windows app (**Files → Template**) or grab [`patches/custom-pack-template.json`](patches/custom-pack-template.json).

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Ruza-Lang v0.8.0 — EN / ID + Custom Packs</title>
+<title>Ruza-Lang v0.8.1 — EN / ID + Custom Packs</title>
 <style>
   :root {
     --rail-w: 68px;
@@ -145,7 +145,7 @@
     flex-direction: column;
   }
 
-  /* Running Process Warning Banner */
+  /* Running Process Warning Banner (clickable to open Force Stop settings) */
   .proc-alert {
     display: none;
     align-items: center;
@@ -158,6 +158,7 @@
     font-size: 11.5px;
     font-weight: 500;
     flex-shrink: 0;
+    cursor: pointer;
     z-index: 20;
   }
   .proc-alert.show { display: flex; }
@@ -782,7 +783,7 @@
           <path d="M16.5 4.5L19.5 4.5L19.5 7.5" stroke="#e8d2a0" stroke-width="1.3"/>
         </svg>
       </div>
-      <span class="rail-ver">0.8.0</span>
+      <span class="rail-ver">0.8.1</span>
     </div>
     <nav class="rail-nav">
       <button class="nav-btn active" data-tab="home">
@@ -819,7 +820,7 @@
         </svg>
       </div>
       <span class="brand-name">Ruza-Lang</span>
-      <span class="brand-ver">0.8.0</span>
+      <span class="brand-ver">0.8.1</span>
     </div>
     <div class="lang-seg">
       <button class="lang-btn active" data-lang="en">EN</button>
@@ -1085,7 +1086,7 @@
       navHome: 'Home', navPackages: 'Files', navNews: 'News', navLog: 'Log',
       heroDesc: 'English & Indonesian Android localization with exact\u2011size repacking, SHA\u2011256 verification, and safe one\u2011click rollback.',
       homeLogTitle: 'Activity Log', fullLog: 'Full Log',
-      btnPatch: 'Install Patch (EN)', btnPatchCustom: (c) => `Install Patch (${c})`, btnNews: 'News (EN)', btnNewsLong: 'Translate News (EN)',
+      btnPatch: 'Install Patch (EN)', btnPatchCustom: (c) => `Install Patch (${c})`, btnPatchBlocked: 'Close Game First', btnNews: 'News (EN)', btnNewsLong: 'Translate News (EN)',
       btnContribute: 'Contribute',
       lblCustomRow: 'Custom Language Pack (BYOL)',
       lblCustomSubDefault: 'Load your own .json language pack directly on Android (100% offline)',
@@ -1167,7 +1168,7 @@
       navHome: 'Utama', navPackages: 'Paket', navNews: 'Berita', navLog: 'Log',
       heroDesc: 'Lokalisasi Android Inggris & Indonesia dengan repacking ukuran identik, verifikasi SHA\u2011256, dan rollback sekali klik.',
       homeLogTitle: 'Log Aktivitas', fullLog: 'Log Penuh',
-      btnPatch: 'Pasang Patch (ID)', btnPatchCustom: (c) => `Pasang Patch (${c})`, btnNews: 'Berita (ID)', btnNewsLong: 'Translate News (ID)',
+      btnPatch: 'Pasang Patch (ID)', btnPatchCustom: (c) => `Pasang Patch (${c})`, btnPatchBlocked: 'Tutup Game Dulu', btnNews: 'Berita (ID)', btnNewsLong: 'Translate News (ID)',
       btnContribute: 'Kontribusi',
       lblCustomRow: 'Paket Bahasa Kustom (BYOL)',
       lblCustomSubDefault: 'Muat file bahasa .json sendiri langsung di Android (100% offline)',
@@ -1307,12 +1308,27 @@
     if (activeTab !== 'log') document.querySelectorAll('.log-dot-ref').forEach(d => d.classList.add('show'));
   }
 
+  function isGameRunning() {
+    return !!(scan && scan.running_pids && scan.running_pids.length > 0);
+  }
+
+  function updateActionLockState() {
+    const tr = t();
+    const running = isGameRunning();
+    for (const id of ['btnPatch', 'btnNews', 'btnNewsPage', 'btnRollback', 'btnRollbackPkg']) {
+      if ($(id)) $(id).disabled = busy || running;
+    }
+    const normalLabel = customPack ? tr.btnPatchCustom(customPack.code) : tr.btnPatch;
+    $('btnPatchText').textContent = running ? tr.btnPatchBlocked : normalLabel;
+  }
+
   function setBusy(v) {
     busy = v;
     for (const id of ['btnPatch', 'btnNews', 'btnNewsPage', 'btnRollback', 'btnRollbackPkg', 'btnQuickScan', 'btnAuthShizuku', 'btnPickSaf', 'btnCheckUpdate', 'btnLoadCustom', 'btnClearCustom']) {
       if ($(id)) $(id).disabled = v;
     }
     document.querySelectorAll('.lang-btn').forEach(b => b.disabled = v);
+    updateActionLockState();
   }
 
   function renderCustomPack() {
@@ -1328,15 +1344,14 @@
       $('btnClearCustom').style.display = '';
       $('heroCustomBtn').classList.add('show');
       $('heroCustomText').textContent = tr.heroCustomFmt(customPack);
-      $('btnPatchText').textContent = tr.btnPatchCustom(customPack.code);
     } else {
       $('lblCustomSub').textContent = tr.lblCustomSubDefault;
       $('customStateBadge').className = 'pkg-state original';
       $('customStateBadge').innerHTML = `<span class="pkg-dot"></span>${tr.customBuiltIn}`;
       $('btnClearCustom').style.display = 'none';
       $('heroCustomBtn').classList.remove('show');
-      $('btnPatchText').textContent = tr.btnPatch;
     }
+    updateActionLockState();
   }
 
   function renderProgress(cur, tot, stage) {
@@ -1372,6 +1387,7 @@
     const hasRunning = (scan.running_pids || []).length > 0;
     procBox.classList.toggle('show', hasRunning);
     if (hasRunning) $('procAlertText').textContent = tr.stateRunning(scan.running_pids.join(', '));
+    updateActionLockState();
 
     const hasAccess = scan.access_mode && scan.access_mode !== 'none';
     $('accessChipText').textContent = hasAccess ? `${scan.access_label}` : tr.chipNeedAccess;
@@ -1613,6 +1629,7 @@
     else switchTab('packages');
   };
   $('btnQuickScan').onclick = () => send('scan');
+  $('procAlert').onclick = () => send('open_app_settings');
   $('btnSetupGuide').onclick = openGuide;
   $('btnAuthShizuku').onclick = () => send('request_shizuku');
   $('btnPickSaf').onclick = () => send('pick_saf');

@@ -30,9 +30,9 @@ class PatchEngineTest {
         assertEquals(target, exact.size)
         assertTrue(CryptoLz4.lz4Decompress(exact, sample.size).contentEquals(sample))
 
-        assertTrue(UpdateChecker.isNewer("v0.8.0", "0.7.1"))
-        assertTrue(!UpdateChecker.isNewer("v0.8.0", "0.8.0"))
-        assertTrue(!UpdateChecker.isNewer("v0.7.1", "0.8.0"))
+        assertTrue(UpdateChecker.isNewer("v0.8.1", "0.8.0"))
+        assertTrue(!UpdateChecker.isNewer("v0.8.1", "0.8.1"))
+        assertTrue(!UpdateChecker.isNewer("v0.8.0", "0.8.1"))
     }
 
     @Test

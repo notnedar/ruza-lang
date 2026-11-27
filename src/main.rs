@@ -495,7 +495,7 @@ fn main() {
     let proxy = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
-        .with_title("Ruza-Lang Patcher v0.8.0 — EN / ID + Custom Packs")
+        .with_title("Ruza-Lang Patcher v0.8.1 — EN / ID + Custom Packs")
         .with_inner_size(LogicalSize::new(960.0, 580.0))
         .with_decorations(false)
         .with_resizable(false)
@@ -565,7 +565,7 @@ fn main() {
                     }
                     thread::spawn(move || {
                         if is_init {
-                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.8.0 (EN / ID + Custom Packs · PC + Android ADB) initialized.");
+                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.8.1 (EN / ID + Custom Packs · PC + Android ADB) initialized.");
                             push_log(&p, LogLevel::Info, "Safety: Exact byte sizes preserved with SHA-256 verification.");
                         }
                         let procs = patch_engine::find_running_game_processes();
