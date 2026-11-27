@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.7.0`)
+# Ruza-Lang (`v0.7.1`)
 
 [![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
 
@@ -9,18 +9,21 @@
 
 An educational bilingual localization & asset-repacking suite demonstrating exact-size string patching (**English** & **Bahasa Indonesia**) for **Windows PC** and **Android** (both a **standalone zero-PC Android APK** and **PC-to-Android ADB**), SHA-256 verification, and safe one-click rollback.
 
-> **Pre-built official binaries:** download **`RuzaLangPatcher.exe`** (Windows PC) or **`RuzaLangPatcher.apk`** (Standalone Android — no PC, no root!) from [Releases](https://github.com/notnedar/ruza-lang/releases).
+> **Pre-built official binaries:** download **`RuzaLangPatcher.exe`** (Windows PC) or **`RuzaLangPatcher.apk`** (Standalone Android — 100% no PC, no root!) from [Releases](https://github.com/notnedar/ruza-lang/releases).
 
 ---
 
-## What's New in `v0.7.0`
+## What's New in `v0.7.1`
 
-- **Standalone Universal Android APK (`RuzaLangPatcher.apk`):** Patch directly on your Android phone with **no laptop, no root, and no APK re-signing**!
-  - Responsive launcher-matched UI (**Portrait phone** top bar + bottom nav & **Landscape tablet/emulator** slim left rail) with the same scenic hero art, frosted-glass Settings cards, bilingual `EN`/`ID` switch, live Activity Log, and built-in Update Checker.
-  - **Zero-PC Storage Access:** Supports **Shizuku** (Android 11–17 via on-phone Wireless Debugging), **SAF Folder Picker**, **Direct Storage**, and automatic **Root (`su`)** fallback, with an interactive bilingual **Setup Guide**.
-  - **Fast Bit-Identical On-Device Patching (~3s):** Repacks **77,190 verified strings (`99.4%`: `VStringPool` + `Static UI KeyConfig`)** plus **Cached News (`EN` / `ID`)** directly on-device, with Process Guard, automatic local backups, atomic replacement + SHA-256 verification, and one-click **Rollback JP**.
-- **Desktop Home Platform Selector (`PC` | `Android`) & Built-In ADB Connect Guide (`v0.6.1`):** Switch between **PC Client** and **Android (ADB)** right from the desktop bottom dock, with smart setup prompts, Wireless ADB (`IP:Port`), and a built-in bilingual USB/Wi-Fi/Emulator ADB guide.
-- **Built-In Auto-Updater (`v0.5.0`):** Checks [GitHub Releases](https://github.com/notnedar/ruza-lang/releases/latest) automatically on launch (plus manual **Check Updates** in **Files**), verifies downloaded binaries against official `SHA256SUMS.txt`, and updates seamlessly.
+- **Major Contextual Translation & UI Fit Overhaul (`EN` & `ID`):**
+  - **Fixed 6 off-by-one chunk shifts (`424` scrambled strings):** Repaired misaligned IDs across food/equipment/material tables (including the bottom-right `Equip` button that previously displayed `"Item"`, plus `Anima`, `Item`, `Quest Item`, `Kibo Egg`, crafting materials) and 5 story dialogue ranges across EN & ID.
+  - **Official Global Terminology Alignment (`3,362` entries):** Standardized place & character names (`Fleece`, `Sprout Valley`, `Jinghua Cape`, `Charlulu Village`, `Terara`, `Cathbelle`, `Cabbird`), eliminated `900+` leaked element names + `11` wrong-element skill descriptions across all 9 elements (`Fire`, `Water`, `Lightning`, `Wind`, `Earth`, `Ice`, `Wood`, `Light`, `Dark`), and polished awkward literal Indonesian skill phrasing.
+  - **Anti-Wrap UI Button & Pill Pass (`162` overrides):** Shortened tight RPG buttons & toggles (`Skill Comparison → Skills`, `Recommended → Rec. / Saran`, `Recommended Anima Sorting → Sort: Rec.`, `Matches character role → Matches Role`, `Breakthrough → Ascend`, `Disassemble → Dismantle / Bongkar`, `Lore → Legacy`) so labels sit cleanly inside pills without mid-word breaks.
+- **Android APK Polish (`100% Non-Root` + Android 15–17 Edge-to-Edge Fix):**
+  - Fixed Android 15–17 status bar, camera cutout, and bottom navigation bar insets (`WindowInsetsCompat`) so top/bottom controls are never obscured.
+  - Added automatic bilingual **Download Shizuku** prompt on launch when Shizuku isn't detected yet (with direct link + SAF folder picker option).
+  - Removed all optional `Root (su)` code paths completely — pure non-root (**Shizuku Wireless Debugging**, **SAF Folder Picker**, and **Direct Storage** for Android 8–10).
+- **Standalone Universal Android APK (`RuzaLangPatcher.apk`, `v0.7.0`):** Patch directly on your Android phone with **zero laptop, zero root, and zero APK re-signing** — responsive Portrait phone & Landscape tablet UI, **77,190 verified strings (`99.4%`)** + Cached News in ~3 seconds with automatic local backups and one-click **Rollback JP**.
 
 ---
 
@@ -83,7 +86,7 @@ An educational bilingual localization & asset-repacking suite demonstrating exac
      2. Enable **Developer Options → Wireless Debugging** on your phone.
      3. Open Shizuku → tap **Pairing** → enter the 6-digit code in the notification → tap **Start**.
      4. Open **Ruza-Lang** → tap **Setup Access** → tap **Authorize Shizuku** → choose **Allow all the time**.
-   - **Alternative — Folder Picker (SAF) / Direct Storage / Root:** Works directly on Android 8–12, compatible emulators, or rooted devices without Shizuku.
+   - **Alternative — Folder Picker (SAF) / Direct Storage:** Works directly on Android 8–12 or compatible emulators without Shizuku (100% non-root).
 4. Choose **`EN`** (English) or **`ID`** (Bahasa Indonesia) in the top bar (or left rail on tablets/landscape).
 5. Tap **Install Patch (`EN` / `ID`)** — takes ~3 seconds with automatic local backups and full SHA-256 verification.
 6. Tap **Rollback JP** anytime to restore original files (including cached News if backed up).

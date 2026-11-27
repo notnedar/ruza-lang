@@ -579,7 +579,10 @@ where
             detected_res_rev, ANDROID_EXPECTED_RES_REV
         ));
     }
-    let modified_cnt = targets.iter().filter(|t| t.state == "modified").count();
+    let modified_cnt = targets
+        .iter()
+        .filter(|t| t.state == "modified" && !t.has_backup)
+        .count();
     let missing_cnt = targets.iter().filter(|t| t.state == "missing").count();
     if modified_cnt > 0 {
         reasons.push(format!(

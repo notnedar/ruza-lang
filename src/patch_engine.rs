@@ -39,10 +39,10 @@ pub const ANDROID_EXPECTED_RES_REV: &str = "3219596";
 pub const ANDROID_STATIC_UI_SUB_OFFSET: usize = 4200075;
 pub const ANDROID_VSTRING_ORIG_SHA: &str = "C6BA69F2403102A9D4DBF2B3AB079ABBE7DE25896ABDB3969DD5B7988A2DB013";
 pub const ANDROID_STATIC_UI_ORIG_SHA: &str = "53A36C59B4ABABF9457ED37B195092DCAFD491C2D95D9BA75A61998C0138D22A";
-pub const ANDROID_VSTRING_EN_SHA: &str = "A2CA49E7A11A9E7246EDF684196A98073046BDBBDB4EE13CE2D0219D3AA0748F";
-pub const ANDROID_STATIC_UI_EN_SHA: &str = "B4566920EC26694F36A422E343C085D86617F8F5172BCE61CF513CA5DDAB53A5";
-pub const ANDROID_VSTRING_ID_SHA: &str = "388A8FB2D8A34C49F0710D0BDFC2A8A5AE5F753DF2646E336C4948874B96054A";
-pub const ANDROID_STATIC_UI_ID_SHA: &str = "6F025078A5B81C60D14FDAB1ED958399E513A643125076E56224465B80FCD1F4";
+pub const ANDROID_VSTRING_EN_SHA: &str = "0D11487EF462D2C7186EE654082BCA47D4E3AA2EC0F66E4A726728B2676932C7";
+pub const ANDROID_STATIC_UI_EN_SHA: &str = "2A4428AE21009DB19621A123B1A2561ED1F83A685B4C9160B94BA74CD50E8DAC";
+pub const ANDROID_VSTRING_ID_SHA: &str = "7DF4345957985A83A4EA37AA6DA480860534673DE1C138166FB20FA5EA718E17";
+pub const ANDROID_STATIC_UI_ID_SHA: &str = "0017773EB20E5B56D3E02179A9F94A6FBC862B48CFD9FF7CF443CCAE9E6A64B2";
 
 pub const VSTRING_REL: &str = r"AzurPromiliaJP_Data\.res\raw_base_package\BundleFiles\z5xzl3cg6ao0ilpbzykexg.r";
 pub const STATIC_UI_REL: &str = r"AzurPromiliaJP_Data\.res\default_package\BundleFiles\yr49bxop0f3reujfsmyfca.r";
@@ -55,16 +55,16 @@ pub const STATIC_UI_ORIG_SHA: &str = "701F04842F5156DA177BD4946A1CF9B7C055F2A614
 pub const STATIC_PKG_ORIG_SHA: &str = "C7C80B98B263F161583A2AB52A5B7039636ACBABCAC8C365F9F37224D11BC4B3";
 pub const RESOURCES_ORIG_SHA: &str = "DF93CE7192D6A46B33350204349E66A45E410124E3057224AD1A17E6F24B115B";
 
-// Verified English (EN) SHA-256 hashes (v0.2.1 UI Fit Pass)
-pub const VSTRING_EN_SHA: &str = "D57E7F499EF6737FF7AB0F957921C626D689CF6A5D612966C2483BC28D54F1CB";
-pub const STATIC_UI_EN_SHA: &str = "40B7950BB70692BF0EBE2B536B7A202EA993DEDE0481E262762DE3A27AE449F9";
+// Verified English (EN) SHA-256 hashes (v0.7.1 Contextual Glossary & UI Fit Pass)
+pub const VSTRING_EN_SHA: &str = "7558163BCE0A53F9721FCE94CEDAA41255CBFDFADEAC511F022F31790DCF2150";
+pub const STATIC_UI_EN_SHA: &str = "8679E44FF0EA0493F464201DD26AC9D4185935CB3A98F99649559066C492BFDA";
 pub const STATIC_UI_EN_SHA_ALT: &str = "";
 pub const STATIC_PKG_EN_SHA: &str = "7FEB394BD2FEAC1F8FC862A1254CD954EDC1D49544DE285D3E6D9C914755F33E";
 pub const RESOURCES_EN_SHA: &str = "C95E1A2C5C5977E105022B49266D3E2E32173A0E1F4E75BD807C7A93A9299883";
 
-// Verified Bahasa Indonesia (ID) SHA-256 hashes (v0.2.1 UI Fit Pass)
-pub const VSTRING_ID_SHA: &str = "B968C8F97791B704CC50877C1B388F9C81C022B285A9244BEDD2ED9B59EB7AC3";
-pub const STATIC_UI_ID_SHA: &str = "8E69653B7EEC783B5235036374601BF248A2DF5A76337BA8DBC58CB5803FBF0B";
+// Verified Bahasa Indonesia (ID) SHA-256 hashes (v0.7.1 Contextual Glossary & UI Fit Pass)
+pub const VSTRING_ID_SHA: &str = "A922DC099BDB817F8EF4CF27F26DAE0CFD9A1BBAF0F7C97B3F1A0253601D56CA";
+pub const STATIC_UI_ID_SHA: &str = "E1E6E9A015DCC4E70994D81E8F2FE3ED8437805F58F61455A470991FADC05772";
 pub const STATIC_PKG_ID_SHA: &str = "3EBE582B61D995108E1DA1F333D102B6218A5C9D33E03C931CB7EEEE585DC1FC";
 pub const RESOURCES_ID_SHA: &str = "85FADFAAC9708C845803FA438C5C2AA634A798FAE48405C9FC40953B4A7772A2";
 
@@ -314,7 +314,10 @@ pub fn detect_client_version(game_dir: &Path, targets: &[TargetStatus]) -> Clien
         ));
     }
 
-    let modified_cnt = targets.iter().filter(|t| t.state == "modified").count();
+    let modified_cnt = targets
+        .iter()
+        .filter(|t| t.state == "modified" && !t.has_backup)
+        .count();
     let missing_cnt = targets.iter().filter(|t| t.state == "missing").count();
     if modified_cnt > 0 {
         reasons.push(format!(
@@ -1903,4 +1906,72 @@ where
         LogLevel::Info,
     );
     Ok(restored)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn verify_pc_and_android_bundle_hashes() {
+        let print_only = std::env::var("PRINT_HASHES").is_ok();
+        let mut noop_log = |_: &str, _: LogLevel| {};
+        let mut noop_prog = |_: usize, _: &str| {};
+
+        // 1. PC originals in ../backups/
+        let pc_vs = Path::new("../backups/z5xzl3cg6ao0ilpbzykexg.r.original");
+        let pc_ui = Path::new("../backups/yr49bxop0f3reujfsmyfca.r.original");
+        if pc_vs.is_file() && pc_ui.is_file() {
+            let vs_orig = fs::read(pc_vs).unwrap();
+            let ui_orig = fs::read(pc_ui).unwrap();
+            let pc_spans = [("base_jp", 1495181usize, 1563711usize), ("hotfix_jp", 1658279usize, usize::MAX)];
+            for (lang, exp_vs, exp_ui) in [
+                (PatchLang::En, VSTRING_EN_SHA, STATIC_UI_EN_SHA),
+                (PatchLang::Id, VSTRING_ID_SHA, STATIC_UI_ID_SHA),
+            ] {
+                let gz = match lang { PatchLang::En => EMBED_VSTRING_EN_GZ, PatchLang::Id => EMBED_VSTRING_ID_GZ };
+                let tr = load_vstring_map(gz).unwrap();
+                let (vs_out, vs_cnt) = patch_vstring_pool_bytes(&vs_orig, &tr, &pc_spans, lang, &mut noop_log, &mut noop_prog).unwrap();
+                let vs_sha = sha256_bytes(&vs_out);
+                let (ui_out, ui_cnt) = patch_static_ui_bytes(&ui_orig, 420062, lang, &mut noop_log, &mut noop_prog).unwrap();
+                let ui_sha = sha256_bytes(&ui_out);
+                println!("PC_{}_VSTRING={} (cnt={})", lang.short_code(), vs_sha, vs_cnt);
+                println!("PC_{}_STATIC_UI={} (cnt={})", lang.short_code(), ui_sha, ui_cnt);
+                assert_eq!(vs_cnt, 74055);
+                assert_eq!(ui_cnt, 3135);
+                if !print_only {
+                    assert_eq!(vs_sha, exp_vs);
+                    assert_eq!(ui_sha, exp_ui);
+                }
+            }
+        }
+
+        // 2. Android originals in %LOCALAPPDATA%\RuzaLang\AndroidBackups\emulator-5554\
+        if let Ok(la) = std::env::var("LOCALAPPDATA") {
+            let bak = PathBuf::from(la).join(r"RuzaLang\AndroidBackups\emulator-5554");
+            let an_vs = bak.join("1qnamndresrohzjhuvt2lw.r.original");
+            let an_ui = bak.join("nibdvaxcnfh3en5bnvhtw.r.original");
+            if an_vs.is_file() && an_ui.is_file() {
+                let vs_orig = fs::read(&an_vs).unwrap();
+                let ui_orig = fs::read(&an_ui).unwrap();
+                for (lang, exp_vs, exp_ui) in [
+                    (PatchLang::En, ANDROID_VSTRING_EN_SHA, ANDROID_STATIC_UI_EN_SHA),
+                    (PatchLang::Id, ANDROID_VSTRING_ID_SHA, ANDROID_STATIC_UI_ID_SHA),
+                ] {
+                    let (vs_out, vs_cnt) = patch_android_vstring_bytes(&vs_orig, lang, &mut noop_log, &mut noop_prog).unwrap();
+                    let vs_sha = sha256_bytes(&vs_out);
+                    let (ui_out, ui_cnt) = patch_static_ui_bytes(&ui_orig, ANDROID_STATIC_UI_SUB_OFFSET, lang, &mut noop_log, &mut noop_prog).unwrap();
+                    let ui_sha = sha256_bytes(&ui_out);
+                    println!("ANDROID_{}_VSTRING={} (cnt={})", lang.short_code(), vs_sha, vs_cnt);
+                    println!("ANDROID_{}_STATIC_UI={} (cnt={})", lang.short_code(), ui_sha, ui_cnt);
+                    assert_eq!(vs_cnt, 74055);
+                    assert_eq!(ui_cnt, 3135);
+                    if !print_only {
+                        assert_eq!(vs_sha, exp_vs);
+                        assert_eq!(ui_sha, exp_ui);
+                    }
+                }
+            }
+        }
+    }
 }

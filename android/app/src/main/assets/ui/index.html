@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Ruza-Lang v0.7.0 — EN / ID</title>
+<title>Ruza-Lang v0.7.1 — EN / ID</title>
 <style>
   :root {
     --rail-w: 68px;
@@ -766,7 +766,7 @@
           <path d="M16.5 4.5L19.5 4.5L19.5 7.5" stroke="#e8d2a0" stroke-width="1.3"/>
         </svg>
       </div>
-      <span class="rail-ver">0.7.0</span>
+      <span class="rail-ver">0.7.1</span>
     </div>
     <nav class="rail-nav">
       <button class="nav-btn active" data-tab="home">
@@ -803,7 +803,7 @@
         </svg>
       </div>
       <span class="brand-name">Ruza-Lang</span>
-      <span class="brand-ver">0.7.0</span>
+      <span class="brand-ver">0.7.1</span>
     </div>
     <div class="lang-seg">
       <button class="lang-btn active" data-lang="en">EN</button>
@@ -1046,6 +1046,7 @@
   let activeTab = 'home';
   let scan = null;
   let updateInfo = null;
+  let shizukuPromptShown = false;
 
   const I18N = {
     en: {
@@ -1090,6 +1091,10 @@
       updateTitle: 'Update Available', updateBody: (c, l, mb) => `A newer Ruza-Lang release is available.\n\nCurrent: ${c}\nLatest: ${l} (${mb} MB)`,
       downloadApk: 'Download APK', openRelease: 'Release Page', later: 'Later',
       notInstTitle: 'Game Not Installed', notInstBody: 'The target Android client was not found on this device.\n\nInstall the game, finish downloading the in-game resource data, close the game, then tap Scan.',
+      shizukuMissingTitle: 'Shizuku Required (No Root, No PC)',
+      shizukuMissingBody: 'Shizuku was not detected on this device.\n\nAndroid 11–17 locks Android/data for regular apps. Install official Shizuku (free on Play Store / GitHub) and start it via Wireless Debugging on your phone — 100% no root and no PC needed.\n\nOn Android 11–12 you can also try Pick Folder (SAF) directly.',
+      downloadShizukuBtn: 'Download Shizuku',
+      trySafBtn: 'Pick Folder (SAF)',
       noAccessTitle: 'Authorize Storage Access First', noAccessBody: 'Android 11+ restricts access to Android/data for normal apps.\n\nUse Shizuku (works right on your phone via Wireless Debugging — zero PC, zero root!) or pick the game folder via SAF.',
       runningTitle: 'Close Game First', runningBody: (p) => `The game is currently running (PID ${p}).\n\nPlease force-close the game before patching or rollback.`,
       forceCloseBtn: 'App Info (Force Stop)',
@@ -1116,8 +1121,8 @@
           <p>Tap <b>Pick Folder (SAF)</b> below and select <code>Android/data/.../files</code> if your system file picker allows it (no Shizuku needed).</p>
         </div>
         <div class="guide-card">
-          <div class="guide-card-title">3. Direct Storage / Root</div>
-          <p>Detected automatically on Android 8–10, emulators with direct storage, or rooted devices.</p>
+          <div class="guide-card-title">3. Direct Storage (Android 8–10)</div>
+          <p>Detected automatically on older Android versions or emulators where <code>Android/data</code> is directly readable (100% non-root).</p>
         </div>`
     },
     id: {
@@ -1162,6 +1167,10 @@
       updateTitle: 'Update Tersedia', updateBody: (c, l, mb) => `Versi baru Ruza-Lang sudah tersedia.\n\nSaat ini: ${c}\nTerbaru: ${l} (${mb} MB)`,
       downloadApk: 'Unduh APK', openRelease: 'Halaman Release', later: 'Nanti',
       notInstTitle: 'Game Belum Terpasang', notInstBody: 'Aplikasi game target belum ditemukan di perangkat ini.\n\nInstall game-nya, selesaikan download data tambahan di dalam game, tutup game, lalu ketuk Scan.',
+      shizukuMissingTitle: 'Download Shizuku Dulu (Tanpa Root & Tanpa PC)',
+      shizukuMissingBody: 'Aplikasi Shizuku belum terdeteksi di HP ini.\n\nAndroid 11–17 mengunci folder Android/data dari aplikasi biasa. Install aplikasi resmi Shizuku (gratis di Play Store / GitHub) lalu aktifkan lewat Wireless Debugging di HP — 100% tanpa root dan tanpa laptop.\n\nDi Android 11–12 kamu juga bisa coba Pilih Folder (SAF) langsung.',
+      downloadShizukuBtn: 'Download Shizuku',
+      trySafBtn: 'Pilih Folder (SAF)',
       noAccessTitle: 'Berikan Izin Akses Storage Dulu', noAccessBody: 'Android 11+ membatasi akses folder Android/data untuk aplikasi biasa.\n\nGunakan Shizuku (langsung di HP lewat Wireless Debugging — tanpa PC & tanpa root!) atau pilih folder lewat SAF.',
       runningTitle: 'Tutup Game Dulu', runningBody: (p) => `Game sedang berjalan di background (PID ${p}).\n\nHarap paksa berhenti (Force Stop) game sebelum patch atau rollback.`,
       forceCloseBtn: 'Info Aplikasi (Force Stop)',
@@ -1188,8 +1197,8 @@
           <p>Ketuk <b>Pilih Folder (SAF)</b> di bawah lalu pilih <code>Android/data/.../files</code> jika file manager bawaan mengizinkan (tanpa Shizuku).</p>
         </div>
         <div class="guide-card">
-          <div class="guide-card-title">3. Direct Storage / Root</div>
-          <p>Otomatis aktif di Android 8–10, emulator dengan direct storage, atau HP yang sudah root.</p>
+          <div class="guide-card-title">3. Direct Storage (Android 8–10)</div>
+          <p>Otomatis aktif di Android versi lama atau emulator yang mengizinkan akses langsung ke <code>Android/data</code> (100% tanpa root).</p>
         </div>`
     }
   };
@@ -1466,7 +1475,18 @@
       case 'log': addLog(ev.level, ev.message); break;
       case 'busy': setBusy(!!ev.value); break;
       case 'progress': renderProgress(ev.current || 0, ev.total || 77190, ev.stage); break;
-      case 'scan_result': scan = ev; renderScan(); break;
+      case 'scan_result':
+        scan = ev;
+        renderScan();
+        if (!shizukuPromptShown && (!scan.access_mode || scan.access_mode === 'none') && !scan.shizuku_installed) {
+          shizukuPromptShown = true;
+          openModal(tr.shizukuMissingTitle, tr.shizukuMissingBody, [
+            { label: tr.later, cls: 'btn-white' },
+            { label: tr.trySafBtn, cls: 'btn-white', onClick: () => send('pick_saf') },
+            { label: tr.downloadShizukuBtn, cls: 'btn-charcoal', onClick: () => send('open_shizuku') }
+          ]);
+        }
+        break;
       case 'update_checking':
         $('btnCheckUpdate').disabled = !!ev.value || busy;
         $('btnCheckUpdate').textContent = ev.value ? tr.checking : tr.btnCheckUpdate;

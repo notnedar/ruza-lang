@@ -11,19 +11,15 @@ import com.ruzalang.patcher.engine.LogLevel
 import com.ruzalang.patcher.engine.PatchEngine
 import com.ruzalang.patcher.engine.PatchLang
 import com.ruzalang.patcher.engine.PayloadLoader
-import java.io.BufferedReader
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.io.InputStreamReader
 import java.security.MessageDigest
-import java.util.concurrent.TimeUnit
 
 enum class AccessMode(val id: String, val label: String) {
     SHIZUKU("shizuku", "Shizuku (No Root)"),
     DIRECT("direct", "Direct Storage"),
     SAF("saf", "SAF Folder"),
-    ROOT("root", "Root (su)"),
     NONE("none", "Setup Required"),
 }
 
@@ -92,31 +88,6 @@ class StorageBridge(private val context: Context) {
         }
     }
 
-    private fun hasRootAccess(): Boolean {
-        return try {
-            val p = ProcessBuilder("su", "-c", "id").redirectErrorStream(true).start()
-            if (!p.waitFor(2, TimeUnit.SECONDS)) {
-                p.destroyForcibly()
-                return false
-            }
-            val out = BufferedReader(InputStreamReader(p.inputStream)).readText()
-            p.exitValue() == 0 && out.contains("uid=0")
-        } catch (_: Throwable) {
-            false
-        }
-    }
-
-    private fun runSu(cmd: String): Pair<Boolean, String> {
-        return try {
-            val p = ProcessBuilder("su", "-c", cmd).redirectErrorStream(true).start()
-            val out = BufferedReader(InputStreamReader(p.inputStream)).readText()
-            val code = p.waitFor()
-            Pair(code == 0, out)
-        } catch (e: Throwable) {
-            Pair(false, e.message ?: "su failed")
-        }
-    }
-
     fun resolveAccessMode(): AccessMode {
         val svc = shizukuService
         if (svc != null) {
@@ -130,7 +101,6 @@ class StorageBridge(private val context: Context) {
         }
         if (isDirectFsWritable()) return AccessMode.DIRECT
         if (safTreeUri != null && resolveSafRoot() != null) return AccessMode.SAF
-        if (hasRootAccess()) return AccessMode.ROOT
         return AccessMode.NONE
     }
 
@@ -188,7 +158,6 @@ class StorageBridge(private val context: Context) {
         AccessMode.SHIZUKU -> shizukuService?.fileExists(remotePath) == true
         AccessMode.DIRECT -> File(remotePath).isFile
         AccessMode.SAF -> resolveSafPath(relFromRemote(remotePath))?.isFile == true
-        AccessMode.ROOT -> runSu("[ -f '$remotePath' ]").first
         AccessMode.NONE -> false
     }
 
@@ -196,7 +165,6 @@ class StorageBridge(private val context: Context) {
         AccessMode.SHIZUKU -> shizukuService?.fileSize(remotePath) ?: -1L
         AccessMode.DIRECT -> File(remotePath).let { if (it.isFile) it.length() else -1L }
         AccessMode.SAF -> resolveSafPath(relFromRemote(remotePath))?.length() ?: -1L
-        AccessMode.ROOT -> runSu("stat -c %s '$remotePath' 2>/dev/null || echo -1").second.trim().toLongOrNull() ?: -1L
         AccessMode.NONE -> -1L
     }
 
@@ -223,11 +191,6 @@ class StorageBridge(private val context: Context) {
                 } ?: return null
                 CryptoLz4.hexUpper(md.digest())
             }
-            AccessMode.ROOT -> {
-                val (ok, out) = runSu("sha256sum '$remotePath' 2>/dev/null")
-                val tok = out.trim().split(Regex("\\s+")).firstOrNull().orEmpty()
-                if (ok && tok.length == 64) tok.uppercase() else null
-            }
             AccessMode.NONE -> null
         }
     }
@@ -236,14 +199,12 @@ class StorageBridge(private val context: Context) {
         AccessMode.SHIZUKU -> shizukuService?.listDir(remoteDir).orEmpty().lines().filter { it.isNotBlank() }
         AccessMode.DIRECT -> File(remoteDir).list()?.sorted().orEmpty()
         AccessMode.SAF -> resolveSafPath(relFromRemote(remoteDir))?.listFiles()?.mapNotNull { it.name }.orEmpty()
-        AccessMode.ROOT -> runSu("ls '$remoteDir' 2>/dev/null").second.lines().filter { it.isNotBlank() }
         AccessMode.NONE -> emptyList()
     }
 
     fun findRunningGamePids(mode: AccessMode): List<Int> {
         val raw = when (mode) {
             AccessMode.SHIZUKU -> shizukuService?.findRunningPids(PatchEngine.ANDROID_PACKAGE_ID).orEmpty()
-            AccessMode.ROOT -> runSu("pidof ${PatchEngine.ANDROID_PACKAGE_ID} 2>/dev/null").second
             else -> ""
         }
         return raw.trim().split(Regex("\\s+")).mapNotNull { it.toIntOrNull() }
@@ -274,16 +235,6 @@ class StorageBridge(private val context: Context) {
                         out.fd.sync()
                     }
                 } ?: error("Failed opening SAF input stream")
-            }
-            AccessMode.ROOT -> {
-                val tmp = File(stageDir, "${localDst.name}.root_tmp")
-                val (ok, out) = runSu("cp -f '$remotePath' '${tmp.absolutePath}' && chmod 666 '${tmp.absolutePath}'")
-                if (!ok || !tmp.isFile) error("Root copy failed: $out")
-                if (localDst.exists()) localDst.delete()
-                if (!tmp.renameTo(localDst)) {
-                    tmp.copyTo(localDst, overwrite = true)
-                    tmp.delete()
-                }
             }
             AccessMode.NONE -> error("No storage access method authorized")
         }
@@ -343,16 +294,6 @@ class StorageBridge(private val context: Context) {
                 val finalSha = remoteSha256(mode, remotePath) ?: error("Post-write SAF hash failed")
                 if (!finalSha.equals(expectedSha, ignoreCase = true)) {
                     error("Final SAF SHA-256 mismatch ($finalSha != $expectedSha)")
-                }
-                return finalSha
-            }
-            AccessMode.ROOT -> {
-                val tmpRemote = "$remotePath.ruza_tmp"
-                val (ok, out) = runSu("cp -f '${localSrc.absolutePath}' '$tmpRemote' && mv -f '$tmpRemote' '$remotePath'")
-                if (!ok) error("Root push failed: $out")
-                val finalSha = remoteSha256(mode, remotePath) ?: error("Root SHA-256 verify failed")
-                if (!finalSha.equals(expectedSha, ignoreCase = true)) {
-                    error("Final Root SHA-256 mismatch ($finalSha != $expectedSha)")
                 }
                 return finalSha
             }
@@ -468,7 +409,7 @@ class StorageBridge(private val context: Context) {
         if (detectedResRev.isNotEmpty() && detectedResRev != PatchEngine.ANDROID_EXPECTED_RES_REV) {
             reasons.add("Resource revision r$detectedResRev != r${PatchEngine.ANDROID_EXPECTED_RES_REV}")
         }
-        val modCnt = targets.count { it.state == "modified" }
+        val modCnt = targets.count { it.state == "modified" && !it.hasBackup }
         val missCnt = targets.count { it.state == "missing" }
         if (modCnt > 0) reasons.add("$modCnt bundle(s) differ from verified SHA-256 hashes")
         if (missCnt > 0) reasons.add("$missCnt bundle(s) missing (finish in-game download first)")

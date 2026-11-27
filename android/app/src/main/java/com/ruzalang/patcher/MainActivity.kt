@@ -20,9 +20,13 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
+import android.widget.FrameLayout
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewClientCompat
 import com.ruzalang.patcher.engine.LogLevel
@@ -112,9 +116,10 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, true)
-        window.statusBarColor = Color.parseColor("#121924")
-        window.navigationBarColor = Color.parseColor("#101721")
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val insetsCtrl = WindowInsetsControllerCompat(window, window.decorView)
+        insetsCtrl.isAppearanceLightStatusBars = false
+        insetsCtrl.isAppearanceLightNavigationBars = false
 
         bridge = StorageBridge(this)
         prefs.getString("saf_uri", null)?.let { saved ->
@@ -131,6 +136,17 @@ class MainActivity : AppCompatActivity() {
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
 
+        val root = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#121924"))
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(root) { v, windowInsets ->
+            val bars = windowInsets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout(),
+            )
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            windowInsets
+        }
+
         webView = WebView(this).apply {
             setBackgroundColor(Color.parseColor("#141b26"))
             settings.javaScriptEnabled = true
@@ -146,7 +162,15 @@ class MainActivity : AppCompatActivity() {
                 ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
             }
         }
-        setContentView(webView)
+        root.addView(
+            webView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        setContentView(root)
+        ViewCompat.requestApplyInsets(root)
         webView.loadUrl("https://appassets.androidplatform.net/assets/ui/index.html")
     }
 

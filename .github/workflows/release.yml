@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build & publish (e.g. v0.7.0)"
+        description: "Release tag to build & publish (e.g. v0.7.1)"
         required: true
-        default: "v0.7.0"
+        default: "v0.7.1"
 
 permissions:
   contents: write
@@ -204,10 +204,12 @@ jobs:
           ![Settings Menu](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-en.jpg)
 
           ### Highlights / Fitur Utama
-          - **NEW — Standalone Universal Android APK (\`RuzaLangPatcher.apk\`, \`v0.7.0\`):** Patch directly on your Android phone with **zero laptop, zero root, and zero APK re-signing**!
-            - Same launcher aesthetic (responsive Portrait phone + Landscape tablet/emulator left-rail, frosted-glass Settings cards, bilingual \`EN\`/\`ID\` toggle, live Activity Log, built-in Update Checker).
-            - **Zero-PC Storage Access:** Supports **Shizuku** (Android 11–17 via on-phone Wireless Debugging), **SAF Folder Picker**, **Direct Storage**, and automatic **Root (\`su\`)** fallback with a built-in bilingual **Setup Guide**.
-            - **Bit-Identical On-Device Repacking (~3 seconds):** Covers **77,190 strings (\`99.4%\`: \`VStringPool\` + \`Static UI KeyConfig\`)** plus **Cached News (\`EN\` / \`ID\`)**, Android Process Guard, automatic local backups, atomic file replacement + SHA-256 verification, and one-click **Rollback JP**.
+          - **NEW — Contextual Localization, Official Glossary & UI Fit Overhaul (\`v0.7.1\`):**
+            - **Repaired 6 off-by-one chunk shifts (\`424\` entries):** Fixes misaligned Equipment/Anima/Material labels (including the bottom-right \`Equip\` button that previously showed \`"Item"\`) and 5 story dialogue segments across \`EN\` & \`ID\`.
+            - **Official Global Terminology & 9-Element Cleanup (\`3,362\` entries):** Aligned place/character names (\`Fleece\`, \`Sprout Valley\`, \`Jinghua Cape\`, \`Charlulu Village\`, \`Terara\`, \`Cathbelle\`, \`Cabbird\`), replaced \`900+\` non-native element names + \`11\` wrong-element skills with the 9 official elements (\`Fire\`, \`Water\`, \`Lightning\`, \`Wind\`, \`Earth\`, \`Ice\`, \`Wood\`, \`Light\`, \`Dark\`), and polished literal Indonesian skill wording.
+            - **Anti-Wrap UI Buttons & Pills (\`162\` overrides):** Tightened cramped buttons (\`Skill Comparison → Skills\`, \`Recommended → Rec. / Saran\`, \`Recommended Anima Sorting → Sort: Rec.\`, \`Matches character role → Matches Role\`, \`Breakthrough → Ascend\`, \`Lore → Legacy\`) so labels fit cleanly without mid-word wrapping.
+            - **Android APK Polish (\`100% Non-Root\`):** Fixed Android 15–17 Edge-to-Edge status bar/cutout/navigation bar insets (\`WindowInsetsCompat\`), added automatic **Download Shizuku** popup when Shizuku isn't installed yet, and removed all \`Root (su)\` code paths completely.
+          - **Standalone Universal Android APK (\`RuzaLangPatcher.apk\`, \`v0.7.0\`):** Patch directly on your Android phone with **zero laptop, zero root, and zero APK re-signing** — responsive Portrait phone & Landscape tablet UI, **Shizuku** (Android 11–17 Wireless Debugging) + **SAF Folder Picker** + **Direct Storage**, **77,190 verified strings (\`99.4%\`)** + Cached News in ~3 seconds, automatic local backups, and one-click **Rollback JP**.
           - **Desktop Launcher Platform Selector (\`PC\` | \`Android\`) & Built-In ADB Connect Guide (\`v0.6.1\`):** Switch between **PC Client** and **Android (ADB)** right from Home, with smart setup prompts, Wireless ADB (\`IP:Port\`), and a bilingual USB/Wi-Fi/Emulator ADB guide.
           - **Built-In SHA-256 Auto-Updater (\`v0.5.0\`):** Automatic update check on launch (plus manual **Check Updates** in **Files**), verified against official \`SHA256SUMS.txt\`.
           - **PC 4-Store Localization Pipeline (\`77,661\` strings):** \`VStringPool\` (\`74,055\`), \`Static UI KeyConfig\` (\`3,135\`), \`StaticPackage CSV\` (\`113\`), \`resources.assets\` (\`358\`) + **Translate News (\`EN\` / \`ID\`)**.
