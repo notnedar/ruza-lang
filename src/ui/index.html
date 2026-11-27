@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Ruza-Lang Patcher v0.4.3 — EN / ID</title>
+<title>Ruza-Lang Patcher v0.5.0 — EN / ID</title>
 <style>
   :root {
     --rail-w: 68px;
@@ -444,6 +444,31 @@
   }
   .hero-ver-btn.mismatch .hero-ver-dot {
     background: #ffd479;
+  }
+
+  /* Clean non-intrusive Update Available inline notice (only shown when a newer release exists) */
+  .hero-update-btn {
+    display: none;
+    align-items: center;
+    gap: 7px;
+    margin-top: 2px;
+    padding: 4px 11px;
+    border-radius: 5px;
+    background: rgba(24, 62, 98, 0.80);
+    border: 1px solid rgba(176, 224, 255, 0.48);
+    color: #eef8ff;
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 14px rgba(10, 26, 46, 0.25);
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .hero-update-btn.show { display: inline-flex; }
+  .hero-update-btn:hover {
+    background: rgba(32, 78, 120, 0.90);
+    border-color: rgba(210, 238, 255, 0.72);
   }
 
   /* Live Activity Log Feed in the open left white-space (shown on Install Patch / Translate News / Rollback) */
@@ -1025,14 +1050,14 @@
 <div class="shell">
   <!-- LEFT SLIM LAUNCHER RAIL -->
   <aside class="rail">
-    <div class="rail-brand" data-drag="1" title="Ruza-Lang v0.4.3">
+    <div class="rail-brand" data-drag="1" title="Ruza-Lang v0.5.0">
       <div class="mark-box">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <path d="M6.5 4.5H13.8C16.4 4.5 18 6 18 8.3C18 10.3 16.7 11.7 14.5 12L18.5 19.5H15.4L11.8 12.4H9V19.5H6.5V4.5ZM9 6.8V10.3H13.4C14.7 10.3 15.5 9.6 15.5 8.5C15.5 7.4 14.7 6.8 13.4 6.8H9Z" fill="#f3eee2"/>
           <path d="M16.5 4.5L19.5 4.5L19.5 7.5" stroke="#e8d2a0" stroke-width="1.3"/>
         </svg>
       </div>
-      <span class="rail-ver">0.4.3</span>
+      <span class="rail-ver">0.5.0</span>
     </div>
 
     <nav class="rail-nav">
@@ -1110,6 +1135,10 @@
                 <span id="btnShowHomeLogText">Show Activity Log</span>
               </button>
             </div>
+            <button id="heroUpdateBtn" class="hero-update-btn" type="button">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m0 0l-5 5m5-5l5 5"/></svg>
+              <span id="heroUpdateText">Update available</span>
+            </button>
           </div>
         </div>
 
@@ -1210,9 +1239,12 @@
             <div id="sheetNote" class="sheet-note">
               Backups saved in <code>_ENPatchBackup\</code> &middot; Exact byte sizes &middot; SHA-256 verified
             </div>
-            <button id="btnRollbackPkg" class="btn-charcoal" type="button">
-              <span id="btnRollbackPkgText">Rollback Original JP</span>
-            </button>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button id="btnCheckUpdate" class="btn-white" type="button">Check Updates</button>
+              <button id="btnRollbackPkg" class="btn-charcoal" type="button">
+                <span id="btnRollbackPkgText">Rollback Original JP</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1312,6 +1344,7 @@
   let activeTab = 'home';  // 'home' | 'packages' | 'news' | 'log'
   let lastTargets = [];
   let clientVersion = null;
+  let updateInfo = null;
   let lastProgress = { current: 0, total: 77661, stage: '' };
 
   const I18N = {
@@ -1339,6 +1372,18 @@
       homeLogTitle: 'Activity Log',
       homeLogFull: 'Full Log',
       homeLogShow: 'Show Log',
+      btnCheckUpdate: 'Check Updates',
+      checkingUpdates: 'Checking...',
+      updateBannerFmt: (ver) => `Update available: ${ver} — Click to update`,
+      updateTitle: 'Patcher Update Available',
+      updateBody: (cur, latest, mb) =>
+        `A new version of Ruza-Lang is available on GitHub Releases.\n\nCurrent: ${cur}\nLatest: ${latest} (${mb} MB)\n\nThe updater verifies SHA-256 against official SHA256SUMS.txt before replacing and relaunching automatically.`,
+      updateNow: 'Update Now',
+      openRelease: 'Release Page',
+      later: 'Later',
+      upToDateTitle: 'Up to Date',
+      upToDateBody: (cur) => `You are already running the latest version (${cur}).`,
+      updateErrTitle: 'Update Check Failed',
       mismatchTitle: 'Client Version Mismatch',
       mismatchBody: (det, exp, reasons) =>
         `Detected client: ${det}\nVerified for: ${exp}\n${reasons ? 'Details: ' + reasons + '\n' : ''}\nWaiting for a Ruza-Lang patcher update is recommended so the patch stays in sync after a game update.\n\nYou can still attempt to install the patch now — original backups are saved first, and exact-size verification will abort safely if bundle layouts changed.`,
@@ -1416,6 +1461,18 @@
       homeLogTitle: 'Log Aktivitas',
       homeLogFull: 'Log Penuh',
       homeLogShow: 'Tampilkan Log',
+      btnCheckUpdate: 'Cek Update',
+      checkingUpdates: 'Mengecek...',
+      updateBannerFmt: (ver) => `Update tersedia: ${ver} — Klik untuk update`,
+      updateTitle: 'Update Patcher Tersedia',
+      updateBody: (cur, latest, mb) =>
+        `Versi baru Ruza-Lang sudah tersedia di GitHub Releases.\n\nSaat ini: ${cur}\nTerbaru: ${latest} (${mb} MB)\n\nAuto-updater akan memverifikasi SHA-256 dari SHA256SUMS.txt resmi sebelum mengganti file & membuka ulang otomatis.`,
+      updateNow: 'Update Sekarang',
+      openRelease: 'Halaman Release',
+      later: 'Nanti',
+      upToDateTitle: 'Sudah Versi Terbaru',
+      upToDateBody: (cur) => `Kamu sudah menggunakan versi terbaru (${cur}).`,
+      updateErrTitle: 'Gagal Cek Update',
       mismatchTitle: 'Versi Klien Tidak Cocok',
       mismatchBody: (det, exp, reasons) =>
         `Versi terdeteksi: ${det}\nTerverifikasi untuk: ${exp}\n${reasons ? 'Detail: ' + reasons + '\n' : ''}\nDisarankan menunggu update patcher Ruza-Lang agar tetap sinkron setelah update game.\n\nKamu tetap bisa mencoba pasang patch sekarang — backup file asli otomatis disimpan dulu dan verifikasi ukuran/integrity tetap berjalan.`,
@@ -1573,6 +1630,35 @@
     }
   }
 
+  function renderUpdateBanner() {
+    const tr = t();
+    const btn = $('heroUpdateBtn');
+    if (updateInfo && updateInfo.has_update) {
+      btn.classList.add('show');
+      $('heroUpdateText').textContent = tr.updateBannerFmt(updateInfo.latest_version);
+    } else {
+      btn.classList.remove('show');
+    }
+  }
+
+  function showUpdateModal(info) {
+    const tr = t();
+    const mb = info.exe_size ? (info.exe_size / (1024 * 1024)).toFixed(2) : '?';
+    openModal(tr.updateTitle, tr.updateBody(info.current_version, info.latest_version, mb), [
+      { label: tr.later, cls: 'btn-white' },
+      { label: tr.openRelease, cls: 'btn-white', onClick: () => send('open_url', { url: info.release_url }) },
+      {
+        label: tr.updateNow,
+        cls: 'btn-charcoal',
+        onClick: () => {
+          switchTab('home');
+          openHomeLog(true);
+          send('install_update', { update: info });
+        }
+      }
+    ]);
+  }
+
   function openHomeLog(reset = false) {
     if (reset) $('homeLogBody').innerHTML = '';
     $('homeLogBox').classList.add('open');
@@ -1622,6 +1708,7 @@
     $('btnNewsPageText').textContent = tr.btnNews;
     $('btnRollbackText').textContent = tr.btnRollbackShort;
     $('btnRollbackPkgText').textContent = tr.btnRollbackFull;
+    $('btnCheckUpdate').textContent = tr.btnCheckUpdate;
     $('sheetNote').innerHTML = tr.sheetNote;
     $('btnCopyLog').textContent = tr.copyLog;
     $('btnClearLog').textContent = tr.clearLog;
@@ -1629,6 +1716,7 @@
     renderProcessAlert();
     updateHeroState();
     renderVersionSync();
+    renderUpdateBanner();
     if (lastTargets.length) {
       renderTargets(lastTargets);
       if (!busy) {
@@ -1675,7 +1763,7 @@
 
   function setBusy(v) {
     busy = v;
-    for (const id of ['btnAuto', 'btnBrowse', 'btnScan', 'btnAutoQuick', 'btnScanQuick', 'btnPatch', 'btnNews', 'btnNewsPage', 'btnRollback', 'btnRollbackPkg', 'langEn', 'langId', 'folderInput']) {
+    for (const id of ['btnAuto', 'btnBrowse', 'btnScan', 'btnAutoQuick', 'btnScanQuick', 'btnPatch', 'btnNews', 'btnNewsPage', 'btnRollback', 'btnRollbackPkg', 'btnCheckUpdate', 'langEn', 'langId', 'folderInput']) {
       $(id).disabled = v;
     }
   }
@@ -1726,7 +1814,13 @@
     const safeTot = Math.max(1, tot || 77661);
     const pct = Math.min(100, (cur * 100) / safeTot);
     $('barFill').style.width = pct.toFixed(2) + '%';
-    $('progCount').textContent = `${fmt(cur)} / ${fmt(safeTot)} · ${pct.toFixed(0)}%`;
+    if (safeTot > 200000) {
+      const mbCur = (cur / (1024 * 1024)).toFixed(1);
+      const mbTot = (safeTot / (1024 * 1024)).toFixed(1);
+      $('progCount').textContent = `${mbCur} / ${mbTot} MB · ${pct.toFixed(0)}%`;
+    } else {
+      $('progCount').textContent = `${fmt(cur)} / ${fmt(safeTot)} · ${pct.toFixed(0)}%`;
+    }
     if (stage) $('progStage').textContent = stage;
   }
 
@@ -1768,6 +1862,26 @@
       case 'busy':
         setBusy(!!ev.value);
         break;
+      case 'update_checking':
+        $('btnCheckUpdate').disabled = !!ev.value || busy;
+        $('btnCheckUpdate').textContent = ev.value ? tr.checkingUpdates : tr.btnCheckUpdate;
+        break;
+      case 'update_status':
+        if (ev.info) {
+          updateInfo = ev.info;
+          renderUpdateBanner();
+          if (!ev.silent) {
+            if (ev.info.has_update) {
+              showUpdateModal(ev.info);
+            } else {
+              openModal(tr.upToDateTitle, tr.upToDateBody(ev.info.current_version), [{ label: tr.ok, cls: 'btn-charcoal' }]);
+            }
+          }
+        }
+        break;
+      case 'update_error':
+        openModal(tr.updateErrTitle, ev.message || 'Unknown error', [{ label: tr.ok, cls: 'btn-charcoal' }]);
+        break;
       case 'alert':
         openModal(ev.title || 'Notice', ev.body || '', [{ label: tr.ok, cls: 'btn-charcoal' }]);
         break;
@@ -1794,6 +1908,8 @@
   $('btnHomeLogFull').onclick = () => switchTab('log');
   $('btnHomeLogHide').onclick = () => hideHomeLog();
   $('btnShowHomeLog').onclick = () => openHomeLog(false);
+  $('heroUpdateBtn').onclick = () => { if (updateInfo && updateInfo.has_update) showUpdateModal(updateInfo); };
+  $('btnCheckUpdate').onclick = () => send('check_update');
 
   // Language switcher
   $('langEn').onclick = () => {

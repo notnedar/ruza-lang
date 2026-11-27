@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build & publish (e.g. v0.4.3)"
+        description: "Release tag to build & publish (e.g. v0.5.0)"
         required: true
-        default: "v0.4.3"
+        default: "v0.5.0"
 
 permissions:
   contents: write
@@ -101,8 +101,8 @@ jobs:
           ![Settings Menu](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-en.jpg)
 
           ### Highlights / Fitur Utama
-          - **Cleaner Launcher Polish (`v0.4.3`):** Removed all uppercase UI eyebrows across Home and sub-views and stripped the dot next to the Activity Log header for a cleaner, calmer presentation.
-          - **Clean Portable Execution & Always-Live Home Activity Log (`v0.4.2`):** Stores WebView2 cache cleanly in `%LOCALAPPDATA%\RuzaLang\WebView2` (no more `*.exe.WebView2` folder next to the executable!) and keeps the translucent Activity Log live right on the Home canvas (collapsible anytime) for startup scan, **Install Patch**, **Translate News**, and **Rollback JP**.
+          - **Built-In SHA-256 Auto-Updater (`v0.5.0`):** Checks GitHub Releases automatically on launch (plus manual **Check Updates** in **Files**), verifies downloaded binaries against official `SHA256SUMS.txt` over strict allowlisted HTTPS, swaps the `.exe` atomically in-place, and auto-relaunches.
+          - **Cleaner Launcher Polish & Portable Execution (`v0.4.2`–`v0.4.3`):** Removed all uppercase UI eyebrows and Activity Log dot; WebView2 profile stored cleanly in `%LOCALAPPDATA%\RuzaLang\WebView2` (zero `*.exe.WebView2` folder clutter).
           - **Client Version Sync Check (`v0.4.1`):** Checks client version + resource revision sync (`v1.0.2 · r3219598`) with a non-blocking update recommendation if a newer client build is detected.
           - **Frameless PC Game Launcher UI (`v0.4.0`):** Rebuilt from scratch as a clean `960×580` frameless desktop launcher with Windows 11 native rounded corners, custom draggable top bar (`—` / geometric `✕`), slim frosted left rail (`Home` · `Files` · `News` · `Log` + `EN`/`ID`), original painted scenic hero canvas, bottom action dock with prominent **Install Patch** CTA + **Translate News**, and frosted-glass sub-pages.
           - **UI Fit Pass (`v0.2.1`):** Tightened quick-menu labels, event sidebar tabs, chapter headers, and banner descriptions + conservative TextMeshPro `<size=80%>` scaling on ultra-wide short prefab labels (`EN` & `ID`) to prevent overlap and `...` truncation.

@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.4.3`)
+# Ruza-Lang (`v0.5.0`)
 
 [![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
 
@@ -13,10 +13,10 @@ An educational desktop localization & asset-repacking study project demonstratin
 
 ---
 
-## What's New in `v0.4.3`
+## What's New in `v0.5.0`
 
-- **Cleaner Launcher Typography & Header Polish:** Removed all tracked uppercase UI eyebrows across Home and sub-views (`Packages`, `News Cache`, `Execution Log`) and stripped the status dot from the Home Activity Log header for a calmer, distraction-free interface.
-- **Zero `.WebView2` Folder Clutter Next to `.exe` (`v0.4.2`):** Redirected Edge WebView2's runtime profile cleanly to `%LOCALAPPDATA%\RuzaLang\WebView2` so running `RuzaLangPatcher.exe` never creates a `RuzaLangPatcher.exe.WebView2` folder on your Desktop or Downloads.
+- **Built-In Auto-Updater (SHA-256 Verified):** Automatically checks [GitHub Releases](https://github.com/notnedar/ruza-lang/releases/latest) in the background on startup (plus a manual **Check Updates** button in **Files**). When a newer release is available, displays a clean one-click update banner on Home, downloads directly over native Windows HTTPS from allowlisted GitHub hosts, verifies the binary against official `SHA256SUMS.txt`, atomically swaps the executable in-place, cleans up the old binary, and relaunches automatically.
+- **Cleaner Launcher Typography & Zero `.WebView2` Clutter (`v0.4.2`–`v0.4.3`):** Removed all uppercase UI eyebrows and Activity Log header dot; WebView2 cache stays cleanly inside `%LOCALAPPDATA%\RuzaLang\WebView2`.
 - **Always-Visible Home Live Activity Log (Collapsible):** Live scan, **Install Patch**, **Translate News**, and **Rollback JP** logs now appear directly in the lower-left Home launcher canvas from launch (with one-click hide `×` / `Show Log` & `Full Log`).
 - **Client Version Sync Check (Non-Blocking):** Automatically reads the installed client version, resource manifest revision, and build GUID (`v1.0.2 · r3219598`) alongside package SHA-256 verification. Displays a clean sync status on Home & **Files**; if a future game update introduces a version mismatch, it recommends waiting for a patcher update via a soft confirmation dialog while still letting you choose **Install Anyway**.
 - **Frameless PC Game Launcher UI (`v0.4.0`):** `960×580` frameless desktop launcher with Windows 11 native rounded corners, custom draggable top bar (`—` / geometric `✕`), slim frosted left rail (`Home` · `Files` · `News` · `Log` + `EN`/`ID`), original painted scenic hero canvas, bottom action dock, and frosted-glass sub-pages.

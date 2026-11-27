@@ -2,6 +2,7 @@
 
 mod crypto_lz4;
 mod patch_engine;
+mod updater;
 
 use patch_engine::{LogLevel, PatchLang, ProcessInfo, TargetStatus};
 use serde::Deserialize;
@@ -41,6 +42,8 @@ struct IpcCommand {
     cmd: String,
     path: Option<String>,
     lang: Option<String>,
+    url: Option<String>,
+    update: Option<updater::UpdateInfo>,
 }
 
 enum UserEvent {
@@ -191,6 +194,27 @@ fn run_selftest(mock_dir: &str) -> i32 {
         let _ = std::fs::remove_file(dir.join("game-launcher-config.json"));
         lines.push("[OK] VERSION SYNC SELFTEST PASSED 100%! (1.0.2 synced -> 1.0.3 mismatch detected)".into());
 
+        // 8. Auto-updater logic & URL allowlist self-test
+        if !updater::is_newer_version("v0.5.1", "0.5.0")
+            || updater::is_newer_version("v0.5.0", "0.5.0")
+            || updater::is_newer_version("v0.4.3", "0.5.0")
+        {
+            return Err("SemVer comparison self-test failed!".into());
+        }
+        let sample_sha = "8B4B618001948E05EA6E9803A8A56E9B806CA59A40489BACB5414409500CB013  RuzaLangPatcher.exe\n";
+        if updater::parse_sha256sums(sample_sha, "RuzaLangPatcher.exe").as_deref()
+            != Some("8B4B618001948E05EA6E9803A8A56E9B806CA59A40489BACB5414409500CB013")
+        {
+            return Err("SHA256SUMS parser self-test failed!".into());
+        }
+        if updater::validate_allowed_https_url("https://github.com/notnedar/ruza-lang/releases/latest").is_err()
+            || updater::validate_allowed_https_url("http://github.com/notnedar/ruza-lang").is_ok()
+            || updater::validate_allowed_https_url("https://evil.example.com/payload.exe").is_ok()
+        {
+            return Err("Update URL allowlist self-test failed!".into());
+        }
+        lines.push("[OK] AUTO-UPDATER SELFTEST PASSED 100%! (SemVer + SHA256SUMS + HTTPS host allowlist)".into());
+
         lines.push("[OK] BILINGUAL SELFTEST PASSED 100%! (Original -> EN -> ID -> EN -> Rollback JP)".into());
         Ok(())
     })();
@@ -259,6 +283,7 @@ fn webview_data_dir() -> PathBuf {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    updater::schedule_old_exe_cleanup(&args);
     if args.len() >= 3 && args[1].eq_ignore_ascii_case("--selftest") {
         std::process::exit(run_selftest(&args[2]));
     }
@@ -266,12 +291,30 @@ fn main() {
         let out = args.get(3).map(|s| s.as_str()).unwrap_or("scan.log");
         std::process::exit(run_cli_scan(&args[2], out));
     }
+    if args.len() >= 2 && args[1].eq_ignore_ascii_case("--check-update") {
+        let out_file = args.get(2).map(|s| s.as_str());
+        match updater::check_for_update() {
+            Ok(info) => {
+                let txt = serde_json::to_string_pretty(&info).unwrap_or_default();
+                if let Some(f) = out_file {
+                    let _ = std::fs::write(f, &txt);
+                }
+                std::process::exit(0);
+            }
+            Err(e) => {
+                if let Some(f) = out_file {
+                    let _ = std::fs::write(f, format!("ERR: {}", e));
+                }
+                std::process::exit(1);
+            }
+        }
+    }
 
     let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
-        .with_title("Ruza-Lang Patcher v0.4.3 — EN / ID")
+        .with_title("Ruza-Lang Patcher v0.5.0 — EN / ID")
         .with_inner_size(LogicalSize::new(960.0, 580.0))
         .with_decorations(false)
         .with_resizable(false)
@@ -317,9 +360,31 @@ fn main() {
                     let _ = p.send_event(UserEvent::CloseWindow);
                 }
                 "init" | "auto_detect" => {
+                    let is_init = parsed.cmd == "init";
+                    if is_init {
+                        let up_proxy = p.clone();
+                        thread::spawn(move || {
+                            if let Ok(info) = updater::check_for_update() {
+                                if info.has_update {
+                                    push_log(
+                                        &up_proxy,
+                                        LogLevel::Info,
+                                        &format!(
+                                            "New patcher release available: {} (current: {}).",
+                                            info.latest_version, info.current_version
+                                        ),
+                                    );
+                                }
+                                push_event(
+                                    &up_proxy,
+                                    json!({ "type": "update_status", "silent": true, "info": info }),
+                                );
+                            }
+                        });
+                    }
                     thread::spawn(move || {
-                        if parsed.cmd == "init" {
-                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.4.3 (EN / ID) initialized.");
+                        if is_init {
+                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.5.0 (EN / ID) initialized.");
                             push_log(&p, LogLevel::Info, "Safety: Exact byte sizes preserved with SHA-256 verification.");
                         }
                         let procs = patch_engine::find_running_game_processes();
@@ -540,6 +605,90 @@ fn main() {
                         }
                         do_scan(&p, &dir);
                     });
+                }
+                "check_update" => {
+                    thread::spawn(move || {
+                        push_event(&p, json!({ "type": "update_checking", "value": true }));
+                        push_log(&p, LogLevel::Info, "Checking GitHub Releases for Ruza-Lang updates...");
+                        match updater::check_for_update() {
+                            Ok(info) => {
+                                if info.has_update {
+                                    push_log(
+                                        &p,
+                                        LogLevel::Ok,
+                                        &format!(
+                                            "Update available: {} (current: {}).",
+                                            info.latest_version, info.current_version
+                                        ),
+                                    );
+                                } else {
+                                    push_log(
+                                        &p,
+                                        LogLevel::Ok,
+                                        &format!(
+                                            "You are on the latest version ({}).",
+                                            info.current_version
+                                        ),
+                                    );
+                                }
+                                push_event(
+                                    &p,
+                                    json!({ "type": "update_status", "silent": false, "info": info }),
+                                );
+                            }
+                            Err(e) => {
+                                push_log(&p, LogLevel::Warn, &format!("Update check failed: {}", e));
+                                push_event(
+                                    &p,
+                                    json!({ "type": "update_error", "message": e }),
+                                );
+                            }
+                        }
+                        push_event(&p, json!({ "type": "update_checking", "value": false }));
+                    });
+                }
+                "install_update" => {
+                    let info_opt = parsed.update;
+                    thread::spawn(move || {
+                        let info = match info_opt {
+                            Some(i) => i,
+                            None => match updater::check_for_update() {
+                                Ok(i) => i,
+                                Err(e) => {
+                                    push_log(&p, LogLevel::Error, &format!("UPDATE FAILED: {}", e));
+                                    push_event(&p, json!({ "type": "alert", "title": "Update Failed", "body": e }));
+                                    return;
+                                }
+                            },
+                        };
+                        push_event(&p, json!({ "type": "busy", "value": true }));
+                        match updater::download_and_apply_update(
+                            &info,
+                            |m, l| push_log(&p, l, m),
+                            |cur, tot, st| {
+                                push_event(&p, json!({ "type": "progress", "current": cur, "total": tot, "stage": st }));
+                            },
+                        ) {
+                            Ok(_) => {
+                                thread::sleep(Duration::from_millis(350));
+                                let _ = p.send_event(UserEvent::CloseWindow);
+                            }
+                            Err(e) => {
+                                push_log(&p, LogLevel::Error, &format!("UPDATE FAILED: {}", e));
+                                push_event(&p, json!({ "type": "busy", "value": false }));
+                                let title = match lang {
+                                    PatchLang::Id => "Auto-Update Gagal",
+                                    PatchLang::En => "Auto-Update Failed",
+                                };
+                                push_event(&p, json!({ "type": "alert", "title": title, "body": e }));
+                            }
+                        }
+                    });
+                }
+                "open_url" => {
+                    if let Some(u) = parsed.url {
+                        let _ = updater::open_safe_release_url(&u);
+                    }
                 }
                 _ => {}
             }
