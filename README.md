@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.2.1`)
+# Ruza-Lang (`v0.3.0`)
 
 [![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
 
@@ -13,12 +13,12 @@ An educational desktop localization & asset-repacking study project demonstratin
 
 ---
 
-## What's New in `v0.2.1`
+## What's New in `v0.3.0`
 
-- **UI Fit Pass (Anti-Overlap & Anti-Truncation for `EN` & `ID`):**
-  - Tightened overflowing quick-menu labels (`Kibo Dex`, `Astral Garden`, `Achievements`, `Pammy Post`, `Farm HQ`, `Dorm`), Event sidebar tabs (`Departure Bonus`, `Little Hero`, `Sprout Journey`, `Origin Starlight`, `Star Journey Log`, etc.), Star Journey chapter headers (`Star Path: Intro` / `Ch. 1–5`), and Event banner descriptions so text no longer overlaps neighboring UI or truncates with `...`.
-  - Applied conservative TextMeshPro `<size=80%>` auto-scaling across ultra-wide short prefab labels in `Static UI KeyConfig` (`116` EN / `50` ID labels) plus `30` hand-crafted Static UI shortenings while keeping exact file byte sizes.
-- **Dedicated `Translate News (EN / ID)` Button (from `v0.2.0`):** Translates **16 cached in-game announcement HTML pages** (`AppData\LocalLow\...\HTTPCache`) into **English** or **Bahasa Indonesia** with automatic `_NewsPatchBackup\` rollback and `ETag`/`Last-Modified` preservation.
+- **Celestial Parchment UI Redesign:** Completely rebuilt the desktop GUI away from generic dark neon cards into a clean, light fantasy-RPG parchment & champagne-gold aesthetic with astrolabe filigree, charcoal section ribbons, diamond milestone progress bar, porcelain capsule buttons, and matching light Windows titlebar.
+- **Includes all `v0.2.1` & `v0.2.0` upgrades:**
+  - **UI Fit Pass (`EN` & `ID`):** Tightened quick-menu labels, event sidebar tabs, chapter headers, and banner descriptions + conservative TextMeshPro `<size=80%>` scaling on ultra-wide short prefab labels (`116` EN / `50` ID) to prevent overlap and `...` truncation.
+  - **Dedicated `Translate News (EN / ID)` Button:** Translates **16 cached in-game announcement HTML pages** (`AppData\LocalLow\...\HTTPCache`) with automatic `_NewsPatchBackup\` rollback and `ETag`/`Last-Modified` preservation.
 
 ---
 

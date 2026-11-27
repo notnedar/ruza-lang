@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build & publish (e.g. v0.2.1)"
+        description: "Release tag to build & publish (e.g. v0.3.0)"
         required: true
-        default: "v0.2.1"
+        default: "v0.3.0"
 
 permissions:
   contents: write
@@ -101,7 +101,8 @@ jobs:
           ![Settings Menu](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-en.jpg)
 
           ### Highlights / Fitur Utama
-          - **UI Fit Pass (`v0.2.1`):** Tightened quick-menu labels, event sidebar tabs, chapter headers, and banner descriptions + conservative TextMeshPro `<size=XX%>` scaling on ultra-wide short prefab labels (`EN` & `ID`) to prevent overlap and `...` truncation.
+          - **Celestial Parchment UI Redesign (`v0.3.0`):** Rebuilt desktop GUI with a light parchment, champagne-gold & charcoal ribbon aesthetic, astrolabe filigree, diamond milestone progress bar, and light Windows titlebar.
+          - **UI Fit Pass (`v0.2.1`):** Tightened quick-menu labels, event sidebar tabs, chapter headers, and banner descriptions + conservative TextMeshPro `<size=80%>` scaling on ultra-wide short prefab labels (`EN` & `ID`) to prevent overlap and `...` truncation.
           - **Bilingual Toggle (`EN` / `ID`):** Switch between English and Bahasa Indonesia anytime right inside the GUI.
           - **Dedicated `Translate News (EN / ID)` Button:** Translates cached in-game announcement HTML pages (`AppData\LocalLow\...\HTTPCache`) with automatic `_NewsPatchBackup\` restore on Rollback.
           - **4-Store Localization Pipeline (`77,661` strings):**

@@ -195,8 +195,8 @@ fn run_cli_scan(game_dir: &str, out_log: &str) -> i32 {
     if all_patched { 0 } else { 2 }
 }
 
-fn enable_windows_dark_titlebar(hwnd: isize) {
-    let dark: i32 = 1;
+fn enable_windows_light_titlebar(hwnd: isize) {
+    let dark: i32 = 0;
     unsafe {
         let _ = DwmSetWindowAttribute(
             hwnd as _,
@@ -221,13 +221,13 @@ fn main() {
     let proxy = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
-        .with_title("Ruza-Lang Patcher v0.2.1 — EN / ID")
+        .with_title("Ruza-Lang Patcher v0.3.0 — EN / ID")
         .with_inner_size(LogicalSize::new(920.0, 740.0))
         .with_min_inner_size(LogicalSize::new(820.0, 640.0))
         .build(&event_loop)
         .expect("Failed to create window");
 
-    enable_windows_dark_titlebar(window.hwnd());
+    enable_windows_light_titlebar(window.hwnd());
 
     // Background process guard poller (every 2 seconds)
     let poll_proxy = proxy.clone();
@@ -240,7 +240,7 @@ fn main() {
     let ipc_proxy = proxy.clone();
     let webview = WebViewBuilder::new()
         .with_html(INDEX_HTML)
-        .with_background_color((8, 12, 21, 255))
+        .with_background_color((245, 241, 232, 255))
         .with_ipc_handler(move |req| {
             let body = req.body().to_string();
             let parsed: IpcCommand = match serde_json::from_str(&body) {
@@ -253,7 +253,7 @@ fn main() {
                 "init" | "auto_detect" => {
                     thread::spawn(move || {
                         if parsed.cmd == "init" {
-                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.2.1 (EN / ID) initialized.");
+                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.3.0 (EN / ID) initialized.");
                             push_log(&p, LogLevel::Info, "Safety: Exact byte sizes preserved with SHA-256 verification.");
                         }
                         let procs = patch_engine::find_running_game_processes();
