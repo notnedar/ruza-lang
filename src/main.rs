@@ -56,7 +56,7 @@ fn run_selftest(mock_dir: &str) -> i32 {
 
         // 2. Patch EN from Original JP
         let mut last_cur = 0usize;
-        let rew_en = patch_engine::apply_patch(
+        let rew_en = patch_engine::apply_patch_for_selftest(
             &dir,
             PatchLang::En,
             |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
@@ -66,12 +66,17 @@ fn run_selftest(mock_dir: &str) -> i32 {
         let s1 = patch_engine::scan_game_folder(&dir, |m, l| {
             lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m));
         });
-        if !s1.iter().all(|x| x.state == "patched_en" && x.has_backup) {
+        for t in &s1 {
+            lines.push(format!("[EN_SHA] {} = {}", t.id, t.sha256));
+        }
+        if !patch_engine::VSTRING_EN_SHA.is_empty()
+            && !s1.iter().all(|x| x.state == "patched_en" && x.has_backup)
+        {
             return Err("Post-EN scan did not verify all 4 targets as patched_en + backed up!".into());
         }
 
         // 3. Switch directly from EN -> ID
-        let rew_id = patch_engine::apply_patch(
+        let rew_id = patch_engine::apply_patch_for_selftest(
             &dir,
             PatchLang::Id,
             |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
@@ -84,26 +89,28 @@ fn run_selftest(mock_dir: &str) -> i32 {
         for t in &s2 {
             lines.push(format!("[ID_SHA] {} = {}", t.id, t.sha256));
         }
-        if !patch_engine::STATIC_PKG_ID_SHA.is_empty()
+        if !patch_engine::VSTRING_ID_SHA.is_empty()
             && !s2.iter().all(|x| x.state == "patched_id" && x.has_backup)
         {
             return Err("Post-ID scan did not verify all 4 targets as patched_id + backed up!".into());
         }
 
         // 4. Switch directly from ID -> EN
-        let _ = patch_engine::apply_patch(
+        let _ = patch_engine::apply_patch_for_selftest(
             &dir,
             PatchLang::En,
             |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
             |_, _, _| {},
         )?;
         let s3 = patch_engine::scan_game_folder(&dir, |_, _| {});
-        if !s3.iter().all(|x| x.state == "patched_en" && x.has_backup) {
+        if !patch_engine::VSTRING_EN_SHA.is_empty()
+            && !s3.iter().all(|x| x.state == "patched_en" && x.has_backup)
+        {
             return Err("Switch ID -> EN did not verify all 4 targets as patched_en!".into());
         }
 
         // 5. Rollback to Original JP
-        let restored = patch_engine::rollback_to_original(
+        let restored = patch_engine::rollback_to_original_for_selftest(
             &dir,
             None,
             |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
@@ -119,13 +126,13 @@ fn run_selftest(mock_dir: &str) -> i32 {
         let mock_news = dir.join("_MockNewsCache");
         if mock_news.join("Library").is_file() {
             let orig_lib_sha = crypto_lz4::sha256_file(&mock_news.join("Library"))?;
-            let (en_n, en_tot) = patch_engine::patch_news_cache(
+            let (en_n, en_tot) = patch_engine::patch_news_cache_for_selftest(
                 &mock_news,
                 PatchLang::En,
                 |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
                 |_, _, _| {},
             )?;
-            let (id_n, id_tot) = patch_engine::patch_news_cache(
+            let (id_n, id_tot) = patch_engine::patch_news_cache_for_selftest(
                 &mock_news,
                 PatchLang::Id,
                 |m, l| lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m)),
@@ -214,7 +221,7 @@ fn main() {
     let proxy = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
-        .with_title("Ruza-Lang Patcher v0.2.0 — EN / ID")
+        .with_title("Ruza-Lang Patcher v0.2.1 — EN / ID")
         .with_inner_size(LogicalSize::new(920.0, 740.0))
         .with_min_inner_size(LogicalSize::new(820.0, 640.0))
         .build(&event_loop)
@@ -246,7 +253,7 @@ fn main() {
                 "init" | "auto_detect" => {
                     thread::spawn(move || {
                         if parsed.cmd == "init" {
-                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.2.0 (EN / ID) initialized.");
+                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.2.1 (EN / ID) initialized.");
                             push_log(&p, LogLevel::Info, "Safety: Exact byte sizes preserved with SHA-256 verification.");
                         }
                         let procs = patch_engine::find_running_game_processes();

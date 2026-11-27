@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.2.0`)
+# Ruza-Lang (`v0.2.1`)
 
 [![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
 
@@ -13,12 +13,12 @@ An educational desktop localization & asset-repacking study project demonstratin
 
 ---
 
-## What's New in `v0.2.0`
+## What's New in `v0.2.1`
 
-- **New Dedicated `Translate News (EN / ID)` Button:** Separate button in the GUI footer that translates **16 cached in-game announcement HTML pages** (`AppData\LocalLow\...\HTTPCache`) into **English** or **Bahasa Indonesia** following the `EN | ID` toggle.
-- **Smart HTTP Cache Sync:** Preserves original `ETag` and `Last-Modified` headers while syncing BestHTTP `Library` body lengths so the client continues receiving `304 Not Modified` and renders the translated announcement body locally.
-- **Automatic News Backup & Rollback:** Original announcement cache files are backed up automatically to `_NewsPatchBackup\` and restored alongside the 4 core client files when clicking **Rollback Original JP**.
-- **Quick Tip:** Open the in-game Announcements window once so the cache is created, close the client, then click **`Translate News (EN / ID)`**. *(Banner PNG images and sidebar tab titles are still served live; all announcement body text is translated.)*
+- **UI Fit Pass (Anti-Overlap & Anti-Truncation for `EN` & `ID`):**
+  - Tightened overflowing quick-menu labels (`Kibo Dex`, `Astral Garden`, `Achievements`, `Pammy Post`, `Farm HQ`, `Dorm`), Event sidebar tabs (`Departure Bonus`, `Little Hero`, `Sprout Journey`, `Origin Starlight`, `Star Journey Log`, etc.), Star Journey chapter headers (`Star Path: Intro` / `Ch. 1–5`), and Event banner descriptions so text no longer overlaps neighboring UI or truncates with `...`.
+  - Applied conservative TextMeshPro `<size=80%>` auto-scaling across ultra-wide short prefab labels in `Static UI KeyConfig` (`116` EN / `50` ID labels) plus `30` hand-crafted Static UI shortenings while keeping exact file byte sizes.
+- **Dedicated `Translate News (EN / ID)` Button (from `v0.2.0`):** Translates **16 cached in-game announcement HTML pages** (`AppData\LocalLow\...\HTTPCache`) into **English** or **Bahasa Indonesia** with automatic `_NewsPatchBackup\` rollback and `ETag`/`Last-Modified` preservation.
 
 ---
 
@@ -34,9 +34,13 @@ An educational desktop localization & asset-repacking study project demonstratin
 | :---: | :---: |
 | ![English UI](docs/screenshot-en.png) | ![Indonesian UI](docs/screenshot-id.png) |
 
-### In-Game Sample (`EN`)
+### In-Game Samples (`EN`)
 
-![In-Game Translation Sample](docs/sample-ingame-en.jpg)
+| Character Screen | Star Journey Record |
+| :---: | :---: |
+| ![Character Screen Sample](docs/sample-ingame-character.jpg) | ![Star Journey Record Sample](docs/sample-ingame-journey.jpg) |
+
+![Settings Menu Sample](docs/sample-ingame-en.jpg)
 
 ---
 

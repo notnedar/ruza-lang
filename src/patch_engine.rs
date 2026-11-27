@@ -36,16 +36,16 @@ pub const STATIC_UI_ORIG_SHA: &str = "701F04842F5156DA177BD4946A1CF9B7C055F2A614
 pub const STATIC_PKG_ORIG_SHA: &str = "C7C80B98B263F161583A2AB52A5B7039636ACBABCAC8C365F9F37224D11BC4B3";
 pub const RESOURCES_ORIG_SHA: &str = "DF93CE7192D6A46B33350204349E66A45E410124E3057224AD1A17E6F24B115B";
 
-// Verified English (EN) SHA-256 hashes
-pub const VSTRING_EN_SHA: &str = "A9CE30D29D6732082DBFBC6396235AB1B1CBF7C3F1DA7B8B242A0CF2A054568F";
-pub const STATIC_UI_EN_SHA: &str = "DD53323A2B633794697CB156765F25D79FE17FADE0A66B948EF60419ABC439CF";
-pub const STATIC_UI_EN_SHA_ALT: &str = "247ED9132492736069AE4C9BC99721D0B04C127BAB9326474F124C96A9D41B73";
+// Verified English (EN) SHA-256 hashes (v0.2.1 UI Fit Pass)
+pub const VSTRING_EN_SHA: &str = "D57E7F499EF6737FF7AB0F957921C626D689CF6A5D612966C2483BC28D54F1CB";
+pub const STATIC_UI_EN_SHA: &str = "40B7950BB70692BF0EBE2B536B7A202EA993DEDE0481E262762DE3A27AE449F9";
+pub const STATIC_UI_EN_SHA_ALT: &str = "";
 pub const STATIC_PKG_EN_SHA: &str = "7FEB394BD2FEAC1F8FC862A1254CD954EDC1D49544DE285D3E6D9C914755F33E";
 pub const RESOURCES_EN_SHA: &str = "C95E1A2C5C5977E105022B49266D3E2E32173A0E1F4E75BD807C7A93A9299883";
 
-// Verified Bahasa Indonesia (ID) SHA-256 hashes
-pub const VSTRING_ID_SHA: &str = "811056084E1343071290498581CCAA8A547C6F6045C858C8A80C9F690F9A86A8";
-pub const STATIC_UI_ID_SHA: &str = "3898E72ABC60606862D46B66B71048DE34FCA0B421CEA37A94974D1B3454C81C";
+// Verified Bahasa Indonesia (ID) SHA-256 hashes (v0.2.1 UI Fit Pass)
+pub const VSTRING_ID_SHA: &str = "B968C8F97791B704CC50877C1B388F9C81C022B285A9244BEDD2ED9B59EB7AC3";
+pub const STATIC_UI_ID_SHA: &str = "8E69653B7EEC783B5235036374601BF248A2DF5A76337BA8DBC58CB5803FBF0B";
 pub const STATIC_PKG_ID_SHA: &str = "3EBE582B61D995108E1DA1F333D102B6218A5C9D33E03C931CB7EEEE585DC1FC";
 pub const RESOURCES_ID_SHA: &str = "85FADFAAC9708C845803FA438C5C2AA634A798FAE48405C9FC40953B4A7772A2";
 
@@ -435,7 +435,47 @@ fn load_string_dict(gz: &[u8]) -> Result<HashMap<String, String>, String> {
     Ok(map)
 }
 
+fn ensure_no_running_game_processes(action: &str) -> Result<(), String> {
+    let procs = find_running_game_processes();
+    if !procs.is_empty() {
+        let s = procs
+            .iter()
+            .map(|p| format!("{} (PID {})", p.name, p.pid))
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(format!("Blocked: {} is currently running. Close it before {}!", s, action));
+    }
+    Ok(())
+}
+
 pub fn apply_patch<L, P>(
+    game_dir: &Path,
+    lang: PatchLang,
+    log: L,
+    on_progress: P,
+) -> Result<usize, String>
+where
+    L: FnMut(&str, LogLevel),
+    P: FnMut(usize, usize, &str),
+{
+    ensure_no_running_game_processes("patching")?;
+    apply_patch_inner(game_dir, lang, log, on_progress)
+}
+
+pub fn apply_patch_for_selftest<L, P>(
+    game_dir: &Path,
+    lang: PatchLang,
+    log: L,
+    on_progress: P,
+) -> Result<usize, String>
+where
+    L: FnMut(&str, LogLevel),
+    P: FnMut(usize, usize, &str),
+{
+    apply_patch_inner(game_dir, lang, log, on_progress)
+}
+
+fn apply_patch_inner<L, P>(
     game_dir: &Path,
     lang: PatchLang,
     mut log: L,
@@ -445,16 +485,6 @@ where
     L: FnMut(&str, LogLevel),
     P: FnMut(usize, usize, &str),
 {
-    let procs = find_running_game_processes();
-    if !procs.is_empty() {
-        let s = procs
-            .iter()
-            .map(|p| format!("{} (PID {})", p.name, p.pid))
-            .collect::<Vec<_>>()
-            .join(", ");
-        return Err(format!("Blocked: {} is currently running. Close it first!", s));
-    }
-
     let bak_dir = game_dir.join("_ENPatchBackup");
     fs::create_dir_all(&bak_dir).map_err(|e| format!("Failed creating backup dir: {}", e))?;
 
@@ -796,7 +826,7 @@ where
     let u0 = bundle.blocks[0].u_size;
     let u1 = bundle.blocks[1].u_size;
     let total_budget = SUB_SIZE - bundle.data_start;
-    let mut c0 = lz4_compress(&new_sf[..u0], 256);
+    let mut c0 = lz4_compress(&new_sf[..u0], 1024);
     let mut c1 = lz4_compress_exact(&new_sf[u0..u0 + u1], total_budget - c0.len(), 1024)?;
     bundle.cipher.encrypt_block_in_place(&mut c0, 0);
     bundle.cipher.encrypt_block_in_place(&mut c1, 1);
@@ -1133,6 +1163,33 @@ where
 pub fn rollback_to_original<L, P>(
     game_dir: &Path,
     news_cache_dir: Option<&Path>,
+    log: L,
+    on_progress: P,
+) -> Result<usize, String>
+where
+    L: FnMut(&str, LogLevel),
+    P: FnMut(usize, usize, &str),
+{
+    ensure_no_running_game_processes("rollback")?;
+    rollback_to_original_inner(game_dir, news_cache_dir, log, on_progress)
+}
+
+pub fn rollback_to_original_for_selftest<L, P>(
+    game_dir: &Path,
+    news_cache_dir: Option<&Path>,
+    log: L,
+    on_progress: P,
+) -> Result<usize, String>
+where
+    L: FnMut(&str, LogLevel),
+    P: FnMut(usize, usize, &str),
+{
+    rollback_to_original_inner(game_dir, news_cache_dir, log, on_progress)
+}
+
+fn rollback_to_original_inner<L, P>(
+    game_dir: &Path,
+    news_cache_dir: Option<&Path>,
     mut log: L,
     mut on_progress: P,
 ) -> Result<usize, String>
@@ -1140,16 +1197,6 @@ where
     L: FnMut(&str, LogLevel),
     P: FnMut(usize, usize, &str),
 {
-    let procs = find_running_game_processes();
-    if !procs.is_empty() {
-        let s = procs
-            .iter()
-            .map(|p| format!("{} (PID {})", p.name, p.pid))
-            .collect::<Vec<_>>()
-            .join(", ");
-        return Err(format!("Blocked: {} is currently running. Close it before rollback!", s));
-    }
-
     let bak_dir = game_dir.join("_ENPatchBackup");
     let targets = scan_game_folder(game_dir, |_, _| {});
     let total = targets.len();
@@ -1344,6 +1391,33 @@ fn update_http_content_length(hdr_bytes: &[u8], new_len: usize) -> Vec<u8> {
 pub fn patch_news_cache<L, P>(
     cache_base: &Path,
     lang: PatchLang,
+    log: L,
+    on_progress: P,
+) -> Result<(usize, usize), String>
+where
+    L: FnMut(&str, LogLevel),
+    P: FnMut(usize, usize, &str),
+{
+    ensure_no_running_game_processes("translating news")?;
+    patch_news_cache_inner(cache_base, lang, log, on_progress)
+}
+
+pub fn patch_news_cache_for_selftest<L, P>(
+    cache_base: &Path,
+    lang: PatchLang,
+    log: L,
+    on_progress: P,
+) -> Result<(usize, usize), String>
+where
+    L: FnMut(&str, LogLevel),
+    P: FnMut(usize, usize, &str),
+{
+    patch_news_cache_inner(cache_base, lang, log, on_progress)
+}
+
+fn patch_news_cache_inner<L, P>(
+    cache_base: &Path,
+    lang: PatchLang,
     mut log: L,
     mut on_progress: P,
 ) -> Result<(usize, usize), String>
@@ -1351,16 +1425,6 @@ where
     L: FnMut(&str, LogLevel),
     P: FnMut(usize, usize, &str),
 {
-    let procs = find_running_game_processes();
-    if !procs.is_empty() {
-        let s = procs
-            .iter()
-            .map(|p| format!("{} (PID {})", p.name, p.pid))
-            .collect::<Vec<_>>()
-            .join(", ");
-        return Err(format!("Blocked: {} is currently running. Close it first!", s));
-    }
-
     let lib_path = cache_base.join("Library");
     let hc_dir = cache_base.join("HTTPCache");
     if !lib_path.is_file() || !hc_dir.is_dir() {
