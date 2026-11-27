@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.9.0`)
+# Ruza-Lang (`v0.9.1`)
 
 🌐 **Language:** **English** | [Bahasa Indonesia (`README_ID.md`)](README_ID.md)
 
@@ -15,9 +15,11 @@ An educational localization & asset-repacking suite demonstrating exact-size str
 
 ---
 
-## What's New in `v0.9.0`
+## What's New in `v0.9.1`
 
-- **Hotfix-Proof Universal Engine (`PC` & `Android`):**
+- **Clean Single-Line Gacha Buttons (`EN` & `ID`):** Fixed truncated and 3-line wrapped Gacha UI labels (`1x Observation` → `1x Observe`, `10 Observations` → `<size=88%>10x Observe</size>`, `ID` `<size=82%>1x Observasi</size>` / `<size=76%>10x Observasi</size>`, `Startrail Exchange` → `Exchange` / `Penukaran`, and `Observation Details` → `Details` / `Detail`).
+- **Android Shizuku Reliability & HyperOS / ColorOS Setup Guide:** Polls Shizuku `UserService` connection up to `2s`, auto-rescans upon returning from Shizuku, logs OEM permission diagnostics if bind times out, and includes Xiaomi/POCO (HyperOS/MIUI) & OPPO/Realme setup steps inside the in-app Setup Guide.
+- **Hotfix-Proof Universal Engine & Full `r3273853` / `r3273851` Support (`v0.9.0`):**
   - **Dynamic Bundle Auto-Discovery:** Automatically locates the active `VStringPool` (`raw_base_package`) and `Static UI KeyConfig` (`default_package`, via constant Unity CAB signature) `.r` files on both PC and Android (Shizuku, SAF, Direct, and ADB) — zero hardcoded `.r` filenames or sub-bundle byte offsets!
   - **Universal Content-Hash Matching (`RZV2`):** Matches all **`76,180`** `VStringPool` strings by `FNV-1a64` content hash + byte length with dynamic contiguous span repacking across builds (`r3219596`, `r3219598`, `r3273851`, `r3273853`, and future resource hotfixes!) — removing the legacy platform remap table completely.
   - **Smart Hotfix Version Sync:** Automatically syncs compatible resource hotfixes (eliminating false `Client Version Mismatch` popups on `r3273851` / `r3273853` and future minor hotfixes) while preserving per-bundle state tracking (`_ruza_state.json`) and `<bundle>.original` backups.

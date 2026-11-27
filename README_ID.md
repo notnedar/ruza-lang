@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.9.0`)
+# Ruza-Lang (`v0.9.1`)
 
 🌐 **Bahasa:** [English (`README.md`)](README.md) | **Bahasa Indonesia**
 
@@ -15,9 +15,11 @@ Suite lokalisasi & asset-repacking edukasional dengan ukuran byte identik (**Bah
 
 ---
 
-## Yang Baru di `v0.9.0`
+## Yang Baru di `v0.9.1`
 
-- **Engine Universal Anti-Hotfix (`PC` & `Android`):**
+- **Perbaikan Tombol UI Gacha Anti-Kepotong (`EN` & `ID`):** Memperbaiki tombol Gacha yang sebelumnya kepotong / jebol 3 baris (`1x Observation` → `1x Observe`, `10 Observations` → `<size=88%>10x Observe</size>`, `ID` `<size=82%>1x Observasi</size>` / `<size=76%>10x Observasi</size>`, `Startrail Exchange` → `Exchange` / `Penukaran`, serta `Observation Details` → `Details` / `Detail`).
+- **Peningkatan Koneksi Shizuku & Panduan HyperOS / ColorOS di APK:** Menambah waktu tunggu koneksi `UserService` Shizuku hingga `2 detik`, auto-rescan otomatis saat kembali dari aplikasi Shizuku, log diagnosa izin OEM jika gagal terhubung, serta panduan khusus Xiaomi/POCO (HyperOS/MIUI) & OPPO/Realme langsung di dalam *Setup Guide* APK.
+- **Engine Universal Anti-Hotfix (`v0.9.0` · `PC` & `Android`):**
   - **Auto-Discovery Bundle Dinamis:** Otomatis mendeteksi file `.r` aktif untuk `VStringPool` (`raw_base_package`) dan `Static UI KeyConfig` (`default_package`, lewat signature Unity CAB) di PC maupun Android (Shizuku, SAF, Direct, dan ADB) — tidak lagi bergantung pada nama file `.r` atau offset hardcoded!
   - **Matching Berbasis Content-Hash Universal (`RZV2`):** Mencocokkan seluruh **`76.180`** string `VStringPool` menggunakan hash `FNV-1a64` + panjang byte dengan dynamic contiguous span repacking — otomatis jalan mulus di `r3219596`, `r3219598`, `r3273851`, `r3273853`, hingga hotfix resource berikutnya!
   - **Smart Hotfix Version Sync:** Otomatis menyinkronkan hotfix resource yang kompatibel (tidak ada lagi popup palsu *Client Version Mismatch* di `r3273851` / `r3273853`+) sambil menyimpan status per-bundle (`_ruza_state.json`) dan backup `<nama_bundle>.original`.

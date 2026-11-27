@@ -233,8 +233,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Auto re-check after returning from App Info (Force Stop) so Install Patch unlocks immediately
-        if (hasScannedOnce && lastDetectedRunning && !scanBusy) {
+        // Auto re-check after returning from App Info (Force Stop) or Shizuku app
+        if (hasScannedOnce && !scanBusy && (lastDetectedRunning || bridge.shizukuService == null)) {
+            if (isShizukuGranted() && bridge.shizukuService == null) {
+                bindShizukuIfReady()
+            }
             triggerScanAsync()
         }
     }
@@ -362,7 +365,17 @@ class MainActivity : AppCompatActivity() {
             try {
                 if (isShizukuGranted() && bridge.shizukuService == null) {
                     runOnUiThread { bindShizukuIfReady() }
-                    Thread.sleep(350)
+                    var waited = 0
+                    while (bridge.shizukuService == null && waited < 2000) {
+                        Thread.sleep(100)
+                        waited += 100
+                    }
+                    if (bridge.shizukuService == null) {
+                        pushLog(
+                            LogLevel.WARN,
+                            "Shizuku permission is granted, but file service did not connect. On Xiaomi/POCO (HyperOS/MIUI) enable 'USB debugging (Security settings)'; on OPPO/Realme enable 'Disable permission monitoring', then restart Shizuku.",
+                        )
+                    }
                 }
                 val snap = bridge.scan(
                     shizukuInstalled = isShizukuInstalled(),

@@ -30,9 +30,9 @@ class PatchEngineTest {
         assertEquals(target, exact.size)
         assertTrue(CryptoLz4.lz4Decompress(exact, sample.size).contentEquals(sample))
 
-        assertTrue(UpdateChecker.isNewer("v0.9.0", "0.8.1"))
-        assertTrue(!UpdateChecker.isNewer("v0.9.0", "0.9.0"))
-        assertTrue(!UpdateChecker.isNewer("v0.8.1", "0.9.0"))
+        assertTrue(UpdateChecker.isNewer("v0.9.1", "0.9.0"))
+        assertTrue(!UpdateChecker.isNewer("v0.9.1", "0.9.1"))
+        assertTrue(!UpdateChecker.isNewer("v0.9.0", "0.9.1"))
     }
 
     @Test
@@ -92,13 +92,13 @@ class PatchEngineTest {
                 for ((lang, expVs, expUi) in listOf(
                     Triple(
                         PatchLang.EN,
-                        "3216E4E2A56F2BC36EAA2FFF79B203C854FA834A93A97C2CA218B40E909FF5F1",
-                        "2A4428AE21009DB19621A123B1A2561ED1F83A685B4C9160B94BA74CD50E8DAC",
+                        "2124FBF99624837DD6C36F0712EDB573ACFDE62DAC304FEF87678E6B91EDE1FF",
+                        "EB18599A3513CDF558F4716E0B70DEA233CAC9076D50BA6EFEB0D7958C87F01B",
                     ),
                     Triple(
                         PatchLang.ID,
-                        "EBC5EE0155910A58D3B62AB978A886CCD1BA4FA68F4CE929B7763E32454531DE",
-                        "60F0B86F98FCA84D46AE1AD7531510320812972D5371F80FC358860B660BC308",
+                        "43DA80F93DACA269313BCBF0B6D14BC3685F25AE479806419DFF848E24AD7150",
+                        "10939AD972515B9A6DF118AC5D7ADA99BBA7F0C0FBF54FCAE79698987B7EE59B",
                     ),
                 )) {
                     val vsBuf = vsOrigFile.readBytes()
@@ -124,12 +124,12 @@ class PatchEngineTest {
                 val vsBuf = vsOrigFile.readBytes()
                 val vsCnt = PatchEngine.patchAndroidVStringInPlace(vsBuf, loader, PatchLang.EN, { _, _ -> }, esPack) { _, _ -> }
                 assertEquals(74058, vsCnt)
-                assertNotEquals("3216E4E2A56F2BC36EAA2FFF79B203C854FA834A93A97C2CA218B40E909FF5F1", CryptoLz4.sha256Bytes(vsBuf))
+                assertNotEquals("2124FBF99624837DD6C36F0712EDB573ACFDE62DAC304FEF87678E6B91EDE1FF", CryptoLz4.sha256Bytes(vsBuf))
 
                 val (uiOut, uiCnt) = PatchEngine.patchAndroidStaticUiBytes(uiOrig, foundUi.first, loader, PatchLang.EN, esPack) { _, _ -> }
                 assertEquals(3135, uiCnt)
                 assertEquals(uiOrig.size, uiOut.size)
-                assertNotEquals("2A4428AE21009DB19621A123B1A2561ED1F83A685B4C9160B94BA74CD50E8DAC", CryptoLz4.sha256Bytes(uiOut))
+                assertNotEquals("EB18599A3513CDF558F4716E0B70DEA233CAC9076D50BA6EFEB0D7958C87F01B", CryptoLz4.sha256Bytes(uiOut))
             }
         }
 
@@ -148,13 +148,13 @@ class PatchEngineTest {
                 for ((lang, expVs, expUi) in listOf(
                     Triple(
                         PatchLang.EN,
-                        "9C4283483E66F334929C92E620BB1A7345E83CBF10DF29DF4BD17CBB20687F05",
-                        "B0CF69FFF31ACB0D3D9D6B9A267D0C16B15A64FBE9E27E9FA93CF7468DDDF11C",
+                        "D3749817194F947BE336AE855300EF9AE8CB59CCA6EC2B18D85AA93A006589D8",
+                        "7900C693A5C922A52B376AB3B62D03DA18E5C03E446B812D1D49CE3DA3FD6683",
                     ),
                     Triple(
                         PatchLang.ID,
-                        "5B0C27CBBA77FD7B9BCAC0D4A263177FCAEFE7FAEBB20A1516BA802028183D4A",
-                        "6A64B6FCEAA1C42264F966A1870F4A36E8B1044D93EF1DFDCA046F0617E7FE5F",
+                        "2FC141815581A91928C2B8E730666D7EC6A831E0F7B3C59F0B85C8D78BF57433",
+                        "DE9E6053428625B8CC78E4C126EB8BDDB41A4B5E5D895FD7FE14C5A37CE59336",
                     ),
                 )) {
                     val vsBuf = vs3273.readBytes()

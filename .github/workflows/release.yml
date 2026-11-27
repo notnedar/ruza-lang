@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build & publish (e.g. v0.9.0)"
+        description: "Release tag to build & publish (e.g. v0.9.1)"
         required: true
-        default: "v0.9.0"
+        default: "v0.9.1"
 
 permissions:
   contents: write
@@ -204,7 +204,11 @@ jobs:
           ![Settings Menu](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-en.jpg)
 
           ### Highlights / Fitur Utama
-          - **NEW — Hotfix-Proof Universal Engine & Full \`r3273853\` / \`r3273851\` Support (\`v0.9.0\`):**
+          - **NEW — Gacha UI Fit Fixes & Android HyperOS Shizuku Improvements (\`v0.9.1\`):**
+            - **Clean Single-Line Gacha Buttons (\`EN\` & \`ID\`):** Fixed truncated/wrapped Gacha buttons — \`1x Observation\` → \`1x Observe\`, \`10 Observations\` → \`<size=88%>10x Observe</size>\` (plus fitted \`ID\` \`<size=82%>1x Observasi</size>\` / \`<size=76%>10x Observasi</size>\`), \`Startrail Exchange\` → \`Exchange\` / \`Penukaran\`, and \`Observation Details\` → \`Details\` / \`Detail\`.
+            - **Improved Android Shizuku Auto-Bind & Setup Guide:** Polls Shizuku \`UserService\` connection up to \`2s\` (fixes slow binds on Xiaomi/POCO HyperOS & ColorOS), auto-rescans when returning from the Shizuku app, logs actionable permission tips on bind timeout, and adds Xiaomi/POCO HyperOS & OPPO/Realme instructions right inside the in-app Setup Guide.
+            - **Indonesian Documentation (\`README_ID.md\`):** Full Indonesian guide with top-of-page language switcher.
+          - **Hotfix-Proof Universal Engine & Full \`r3273853\` / \`r3273851\` Support (\`v0.9.0\`):**
             - **Dynamic Bundle Auto-Discovery (\`PC\` & \`Android\`):** Automatically finds active \`VStringPool\` and \`Static UI KeyConfig\` \`.r\` bundles with zero hardcoded filenames or sub-bundle offsets across PC, Android ADB, Shizuku, SAF, and Direct Storage.
             - **Universal Content-Hash Matching (\`RZV2\`):** Matches all **\`76,180\`** \`VStringPool\` strings by \`FNV-1a64\` content hash + byte length with dynamic contiguous span repacking — works seamlessly across \`r3219596\`, \`r3219598\`, \`r3273851\`, \`r3273853\`, and future resource hotfixes!
             - **Smart Hotfix Version Sync:** Eliminates false \`Client Version Mismatch\` popups on compatible resource hotfixes (\`r3273851\` / \`r3273853\`+) with per-bundle \`_ruza_state.json\` tracking (including \`Custom OK\` state for custom packs) and \`<bundle>.original\` backups.
