@@ -3,7 +3,7 @@
 Welcome to **Ruza-Lang**! Here are the easiest ways to use custom translations or contribute your language:
 
 1. **[Fastest Way: Tell Your AI Agent / LLM to Do It](#1-fastest-way-tell-your-ai-agent--llm-to-do-it)** — we live in the present age where LLMs are actually good at this, **use it.** Point your coding agent, Gemini, or ChatGPT at this repo and let it generate & validate a language pack in minutes.
-2. **[Bring Your Own Language Pack (No Coding Required)](#2-bring-your-own-language-pack-byol)** — load any `.json` pack directly in **`RuzaLangPatcher.exe`** (Windows PC + Android ADB) or **`RuzaLangPatcher.apk`** (Standalone Android, 100% offline!).
+2. **[Bring Your Own Language Pack (Manual / BYOL)](#2-bring-your-own-language-pack-byol)** — if you love living in the past and insist on hand-writing every line like a medieval scribe (or you already have a `.json` pack ready from Step 1), load it directly in **`RuzaLangPatcher.exe`** (Windows PC + Android ADB) or **`RuzaLangPatcher.apk`** (Standalone Android, 100% offline!).
 3. **[Contribute Translations via Pull Request](#3-contributing-translations-to-the-repository)** — submit `EN`/`ID` fixes, anti-wrap UI tweaks, or a full community language pack!
 
 ---
@@ -44,6 +44,9 @@ Translate the UI labels and combat terms into natural, concise <TARGET LANGUAGE>
 ---
 
 ## 2. Bring Your Own Language Pack (BYOL)
+
+> *"If you love living in the past and still prefer writing your own files by hand like a medieval scribe carving stone tablets — respect, use this method."*
+> *(Also the exact 3-step way to load the `.json` pack your AI agent just generated for you in Step 1!)*
 
 You do **not** need to compile anything to run your own language (Spanish, Portuguese, French, German, Vietnamese, Thai, Russian, Arabic, Traditional Chinese, Korean, custom meme pack, or personal wording tweaks).
 
