@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.3.0`)
+# Ruza-Lang (`v0.4.0`)
 
 [![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
 
@@ -13,9 +13,9 @@ An educational desktop localization & asset-repacking study project demonstratin
 
 ---
 
-## What's New in `v0.3.0`
+## What's New in `v0.4.0`
 
-- **Celestial Parchment UI Redesign:** Completely rebuilt the desktop GUI away from generic dark neon cards into a clean, light fantasy-RPG parchment & champagne-gold aesthetic with astrolabe filigree, charcoal section ribbons, diamond milestone progress bar, porcelain capsule buttons, and matching light Windows titlebar.
+- **Frameless PC Game Launcher Overhaul:** Rebuilt from scratch as a clean `960×580` frameless desktop launcher with Windows 11 native rounded corners, custom draggable top bar (`—` / geometric `✕`), slim frosted navigation rail (`Home` · `Files` · `News` · `Log` + `EN`/`ID` switch), original painted scenic sky-observatory hero canvas, seamless bottom action dock with prominent **Install Patch** CTA + **Translate News**, and serene frosted-glass sub-pages for package verification, news cache info, and execution logs.
 - **Includes all `v0.2.1` & `v0.2.0` upgrades:**
   - **UI Fit Pass (`EN` & `ID`):** Tightened quick-menu labels, event sidebar tabs, chapter headers, and banner descriptions + conservative TextMeshPro `<size=80%>` scaling on ultra-wide short prefab labels (`116` EN / `50` ID) to prevent overlap and `...` truncation.
   - **Dedicated `Translate News (EN / ID)` Button:** Translates **16 cached in-game announcement HTML pages** (`AppData\LocalLow\...\HTTPCache`) with automatic `_NewsPatchBackup\` rollback and `ETag`/`Last-Modified` preservation.
@@ -56,7 +56,7 @@ An educational desktop localization & asset-repacking study project demonstratin
 - **Process Guard:** Checks whether target client/launcher processes are running and blocks patching, news translation, or rollback until they are closed.
 - **One-Click Rollback:** Saves verified original backups to `_ENPatchBackup\` (and `_NewsPatchBackup\` for cached announcements) before patching and restores exact original SHA-256 hashes anytime.
 - **Exact-Size Asset Repacking:** Preserves identical file byte sizes across all 4 targets using exact-size LZ4HC tuning and round-trip integrity checks.
-- **Live Terminal Log & Progress Counter:** Real-time rewrite counter (`0 → 77,661`) and per-target SHA-256 status badges.
+- **Live Verification Log & Progress Rail:** Real-time rewrite progress (`0 → 77,661`) along the launcher dock, per-package SHA-256 verification rows in the `Files` view, and a clean execution ledger in the `Log` view.
 
 ---
 
@@ -64,17 +64,17 @@ An educational desktop localization & asset-repacking study project demonstratin
 
 1. Make sure the target client and launcher are completely closed.
 2. Download and run `RuzaLangPatcher.exe` from [Releases](https://github.com/notnedar/ruza-lang/releases).
-3. Verify the auto-detected target directory (or click **Browse...** to select it manually).
-4. Choose **`EN`** (English) or **`ID`** (Bahasa Indonesia) in the top-right toggle.
-5. Click **Install Patch** and wait ~2 seconds for verification to complete.
+3. Check the auto-detected target folder in the bottom dock (or click the path / open **Files** to browse manually).
+4. Choose **`EN`** (English) or **`ID`** (Bahasa Indonesia) at the bottom of the left rail.
+5. Click **Install Patch** in the bottom-right dock and wait ~2 seconds for verification to complete.
 6. *(Optional)* After opening the in-game News/Announcements screen at least once, close the client and click **Translate News (`EN` / `ID`)** to translate cached in-game announcements.
-7. Click **Rollback Original JP** at any time to restore original files (including cached News if backed up).
+7. Click **Rollback JP** at any time to restore original files (including cached News if backed up).
 
 ---
 
 ## Repository Layout
 
-- `src/` — Standalone desktop application & WebView2 dark UI (`src/ui/index.html`)
+- `src/` — Standalone desktop launcher & frameless WebView2 UI (`src/ui/index.html`, `src/ui/hero.webp`)
 - `resources/` — Compressed bilingual localization payloads (`EN` + `ID`)
 - `patches/` — Human-readable JSON translation dictionaries (`EN` + `ID`)
 - `tools/` — Node.js scripts for payload packing and asset repacking research

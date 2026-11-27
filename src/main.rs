@@ -14,10 +14,27 @@ use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
 use tao::platform::windows::WindowExtWindows;
 use tao::window::WindowBuilder;
-use windows_sys::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_USE_IMMERSIVE_DARK_MODE};
+use windows_sys::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE};
 use wry::WebViewBuilder;
 
 const INDEX_HTML: &str = include_str!("ui/index.html");
+const HERO_WEBP: &[u8] = include_bytes!("ui/hero.webp");
+
+fn base64_encode(input: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(((input.len() + 2) / 3) * 4);
+    for chunk in input.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
+        let n = (b0 << 16) | (b1 << 8) | b2;
+        out.push(TABLE[((n >> 18) & 63) as usize] as char);
+        out.push(TABLE[((n >> 12) & 63) as usize] as char);
+        out.push(if chunk.len() > 1 { TABLE[((n >> 6) & 63) as usize] as char } else { '=' });
+        out.push(if chunk.len() > 2 { TABLE[(n & 63) as usize] as char } else { '=' });
+    }
+    out
+}
 
 #[derive(Deserialize)]
 struct IpcCommand {
@@ -28,6 +45,9 @@ struct IpcCommand {
 
 enum UserEvent {
     EvalJs(String),
+    DragWindow,
+    MinimizeWindow,
+    CloseWindow,
 }
 
 fn push_event(proxy: &tao::event_loop::EventLoopProxy<UserEvent>, val: serde_json::Value) {
@@ -195,13 +215,14 @@ fn run_cli_scan(game_dir: &str, out_log: &str) -> i32 {
     if all_patched { 0 } else { 2 }
 }
 
-fn enable_windows_light_titlebar(hwnd: isize) {
-    let dark: i32 = 0;
+fn enable_frameless_dwm_corners(hwnd: isize) {
+    // DWMWCP_ROUND = 2 (Windows 11 native rounded corners + subtle drop shadow on frameless windows)
+    let pref: i32 = 2;
     unsafe {
         let _ = DwmSetWindowAttribute(
             hwnd as _,
-            DWMWA_USE_IMMERSIVE_DARK_MODE as u32,
-            &dark as *const i32 as *const _,
+            DWMWA_WINDOW_CORNER_PREFERENCE as u32,
+            &pref as *const i32 as *const _,
             std::mem::size_of::<i32>() as u32,
         );
     }
@@ -221,13 +242,18 @@ fn main() {
     let proxy = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
-        .with_title("Ruza-Lang Patcher v0.3.0 — EN / ID")
-        .with_inner_size(LogicalSize::new(920.0, 740.0))
-        .with_min_inner_size(LogicalSize::new(820.0, 640.0))
+        .with_title("Ruza-Lang Patcher v0.4.0 — EN / ID")
+        .with_inner_size(LogicalSize::new(960.0, 580.0))
+        .with_decorations(false)
+        .with_resizable(false)
         .build(&event_loop)
         .expect("Failed to create window");
 
-    enable_windows_light_titlebar(window.hwnd());
+    enable_frameless_dwm_corners(window.hwnd());
+
+    // Inline the embedded WebP hero art as a data URI for standalone single-exe execution
+    let hero_uri = format!("url('data:image/webp;base64,{}')", base64_encode(HERO_WEBP));
+    let html_with_art = INDEX_HTML.replace("url('hero.webp')", &hero_uri);
 
     // Background process guard poller (every 2 seconds)
     let poll_proxy = proxy.clone();
@@ -239,8 +265,8 @@ fn main() {
 
     let ipc_proxy = proxy.clone();
     let webview = WebViewBuilder::new()
-        .with_html(INDEX_HTML)
-        .with_background_color((245, 241, 232, 255))
+        .with_html(html_with_art)
+        .with_background_color((20, 27, 38, 255))
         .with_ipc_handler(move |req| {
             let body = req.body().to_string();
             let parsed: IpcCommand = match serde_json::from_str(&body) {
@@ -250,10 +276,19 @@ fn main() {
             let p = ipc_proxy.clone();
             let lang = PatchLang::from_opt(parsed.lang.as_deref());
             match parsed.cmd.as_str() {
+                "win_drag" => {
+                    let _ = p.send_event(UserEvent::DragWindow);
+                }
+                "win_minimize" => {
+                    let _ = p.send_event(UserEvent::MinimizeWindow);
+                }
+                "win_close" => {
+                    let _ = p.send_event(UserEvent::CloseWindow);
+                }
                 "init" | "auto_detect" => {
                     thread::spawn(move || {
                         if parsed.cmd == "init" {
-                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.3.0 (EN / ID) initialized.");
+                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.4.0 (EN / ID) initialized.");
                             push_log(&p, LogLevel::Info, "Safety: Exact byte sizes preserved with SHA-256 verification.");
                         }
                         let procs = patch_engine::find_running_game_processes();
@@ -490,6 +525,15 @@ fn main() {
             } => *control_flow = ControlFlow::Exit,
             Event::UserEvent(UserEvent::EvalJs(script)) => {
                 let _ = webview.evaluate_script(&script);
+            }
+            Event::UserEvent(UserEvent::DragWindow) => {
+                let _ = window.drag_window();
+            }
+            Event::UserEvent(UserEvent::MinimizeWindow) => {
+                window.set_minimized(true);
+            }
+            Event::UserEvent(UserEvent::CloseWindow) => {
+                *control_flow = ControlFlow::Exit;
             }
             _ => {}
         }
