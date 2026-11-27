@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.6.0`)
+# Ruza-Lang (`v0.6.1`)
 
 [![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
 
@@ -13,17 +13,13 @@ An educational desktop localization & asset-repacking study project demonstratin
 
 ---
 
-## What's New in `v0.6.0`
+## What's New in `v0.6.1`
 
-- **Android (ADB) Patching Mode — No Root, No APK Re-Signing:** New dedicated **Android** tab inside the desktop launcher that patches Android devices (USB Debugging phones) and Windows Android emulators (BlueStacks, LDPlayer, MuMu, MEmu, Nox) directly over ADB:
-  - **77,190 verified strings (`99.4%` coverage):** Exact-size repacking for Android `VStringPool` (`74,055` strings via embedded remap table) and Android `Static UI KeyConfig` (`3,135` strings), plus **Android Cached News (`EN` / `ID`)** translation (`HTTPCache` + `Library v3`).
-  - **Zero APK Modification:** Patches only writable external `.res` asset bundles — keeps official APK signatures 100% intact with zero root or Shizuku required.
-  - **Full Safety Guarantees:** Auto-detects `adb.exe` / `HD-Adb.exe` (or custom browse), checks Android client version/revision sync (`v1.0.0 · r3219596`), enforces **Android Process Guard** (`pidof`), saves verified original backups to `%LOCALAPPDATA%\RuzaLang\AndroidBackups\`, uses atomic remote staging + `sha256sum` verification before swapping, and supports one-click **Rollback JP**.
-- **Built-In Auto-Updater (`v0.5.0`):** Checks [GitHub Releases](https://github.com/notnedar/ruza-lang/releases/latest) automatically on startup (plus manual **Check Updates** in **Files**), verifies downloaded binaries against official `SHA256SUMS.txt` over allowlisted HTTPS, atomically swaps the executable in-place, and relaunches automatically.
-- **Frameless PC Game Launcher UI (`v0.4.0`–`v0.4.3`):** `960×580` frameless desktop launcher with Windows 11 rounded corners, slim frosted left rail (`Home` · `Files` · `Android` · `News` · `Log` + `EN`/`ID`), always-live Home Activity Log, non-blocking Client Version Sync (`v1.0.2 · r3219598`), and clean WebView2 data isolation in `%LOCALAPPDATA%\RuzaLang\WebView2`.
-- **Includes all `v0.2.1` & `v0.2.0` upgrades:**
-  - **UI Fit Pass (`EN` & `ID`):** Tightened quick-menu labels, event sidebar tabs, chapter headers, and banner descriptions + conservative TextMeshPro `<size=80%>` scaling on ultra-wide short prefab labels (`116` EN / `50` ID).
-  - **Dedicated `Translate News (EN / ID)` Button:** Translates **16 cached in-game announcement HTML pages** (`HTTPCache` + `Library v3`) with automatic backup & `ETag`/`Last-Modified` preservation.
+- **Home Dock Platform Selector (`PC` | `Android`):** Switch directly between **PC Client** and **Android (ADB)** right from the bottom launcher dock on Home. Hero status, client version sync, progress bar, **Install Patch**, **Translate News**, and **Rollback JP** all adapt automatically to the selected platform.
+- **Smart Missing-Install & Setup Prompts:** Clearly guides you when the PC folder isn't detected (**Browse Folder** / **Auto-Scan** / **Switch to Android**) or when Android ADB / device / client app / in-game asset bundles aren't ready yet (**ADB Connect Guide** / **Choose Device** / **Browse `adb.exe`** / **Switch to PC**).
+- **Built-In ADB Connect Guide & Wireless IP Connect:** In-app bilingual (**EN** / **ID**) step-by-step guide covering **real Android phones via USB cable**, **Android 11+ Wireless Debugging (`IP:Port` connect)**, **Windows Android emulators** (BlueStacks / LDPlayer / MuMu), and a direct link to Google **Android SDK Platform-Tools**.
+- **Android (ADB) Patching Mode (`v0.6.0`):** Patches Android devices & emulators over ADB with **zero root and zero APK re-signing** — **77,190 verified strings (`99.4%`: `VStringPool` + `Static UI KeyConfig`)** plus **Android Cached News (`EN` / `ID`)**, Android Process Guard (`pidof`), PC backups in `%LOCALAPPDATA%\RuzaLang\AndroidBackups\`, atomic transfer + remote `sha256sum` verification, and one-click **Rollback JP**.
+- **Built-In Auto-Updater (`v0.5.0`):** Checks [GitHub Releases](https://github.com/notnedar/ruza-lang/releases/latest) automatically on launch (plus manual **Check Updates** in **Files**), verifies downloaded binaries against official `SHA256SUMS.txt` over allowlisted HTTPS, swaps the executable atomically in-place, and relaunches automatically.
 
 ---
 
@@ -80,13 +76,24 @@ An educational desktop localization & asset-repacking study project demonstratin
 6. *(Optional)* After opening the in-game News/Announcements screen at least once, close the client and click **Translate News (`EN` / `ID`)** to translate cached in-game announcements.
 7. Click **Rollback JP** at any time to restore original files (including cached News if backed up).
 
-### Android (Phone via USB Debugging or BlueStacks / Emulator)
+### Android (Real Phone via USB / Wi-Fi ADB, or Emulator)
+Works on **any real Android phone** (no root, no APK re-sign) as well as Windows Android emulators (BlueStacks, LDPlayer, MuMu, MEmu, Nox):
+
 1. Finish downloading the in-game additional data on Android, then **completely close the game** on your phone/emulator.
-2. Connect your Android phone with **USB Debugging** enabled (or enable **Android Debug Bridge (ADB)** in BlueStacks Settings → Advanced).
-3. Open `RuzaLangPatcher.exe`, pick **`EN`** or **`ID`** on the left rail, and open the **Android** tab.
-4. Confirm your device is listed (click **Scan**, or click **ADB** to select `adb.exe` / `HD-Adb.exe` if needed).
-5. Click **Install Patch (`EN` / `ID`)** — original bundles are backed up to `%LOCALAPPDATA%\RuzaLang\AndroidBackups\`, patched exact-size, pushed atomically, and verified via remote `sha256sum`.
-6. Click **Rollback JP** anytime to restore Android back to Original JP.
+2. **How to connect ADB:**
+   - **Real Android Phone (USB Cable — Recommended):**
+     1. Open **Settings → About Phone** and tap **Build Number** 7 times to unlock Developer Options.
+     2. Open **Settings → System → Developer Options** and enable **USB Debugging**.
+     3. Plug your phone into your PC with a data USB cable, unlock the screen, and tap **Allow** on the USB Debugging prompt.
+   - **Real Android Phone (Wi-Fi — Android 11+ Wireless Debugging):**
+     1. Enable **Developer Options → Wireless Debugging** (pair once with PC or via USB first).
+     2. In Ruza-Lang, click **ADB Guide** (`?`) → enter the `IP:Port` shown on your phone → click **Connect IP**.
+   - **Windows Emulator (BlueStacks / LDPlayer / MuMu):**
+     - Enable **Android Debug Bridge (ADB)** in emulator Settings (BlueStacks: *Settings → Advanced → ADB ON*).
+   - **No `adb.exe` on PC yet?** Download official [Google Android SDK Platform-Tools](https://developer.android.com/tools/releases/platform-tools) and extract `adb.exe` (+ DLLs) right next to `RuzaLangPatcher.exe` (or click **ADB** in the **Android** tab to pick it).
+3. Open `RuzaLangPatcher.exe`, switch the bottom dock toggle to **Android** (or open the **Android** tab), choose **`EN`** or **`ID`**, and click **Scan**.
+4. Click **Install Patch (`EN` / `ID`)** — original bundles are backed up to `%LOCALAPPDATA%\RuzaLang\AndroidBackups\`, patched exact-size, pushed atomically, and verified via remote `sha256sum`.
+5. Click **Rollback JP** anytime to restore Android back to Original JP.
 
 ---
 

@@ -47,6 +47,7 @@ struct IpcCommand {
     update: Option<updater::UpdateInfo>,
     serial: Option<String>,
     adb_path: Option<String>,
+    endpoint: Option<String>,
 }
 
 enum UserEvent {
@@ -315,20 +316,18 @@ fn run_cli_android_scan(out_log: &str) -> i32 {
         lines.push(format!("[INFO] Devices found: {}", devs.len()));
         for d in &devs {
             lines.push(format!(
-                "  - {} ({}, Android {}, state={})",
-                d.serial, d.model, d.android_ver, d.state
+                "  - {} ({}, Android {}, state={}, has_game={})",
+                d.serial, d.model, d.android_ver, d.state, d.has_game
             ));
         }
-        if let Some(dev) = devs
-            .iter()
-            .find(|d| d.state == "device" && d.has_game)
-            .or_else(|| devs.iter().find(|d| d.state == "device"))
-        {
+        // Scan every ready device so CLI testing shows both installed & uninstalled devices cleanly
+        for dev in devs.iter().filter(|d| d.state == "device") {
             let scan = adb::scan_android_device(&adb_bin, &dev.serial, |m, l| {
                 lines.push(format!("[{}] {}", l.as_str().to_uppercase(), m));
             })?;
             lines.push(format!(
-                "[OK] Installed={}, RunningPIDs={:?}, Ver={} (r{}), Status={}",
+                "[OK] Device={} Installed={} RunningPIDs={:?} Ver={} (r{}) Status={}",
+                dev.serial,
                 scan.installed,
                 scan.running_pids,
                 scan.version.detected_version,
@@ -489,7 +488,7 @@ fn main() {
     let proxy = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
-        .with_title("Ruza-Lang Patcher v0.6.0 — EN / ID")
+        .with_title("Ruza-Lang Patcher v0.6.1 — EN / ID")
         .with_inner_size(LogicalSize::new(960.0, 580.0))
         .with_decorations(false)
         .with_resizable(false)
@@ -559,7 +558,7 @@ fn main() {
                     }
                     thread::spawn(move || {
                         if is_init {
-                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.6.0 (EN / ID · PC + Android ADB) initialized.");
+                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.6.1 (EN / ID · PC + Android ADB) initialized.");
                             push_log(&p, LogLevel::Info, "Safety: Exact byte sizes preserved with SHA-256 verification.");
                         }
                         let procs = patch_engine::find_running_game_processes();
@@ -870,6 +869,43 @@ fn main() {
                     let preferred_serial = parsed.serial;
                     thread::spawn(move || {
                         do_android_detect(&p, custom_adb.as_deref(), preferred_serial.as_deref());
+                    });
+                }
+                "android_connect_ip" => {
+                    let custom_adb = parsed.adb_path;
+                    let endpoint = parsed.endpoint.unwrap_or_default();
+                    thread::spawn(move || {
+                        let Some(adb_bin) = adb::detect_adb_binary(custom_adb.as_deref()) else {
+                            let (title, body) = match lang {
+                                PatchLang::Id => (
+                                    "ADB Belum Ditemukan",
+                                    "File adb.exe / HD-Adb.exe tidak ditemukan. Unduh Android Platform-Tools atau klik tombol ADB untuk memilih file-nya.",
+                                ),
+                                PatchLang::En => (
+                                    "ADB Not Found",
+                                    "Could not locate adb.exe / HD-Adb.exe. Download Android Platform-Tools or click the ADB button to select it.",
+                                ),
+                            };
+                            push_event(&p, json!({ "type": "alert", "title": title, "body": body }));
+                            return;
+                        };
+                        push_event(&p, json!({ "type": "busy", "value": true }));
+                        push_log(&p, LogLevel::Info, &format!("Connecting ADB TCP endpoint {}...", endpoint));
+                        match adb::connect_tcp_endpoint(&adb_bin, &endpoint) {
+                            Ok(msg) => {
+                                push_log(&p, LogLevel::Ok, &format!("ADB connect: {}", msg));
+                                do_android_detect(&p, Some(&adb_bin.to_string_lossy()), Some(endpoint.trim()));
+                            }
+                            Err(e) => {
+                                push_log(&p, LogLevel::Error, &format!("ADB connect failed: {}", e));
+                                push_event(&p, json!({ "type": "busy", "value": false }));
+                                let title = match lang {
+                                    PatchLang::Id => "Gagal Konek ADB IP",
+                                    PatchLang::En => "ADB IP Connect Failed",
+                                };
+                                push_event(&p, json!({ "type": "alert", "title": title, "body": e }));
+                            }
+                        }
                     });
                 }
                 "android_browse_adb" => {

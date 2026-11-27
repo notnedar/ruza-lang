@@ -475,8 +475,10 @@ pub fn schedule_old_exe_cleanup(args: &[String]) {
 }
 
 pub fn open_safe_release_url(url: &str) -> Result<(), String> {
-    if !url.starts_with("https://github.com/notnedar/ruza-lang") {
-        return Err("Refused to open non-repository URL".into());
+    let allowed = url.starts_with("https://github.com/notnedar/ruza-lang")
+        || url == "https://developer.android.com/tools/releases/platform-tools";
+    if !allowed {
+        return Err("Refused to open non-allowlisted URL".into());
     }
     Command::new("explorer")
         .arg(url)

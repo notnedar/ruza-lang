@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Ruza-Lang Patcher v0.6.0 — EN / ID</title>
+<title>Ruza-Lang Patcher v0.6.1 — EN / ID</title>
 <style>
   :root {
     --rail-w: 68px;
@@ -616,16 +616,51 @@
   .dock-meta-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     min-width: 0;
   }
+  .mode-seg {
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    padding: 2px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    flex-shrink: 0;
+  }
+  .mode-btn {
+    height: 22px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 3.5px;
+    background: transparent;
+    color: rgba(226, 234, 244, 0.62);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+    transition: all 0.14s ease;
+    white-space: nowrap;
+  }
+  .mode-btn:hover:not(.active):not(:disabled) {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .mode-btn.active {
+    background: #f3eee2;
+    color: var(--ivory-ink);
+  }
+  .mode-btn:disabled { opacity: 0.45; cursor: not-allowed; }
   .path-strip {
     display: flex;
     align-items: center;
     gap: 6px;
     height: 28px;
-    max-width: 310px;
-    min-width: 170px;
+    max-width: 244px;
+    min-width: 154px;
+    flex: 1;
     padding: 0 6px 0 9px;
     border-radius: 5px;
     background: rgba(255, 255, 255, 0.07);
@@ -1091,6 +1126,63 @@
     cursor: pointer;
   }
   .btn-danger-pill:hover { background: #be3b42; }
+
+  /* Structured ADB Connect Guide Modal */
+  .modal.guide-modal {
+    width: 560px;
+    max-height: 548px;
+    display: flex;
+    flex-direction: column;
+    padding: 15px 19px;
+  }
+  .modal.guide-modal h3 { margin-bottom: 10px; }
+  .guide-body {
+    overflow-y: auto;
+    padding-right: 2px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .guide-card {
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(48, 58, 72, 0.12);
+    border-radius: 7px;
+    padding: 7px 11px;
+  }
+  .guide-card-title {
+    font-size: 11.8px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 3px;
+  }
+  .guide-card ol, .guide-card p {
+    margin: 0;
+    font-size: 11.2px;
+    line-height: 1.42;
+    color: var(--ink-soft);
+  }
+  .guide-card ol { padding-left: 16px; }
+  .guide-card code {
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 10.6px;
+    background: rgba(48, 58, 72, 0.08);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+  .guide-ip-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 6px;
+  }
+  .guide-ip-row .path-field {
+    flex: 1;
+    width: auto;
+    height: 29px;
+    font-size: 11.2px;
+  }
 </style>
 </head>
 <body>
@@ -1101,14 +1193,14 @@
 <div class="shell">
   <!-- LEFT SLIM LAUNCHER RAIL -->
   <aside class="rail">
-    <div class="rail-brand" data-drag="1" title="Ruza-Lang v0.6.0">
+    <div class="rail-brand" data-drag="1" title="Ruza-Lang v0.6.1">
       <div class="mark-box">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <path d="M6.5 4.5H13.8C16.4 4.5 18 6 18 8.3C18 10.3 16.7 11.7 14.5 12L18.5 19.5H15.4L11.8 12.4H9V19.5H6.5V4.5ZM9 6.8V10.3H13.4C14.7 10.3 15.5 9.6 15.5 8.5C15.5 7.4 14.7 6.8 13.4 6.8H9Z" fill="#f3eee2"/>
           <path d="M16.5 4.5L19.5 4.5L19.5 7.5" stroke="#e8d2a0" stroke-width="1.3"/>
         </svg>
       </div>
-      <span class="rail-ver">0.6.0</span>
+      <span class="rail-ver">0.6.1</span>
     </div>
 
     <nav class="rail-nav">
@@ -1220,14 +1312,22 @@
             <span id="progCount" class="dock-count">0 / 77,661</span>
           </div>
           <div class="dock-meta-row">
+            <div class="mode-seg" role="group" aria-label="Target platform">
+              <button id="modePc" class="mode-btn active" type="button">PC</button>
+              <button id="modeAndroid" class="mode-btn" type="button">Android</button>
+            </div>
             <div class="path-strip">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(220,232,244,0.65)" stroke-width="1.8"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+              <svg id="dockIconPc" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(220,232,244,0.65)" stroke-width="1.8" style="flex-shrink:0;"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+              <svg id="dockIconAndroid" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(220,232,244,0.72)" stroke-width="1.8" style="display:none;flex-shrink:0;"><rect x="6" y="3" width="12" height="18" rx="2.2"/><path d="M10.5 18h3"/></svg>
               <button id="homePathText" class="path-strip-text" type="button" title="Click to browse target folder">Detecting folder...</button>
               <button id="btnAutoQuick" class="icon-tiny" type="button" title="Auto-Scan folder">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>
               </button>
               <button id="btnScanQuick" class="icon-tiny" type="button" title="Re-inspect SHA-256 status">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M20 12a8 8 0 10-2.3 5.6M20 12V6m0 6h-6"/></svg>
+              </button>
+              <button id="btnDockGuide" class="icon-tiny" type="button" title="How to connect Android (ADB)" style="display:none;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.6 2.6 0 015 1c0 1.6-2.5 2-2.5 3.3"/><circle cx="12" cy="17.2" r="0.7" fill="currentColor"/></svg>
               </button>
             </div>
             <span class="dock-sep"></span>
@@ -1311,7 +1411,10 @@
         <div class="glass-sheet">
           <div class="sec-bar">
             <span id="lblAnDeviceSec">Android Device (ADB)</span>
-            <span id="anAdbHint" class="sec-bar-right">Auto-detects ADB / Emulator</span>
+            <div class="sec-bar-right">
+              <span id="anAdbHint">Auto-detects ADB / Emulator</span>
+              <button id="btnAnGuide" class="btn-bar-link" type="button">ADB Guide</button>
+            </div>
           </div>
           <div class="rows-block">
             <div class="set-row">
@@ -1455,11 +1558,26 @@
   </div>
 </div>
 
+<!-- ADB Connect Guide & Wireless IP Modal -->
+<div id="guideBackdrop" class="modal-backdrop">
+  <div class="modal guide-modal">
+    <h3 id="guideTitle">How to Connect Android via ADB</h3>
+    <div id="guideBody" class="guide-body"></div>
+    <div class="modal-btns">
+      <button id="btnGuideDlTools" class="btn-white" type="button">Download Platform-Tools</button>
+      <button id="btnGuideBrowseAdb" class="btn-white" type="button">Browse adb.exe</button>
+      <button id="btnGuideClose" class="btn-charcoal" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
   const $ = (id) => document.getElementById(id);
   let busy = false;
   let runningProcs = [];
   let selectedLang = 'en'; // 'en' | 'id'
+  let targetMode = 'pc';   // 'pc' | 'android'
+  let pcFolderValid = false;
   let activeTab = 'home';  // 'home' | 'packages' | 'android' | 'news' | 'log'
   let lastTargets = [];
   let clientVersion = null;
@@ -1590,7 +1708,78 @@
       anBlockedTitle: 'Close Android Client First',
       anBlockedBody: (pids) => `The Android client is currently running on the device (PID ${pids}).\n\nPlease force-close or swipe away the app on Android/BlueStacks before patching or rollback.`,
       anRollbackTitle: 'Confirm Android Rollback to Original JP',
-      anRollbackBody: (serial) => `Restore Android bundles (and cached News if backed up) on ${serial} back to Original JP?\n\nRemote SHA-256 hashes will be verified automatically after transfer.`
+      anRollbackBody: (serial) => `Restore Android bundles (and cached News if backed up) on ${serial} back to Original JP?\n\nRemote SHA-256 hashes will be verified automatically after transfer.`,
+      btnAnGuide: 'ADB Guide',
+      modePcLbl: 'PC',
+      modeAnLbl: 'Android',
+      pcMissingTitle: 'PC Client Not Found',
+      pcMissingBody: 'The PC client folder has not been detected yet.\n\nClick Browse Folder to pick your PC installation directory, run Auto-Scan, or switch to Android mode if you want to patch a phone/emulator.',
+      btnBrowseFolder: 'Browse Folder',
+      btnSwitchToAndroid: 'Switch to Android',
+      btnSwitchToPc: 'Switch to PC',
+      btnSwitchDevice: 'Choose Device',
+      btnScanAgain: 'Scan Again',
+      btnOpenGuide: 'ADB Connect Guide',
+      btnBrowseAdb: 'Browse adb.exe',
+      btnDlTools: 'Download Platform-Tools',
+      btnClose: 'Close',
+      btnConnectIp: 'Connect IP',
+      anAdbMissingTitle: 'ADB Tool Not Found',
+      anAdbMissingBody: 'Could not find adb.exe or emulator ADB (BlueStacks / LDPlayer / MuMu) on this PC.\n\nOpen the ADB Connect Guide to download official Google Platform-Tools (unzip adb.exe next to RuzaLangPatcher.exe), or click Browse adb.exe.',
+      anNoDevTitle: 'No Android Device Detected',
+      anNoDevBody: 'No Android phone or emulator is currently connected over ADB.\n\nConnect your phone with USB Debugging enabled (or start BlueStacks with ADB enabled), then click Scan Again.',
+      anUnauthTitle: 'Allow USB Debugging on Device',
+      anUnauthBody: (serial) => `Device ${serial} is connected but unauthorized/offline.\n\nUnlock your Android phone screen, tap "Allow" on the USB Debugging prompt, then click Scan Again.`,
+      anNotInstTitle: 'Android Client Not Installed',
+      anNotInstBody: (dev) => `The target Android client was not found on ${dev}.\n\nInstall the game on this device (or select another connected device in the Android tab), finish downloading the in-game data, then click Scan Again.`,
+      anDataMissTitle: 'In-Game Data Not Downloaded',
+      anDataMissBody: (dev) => `The game is installed on ${dev}, but its external asset bundles (.res) are missing.\n\nLaunch the game once on Android, finish downloading the in-game resource data, close the game completely, then click Scan Again.`,
+      heroAnScanning: 'Scanning Android device via ADB...',
+      heroAnAdbMiss: 'Android ADB not found · Click to set up',
+      heroAnNoDev: 'No Android device detected · Click to connect',
+      heroAnUnauth: (s) => `Device ${s} unauthorized · Allow USB prompt`,
+      heroAnNotInst: (m) => `Android client not installed on ${m}`,
+      heroAnDataMiss: (m) => `In-game data missing on ${m} · Download first`,
+      heroAnRunning: (pids) => `Android client running (PID ${pids}) · Close first`,
+      heroAnEnOk: 'Android English (EN) active · 2/2 bundles verified',
+      heroAnIdOk: 'Android Indonesian (ID) active · 2/2 bundles verified',
+      heroAnOrig: 'Android Original JP detected · Ready to patch',
+      heroAnMixed: 'Android partial state · Click to inspect',
+      dockPcMissing: 'PC folder not found — click to browse',
+      dockAnAdbMiss: 'ADB not found — click for guide',
+      dockAnNoDev: 'No Android device — click to connect',
+      stagePcMissing: 'PC client not detected — browse folder or run Auto-Scan.',
+      stageAnNoDev: 'Connect Android phone (USB/Wi-Fi) or emulator via ADB.',
+      stageAnNotInst: 'Android client not installed on selected device.',
+      anVerSyncedFmt: (v) => `Android ${v} · Synced`,
+      anVerMismatchFmt: (v, exp) => `Android ${v} ≠ ${exp} — Patcher update recommended`,
+      guideTitle: 'How to Connect Android via ADB',
+      guideHtml: `
+        <div class="guide-card">
+          <div class="guide-card-title">1. Real Android Phone via USB Cable (Recommended)</div>
+          <ol>
+            <li>On your phone, open <b>Settings &rarr; About Phone</b> and tap <b>Build Number</b> 7 times to unlock Developer Options.</li>
+            <li>Open <b>Settings &rarr; System &rarr; Developer Options</b> and turn ON <b>USB Debugging</b>.</li>
+            <li>Connect your phone to this PC with a data USB cable, unlock the screen, and tap <b>Allow</b> on the USB Debugging popup.</li>
+            <li>Close the game completely on your phone, then click <b>Scan</b>.</li>
+          </ol>
+        </div>
+        <div class="guide-card">
+          <div class="guide-card-title">2. Real Android Phone via Wi-Fi (Android 11+ Wireless Debugging)</div>
+          <p>In <b>Developer Options &rarr; Wireless Debugging</b>, enable it, pair with this PC once (or connect via USB first), then enter the device <code>IP:Port</code> shown on screen:</p>
+          <div class="guide-ip-row">
+            <input id="guideIpInput" class="path-field" type="text" placeholder="192.168.1.25:41235 or 127.0.0.1:5555" />
+            <button id="btnGuideConnectIp" class="btn-charcoal" type="button" style="height:30px;padding:0 14px;font-size:11.5px;">Connect IP</button>
+          </div>
+        </div>
+        <div class="guide-card">
+          <div class="guide-card-title">3. Windows Android Emulators (BlueStacks / LDPlayer / MuMu)</div>
+          <p>Enable <b>Android Debug Bridge (ADB)</b> in emulator Settings (BlueStacks: <i>Settings &rarr; Advanced &rarr; ADB ON</i>), close the game inside the emulator, then click <b>Scan</b>.</p>
+        </div>
+        <div class="guide-card">
+          <div class="guide-card-title">4. No <code>adb.exe</code> on PC yet?</div>
+          <p>Click <b>Download Platform-Tools</b> below, extract <code>adb.exe</code> + DLLs right next to <code>RuzaLangPatcher.exe</code> (or click <b>Browse adb.exe</b>). Zero root &amp; zero APK re-signing needed.</p>
+        </div>`
     },
     id: {
       navHome: 'Utama', navPackages: 'Paket', navAndroid: 'Android', navNews: 'Berita', navLog: 'Log',
@@ -1710,7 +1899,78 @@
       anBlockedTitle: 'Tutup Game di Android Dulu',
       anBlockedBody: (pids) => `Aplikasi klien masih berjalan di perangkat Android (PID ${pids}).\n\nHarap tutup dulu game di Android/BlueStacks sebelum patch atau rollback.`,
       anRollbackTitle: 'Konfirmasi Rollback Android ke Original JP',
-      anRollbackBody: (serial) => `Kembalikan semua bundle Android (dan cache News jika ada backup) di ${serial} ke Original JP?\n\nHash SHA-256 di perangkat akan diverifikasi otomatis setelah transfer.`
+      anRollbackBody: (serial) => `Kembalikan semua bundle Android (dan cache News jika ada backup) di ${serial} ke Original JP?\n\nHash SHA-256 di perangkat akan diverifikasi otomatis setelah transfer.`,
+      btnAnGuide: 'Panduan ADB',
+      modePcLbl: 'PC',
+      modeAnLbl: 'Android',
+      pcMissingTitle: 'Klien PC Belum Terdeteksi',
+      pcMissingBody: 'Folder instalasi klien PC belum ditemukan.\n\nKlik Pilih Folder untuk mencari direktori game PC secara manual, jalankan Scan Otomatis, atau pindah ke mode Android jika ingin patch HP/emulator.',
+      btnBrowseFolder: 'Pilih Folder',
+      btnSwitchToAndroid: 'Pindah ke Android',
+      btnSwitchToPc: 'Pindah ke PC',
+      btnSwitchDevice: 'Pilih Perangkat',
+      btnScanAgain: 'Scan Ulang',
+      btnOpenGuide: 'Panduan Konek ADB',
+      btnBrowseAdb: 'Pilih adb.exe',
+      btnDlTools: 'Unduh Platform-Tools',
+      btnClose: 'Tutup',
+      btnConnectIp: 'Konek IP',
+      anAdbMissingTitle: 'ADB Tidak Ditemukan',
+      anAdbMissingBody: 'File adb.exe atau ADB emulator (BlueStacks / LDPlayer / MuMu) tidak ditemukan di PC ini.\n\nBuka Panduan Konek ADB untuk mengunduh Google Platform-Tools resmi (ekstrak adb.exe di sebelah RuzaLangPatcher.exe), atau klik Pilih adb.exe.',
+      anNoDevTitle: 'Perangkat Android Belum Terdeteksi',
+      anNoDevBody: 'Belum ada HP Android atau emulator yang terhubung lewat ADB.\n\nHubungkan HP dengan USB Debugging aktif (atau buka BlueStacks dengan ADB ON), lalu klik Scan Ulang.',
+      anUnauthTitle: 'Izinkan USB Debugging di HP',
+      anUnauthBody: (serial) => `Perangkat ${serial} terdeteksi tetapi belum diizinkan (unauthorized/offline).\n\nBuka kunci layar HP Android, tekan "Izinkan / Allow" pada popup USB Debugging, lalu klik Scan Ulang.`,
+      anNotInstTitle: 'Game Android Belum Terpasang',
+      anNotInstBody: (dev) => `Klien Android target belum terpasang di ${dev}.\n\nInstall game-nya di perangkat ini (atau pilih perangkat lain di tab Android), selesaikan download data di dalam game, lalu klik Scan Ulang.`,
+      anDataMissTitle: 'Data In-Game Belum Selesai Diunduh',
+      anDataMissBody: (dev) => `Game sudah terpasang di ${dev}, tetapi file bundle aset (.res) belum lengkap.\n\nBuka game sekali di Android sampai selesai download data tambahan, tutup game sepenuhnya, lalu klik Scan Ulang.`,
+      heroAnScanning: 'Memindai perangkat Android lewat ADB...',
+      heroAnAdbMiss: 'ADB belum ditemukan · Klik untuk panduan',
+      heroAnNoDev: 'Perangkat Android belum terhubung · Klik untuk konek',
+      heroAnUnauth: (s) => `Perangkat ${s} belum diizinkan · Tekan Allow di HP`,
+      heroAnNotInst: (m) => `Game Android belum terpasang di ${m}`,
+      heroAnDataMiss: (m) => `Data in-game belum lengkap di ${m}`,
+      heroAnRunning: (pids) => `Game Android sedang berjalan (PID ${pids}) · Tutup dulu`,
+      heroAnEnOk: 'Android Bahasa Inggris (EN) aktif · 2/2 bundle terverifikasi',
+      heroAnIdOk: 'Android Bahasa Indonesia (ID) aktif · 2/2 bundle terverifikasi',
+      heroAnOrig: 'Android Original JP terdeteksi · Siap dipasang',
+      heroAnMixed: 'Status Android campuran · Klik untuk cek',
+      dockPcMissing: 'Folder PC belum ketemu — klik pilih',
+      dockAnAdbMiss: 'ADB belum ketemu — klik panduan',
+      dockAnNoDev: 'Android belum terhubung — klik panduan',
+      stagePcMissing: 'Klien PC belum ditemukan — pilih folder atau Scan Otomatis.',
+      stageAnNoDev: 'Hubungkan HP Android (USB/Wi-Fi) atau emulator lewat ADB.',
+      stageAnNotInst: 'Game Android belum terpasang di perangkat terpilih.',
+      anVerSyncedFmt: (v) => `Android ${v} · Sinkron`,
+      anVerMismatchFmt: (v, exp) => `Android ${v} ≠ ${exp} — Disarankan tunggu update patcher`,
+      guideTitle: 'Cara Menghubungkan Android via ADB',
+      guideHtml: `
+        <div class="guide-card">
+          <div class="guide-card-title">1. HP Android Asli via Kabel USB (Disarankan)</div>
+          <ol>
+            <li>Di HP, buka <b>Pengaturan &rarr; Tentang Ponsel</b> lalu ketuk <b>Nomor Build (Build Number)</b> 7 kali sampai Opsi Pengembang aktif.</li>
+            <li>Buka <b>Pengaturan &rarr; Sistem &rarr; Opsi Pengembang</b> lalu aktifkan <b>USB Debugging</b>.</li>
+            <li>Colok HP ke PC pakai kabel USB data, buka layar HP, lalu tekan <b>Izinkan (Allow)</b> pada popup USB Debugging.</li>
+            <li>Pastikan game di HP sudah ditutup total, lalu klik <b>Scan</b>.</li>
+          </ol>
+        </div>
+        <div class="guide-card">
+          <div class="guide-card-title">2. HP Android Asli via Wi-Fi (Android 11+ Wireless Debugging)</div>
+          <p>Aktifkan <b>Opsi Pengembang &rarr; Wireless Debugging</b> (pairing dulu sekali ke PC atau lewat USB), lalu masukkan <code>IP:Port</code> yang tampil di HP:</p>
+          <div class="guide-ip-row">
+            <input id="guideIpInput" class="path-field" type="text" placeholder="192.168.1.25:41235 atau 127.0.0.1:5555" />
+            <button id="btnGuideConnectIp" class="btn-charcoal" type="button" style="height:30px;padding:0 14px;font-size:11.5px;">Konek IP</button>
+          </div>
+        </div>
+        <div class="guide-card">
+          <div class="guide-card-title">3. Emulator Android di PC (BlueStacks / LDPlayer / MuMu)</div>
+          <p>Aktifkan <b>Android Debug Bridge (ADB)</b> di pengaturan emulator (BlueStacks: <i>Settings &rarr; Advanced &rarr; ADB ON</i>), tutup game di emulator, lalu klik <b>Scan</b>.</p>
+        </div>
+        <div class="guide-card">
+          <div class="guide-card-title">4. Belum punya <code>adb.exe</code> di PC?</div>
+          <p>Klik <b>Unduh Platform-Tools</b> di bawah, ekstrak <code>adb.exe</code> + DLL di sebelah <code>RuzaLangPatcher.exe</code> (atau klik <b>Pilih adb.exe</b>). Tanpa root &amp; tanpa re-sign APK.</p>
+        </div>`
     }
   };
 
@@ -1744,13 +2004,164 @@
     if (c) $('crumbTitle').textContent = c;
   }
 
+  function getSelectedAndroidDevice() {
+    const serial = $('androidDeviceSelect').value;
+    if (serial) return androidDevices.find(d => d.serial === serial) || null;
+    return androidDevices[0] || null;
+  }
+
+  function openAdbGuide() {
+    const tr = t();
+    $('guideTitle').textContent = tr.guideTitle;
+    $('guideBody').innerHTML = tr.guideHtml;
+    $('btnGuideDlTools').textContent = tr.btnDlTools;
+    $('btnGuideBrowseAdb').textContent = tr.btnBrowseAdb;
+    $('btnGuideClose').textContent = tr.btnClose;
+    const btnIp = $('btnGuideConnectIp');
+    const ipIn = $('guideIpInput');
+    if (btnIp && ipIn) {
+      btnIp.textContent = tr.btnConnectIp;
+      btnIp.onclick = () => {
+        const ep = ipIn.value.trim();
+        if (!ep) { ipIn.focus(); return; }
+        $('guideBackdrop').classList.remove('open');
+        androidInited = true;
+        send('android_connect_ip', { adb_path: androidAdbPath || undefined, endpoint: ep });
+      };
+      ipIn.onkeydown = (e) => { if (e.key === 'Enter') btnIp.click(); };
+    }
+    $('guideBackdrop').classList.add('open');
+  }
+
+  function setTargetMode(mode, triggerScan = true) {
+    targetMode = mode === 'android' ? 'android' : 'pc';
+    $('modePc').classList.toggle('active', targetMode === 'pc');
+    $('modeAndroid').classList.toggle('active', targetMode === 'android');
+    $('dockIconPc').style.display = targetMode === 'pc' ? '' : 'none';
+    $('dockIconAndroid').style.display = targetMode === 'android' ? '' : 'none';
+    $('btnAutoQuick').style.display = targetMode === 'pc' ? '' : 'none';
+    $('btnDockGuide').style.display = targetMode === 'android' ? '' : 'none';
+    renderDockStrip();
+    updateHeroState();
+    renderVersionSync();
+    renderProcessAlert();
+    syncHomeProgress();
+    if (targetMode === 'android' && triggerScan && !androidInited && !busy) {
+      androidInited = true;
+      send('android_detect', { adb_path: androidAdbPath || undefined });
+    }
+  }
+
+  function renderDockStrip() {
+    const tr = t();
+    const pathEl = $('homePathText');
+    if (targetMode === 'pc') {
+      const p = $('folderInput').value.trim();
+      pathEl.textContent = (pcFolderValid && p) ? p : tr.dockPcMissing;
+      pathEl.title = p || tr.btnBrowseFolder;
+    } else {
+      const dev = getSelectedAndroidDevice();
+      if (!androidAdbPath && androidInited) {
+        pathEl.textContent = tr.dockAnAdbMiss;
+      } else if (!dev) {
+        pathEl.textContent = tr.dockAnNoDev;
+      } else {
+        const st = dev.state !== 'device' ? ` [${dev.state}]` : '';
+        pathEl.textContent = `${dev.model} (${dev.serial})${st}`;
+      }
+      pathEl.title = tr.crumbs.android;
+    }
+  }
+
+  function syncHomeProgress() {
+    if (busy) return;
+    const tr = t();
+    if (targetMode === 'pc') {
+      if (!pcFolderValid || !lastTargets.length) {
+        renderProgress(0, 77661, tr.stagePcMissing);
+        return;
+      }
+      const activeCount = lastTargets.filter(x => x.state === 'patched_en' || x.state === 'patched_id').reduce((s, x) => s + x.string_count, 0);
+      const allId = lastTargets.every(x => x.state === 'patched_id');
+      const allEn = lastTargets.every(x => x.state === 'patched_en');
+      renderProgress(activeCount, 77661, allId ? tr.installedId : (allEn ? tr.installedEn : tr.origReady));
+    } else {
+      if (!androidScan) {
+        renderProgress(0, 77190, androidInited ? tr.stageAnNoDev : tr.anIdleStage);
+        return;
+      }
+      if (!androidScan.installed) {
+        renderProgress(0, 77190, tr.stageAnNotInst);
+        return;
+      }
+      const list = androidScan.targets || [];
+      const activeCount = list.filter(x => x.state === 'patched_en' || x.state === 'patched_id').reduce((s, x) => s + x.string_count, 0);
+      const allId = list.length > 0 && list.every(x => x.state === 'patched_id');
+      const allEn = list.length > 0 && list.every(x => x.state === 'patched_en');
+      renderProgress(activeCount, 77190, allId ? tr.anInstalledId : (allEn ? tr.anInstalledEn : tr.anReadyOrig));
+    }
+  }
+
   function updateHeroState() {
     const tr = t();
     const dot = $('heroStateDot');
     const txt = $('heroStateText');
-    if (!lastTargets.length) {
-      dot.className = 'state-diamond';
-      txt.textContent = $('folderInput').value ? tr.stateScanning : tr.stateInvalid;
+    if (targetMode === 'android') {
+      const dev = getSelectedAndroidDevice();
+      if (!androidInited) {
+        dot.className = 'state-diamond';
+        txt.textContent = tr.heroAnScanning;
+        return;
+      }
+      if (!androidAdbPath) {
+        dot.className = 'state-diamond warn';
+        txt.textContent = tr.heroAnAdbMiss;
+        return;
+      }
+      if (!dev) {
+        dot.className = 'state-diamond warn';
+        txt.textContent = tr.heroAnNoDev;
+        return;
+      }
+      if (dev.state !== 'device') {
+        dot.className = 'state-diamond warn';
+        txt.textContent = tr.heroAnUnauth(dev.serial);
+        return;
+      }
+      if (!androidScan) {
+        dot.className = 'state-diamond';
+        txt.textContent = tr.heroAnScanning;
+        return;
+      }
+      if (!androidScan.installed) {
+        dot.className = 'state-diamond warn';
+        txt.textContent = tr.heroAnNotInst(dev.model || dev.serial);
+        return;
+      }
+      if (androidScan.running_pids && androidScan.running_pids.length > 0) {
+        dot.className = 'state-diamond warn';
+        txt.textContent = tr.heroAnRunning(androidScan.running_pids.join(', '));
+        return;
+      }
+      const list = androidScan.targets || [];
+      if (list.some(x => x.state === 'missing')) {
+        dot.className = 'state-diamond warn';
+        txt.textContent = tr.heroAnDataMiss(dev.model || dev.serial);
+        return;
+      }
+      const allEn = list.length > 0 && list.every(x => x.state === 'patched_en');
+      const allId = list.length > 0 && list.every(x => x.state === 'patched_id');
+      const allOrig = list.length > 0 && list.every(x => x.state === 'original');
+      if (allEn) { dot.className = 'state-diamond en'; txt.textContent = tr.heroAnEnOk; }
+      else if (allId) { dot.className = 'state-diamond id'; txt.textContent = tr.heroAnIdOk; }
+      else if (allOrig) { dot.className = 'state-diamond'; txt.textContent = tr.heroAnOrig; }
+      else { dot.className = 'state-diamond warn'; txt.textContent = tr.heroAnMixed; }
+      return;
+    }
+
+    if (!pcFolderValid || !lastTargets.length) {
+      dot.className = pcFolderValid ? 'state-diamond' : 'state-diamond warn';
+      txt.textContent = pcFolderValid ? tr.stateScanning : tr.stateInvalid;
       return;
     }
     const allEn = lastTargets.every(x => x.state === 'patched_en');
@@ -1792,32 +2203,51 @@
     lblVerRow.textContent = tr.lblVerRow;
 
     if (!clientVersion) {
-      btn.style.display = 'none';
       lblVerSub.textContent = tr.lblVerSubSynced('v1.0.2 (r3219598)');
       pkgDet.textContent = '—';
       pkgSt.className = 'pkg-state original';
       pkgSt.innerHTML = `<span class="pkg-dot"></span>—`;
+    } else {
+      const det = formatClientVer(clientVersion);
+      const exp = `v${clientVersion.expected_version} (r${clientVersion.expected_res_rev})`;
+      const isMismatch = clientVersion.status === 'mismatch';
+      pkgDet.textContent = det;
+      if (isMismatch) {
+        const reasons = (clientVersion.reasons || []).join('; ');
+        lblVerSub.textContent = tr.lblVerSubMismatch(reasons);
+        pkgSt.className = 'pkg-state modified';
+        pkgSt.innerHTML = `<span class="pkg-dot"></span>${tr.verBadgeMismatch}`;
+      } else {
+        lblVerSub.textContent = tr.lblVerSubSynced(exp);
+        pkgSt.className = 'pkg-state patched_id';
+        pkgSt.innerHTML = `<span class="pkg-dot"></span>${tr.verBadgeSynced}`;
+      }
+    }
+
+    // Home hero version badge tracks whichever platform is selected in the Home dock
+    if (targetMode === 'android') {
+      if (!androidScan || !androidScan.installed || !androidScan.version) {
+        btn.style.display = 'none';
+        return;
+      }
+      const av = androidScan.version;
+      const det = formatClientVer(av);
+      const isMismatch = av.status === 'mismatch';
+      btn.style.display = 'inline-flex';
+      btn.classList.toggle('mismatch', isMismatch);
+      txt.textContent = isMismatch ? tr.anVerMismatchFmt(det, `v${av.expected_version}`) : tr.anVerSyncedFmt(det);
       return;
     }
 
+    if (!clientVersion) {
+      btn.style.display = 'none';
+      return;
+    }
     const det = formatClientVer(clientVersion);
-    const exp = `v${clientVersion.expected_version} (r${clientVersion.expected_res_rev})`;
     const isMismatch = clientVersion.status === 'mismatch';
     btn.style.display = 'inline-flex';
     btn.classList.toggle('mismatch', isMismatch);
     txt.textContent = isMismatch ? tr.verMismatchFmt(det, `v${clientVersion.expected_version}`) : tr.verSyncedFmt(det);
-
-    pkgDet.textContent = det;
-    if (isMismatch) {
-      const reasons = (clientVersion.reasons || []).join('; ');
-      lblVerSub.textContent = tr.lblVerSubMismatch(reasons);
-      pkgSt.className = 'pkg-state modified';
-      pkgSt.innerHTML = `<span class="pkg-dot"></span>${tr.verBadgeMismatch}`;
-    } else {
-      lblVerSub.textContent = tr.lblVerSubSynced(exp);
-      pkgSt.className = 'pkg-state patched_id';
-      pkgSt.innerHTML = `<span class="pkg-dot"></span>${tr.verBadgeSynced}`;
-    }
   }
 
   function renderUpdateBanner() {
@@ -1915,29 +2345,30 @@
     $('btnAnRollback').textContent = tr.btnAnRollback;
     $('btnAnNews').textContent = tr.btnAnNews;
     $('btnAnPatchText').textContent = tr.btnAnPatch;
+    $('btnAnGuide').textContent = tr.btnAnGuide;
+    $('modePc').textContent = tr.modePcLbl;
+    $('modeAndroid').textContent = tr.modeAnLbl;
+    renderDockStrip();
     renderAndroidView();
     updateCrumb();
     renderProcessAlert();
     updateHeroState();
     renderVersionSync();
     renderUpdateBanner();
-    if (lastTargets.length) {
-      renderTargets(lastTargets);
-      if (!busy) {
-        const allId = lastTargets.every(x => x.state === 'patched_id');
-        const allEn = lastTargets.every(x => x.state === 'patched_en');
-        const stg = allId ? tr.installedId : (allEn ? tr.installedEn : tr.origReady);
-        renderProgress(lastProgress.current, lastProgress.total, stg);
-        return;
-      }
-    }
+    if (lastTargets.length) renderTargets(lastTargets);
+    if (!busy) { syncHomeProgress(); return; }
     renderProgress(lastProgress.current, lastProgress.total, lastProgress.stage);
   }
 
   function renderProcessAlert() {
     const tr = t();
     const box = $('procAlert');
-    if (runningProcs.length > 0) {
+    const showAndroidProc = (targetMode === 'android' || activeTab === 'android')
+      && androidScan && androidScan.running_pids && androidScan.running_pids.length > 0;
+    if (showAndroidProc) {
+      box.classList.add('show');
+      $('procAlertText').textContent = tr.heroAnRunning(androidScan.running_pids.join(', '));
+    } else if (runningProcs.length > 0) {
       box.classList.add('show');
       $('procAlertText').textContent = tr.procRunPrefix + runningProcs.map(p => p.name).join(', ') + tr.procRunSuffix;
     } else {
@@ -1967,7 +2398,7 @@
 
   function setBusy(v) {
     busy = v;
-    for (const id of ['btnAuto', 'btnBrowse', 'btnScan', 'btnAutoQuick', 'btnScanQuick', 'btnPatch', 'btnNews', 'btnNewsPage', 'btnRollback', 'btnRollbackPkg', 'btnCheckUpdate', 'langEn', 'langId', 'folderInput', 'androidDeviceSelect', 'btnAnScan', 'btnAnBrowseAdb', 'btnAnPatch', 'btnAnNews', 'btnAnRollback']) {
+    for (const id of ['btnAuto', 'btnBrowse', 'btnScan', 'btnAutoQuick', 'btnScanQuick', 'btnPatch', 'btnNews', 'btnNewsPage', 'btnRollback', 'btnRollbackPkg', 'btnCheckUpdate', 'langEn', 'langId', 'folderInput', 'androidDeviceSelect', 'btnAnScan', 'btnAnBrowseAdb', 'btnAnPatch', 'btnAnNews', 'btnAnRollback', 'modePc', 'modeAndroid']) {
       if ($(id)) $(id).disabled = v;
     }
   }
@@ -2178,11 +2609,15 @@
         break;
       case 'folder': {
         const p = ev.path || '';
+        pcFolderValid = !!ev.valid;
         $('folderInput').value = p;
-        $('homePathText').textContent = p || tr.invalidFolder;
         $('folderHint').textContent = ev.valid ? tr.validFolder : tr.invalidFolder;
         $('folderHint').style.color = ev.valid ? '#a7e3c7' : '#f7a5a7';
-        if (!ev.valid) { lastTargets = []; clientVersion = null; updateHeroState(); renderVersionSync(); }
+        if (!ev.valid) { lastTargets = []; clientVersion = null; }
+        renderDockStrip();
+        updateHeroState();
+        renderVersionSync();
+        if (!ev.valid && targetMode === 'pc') syncHomeProgress();
         break;
       }
       case 'scan_result': {
@@ -2191,26 +2626,34 @@
         if (ev.version) clientVersion = ev.version;
         renderTargets(list);
         renderVersionSync();
-        const activeCount = list.filter(x => x.state === 'patched_en' || x.state === 'patched_id').reduce((s, x) => s + x.string_count, 0);
-        const allId = list.length > 0 && list.every(x => x.state === 'patched_id');
-        const allEn = list.length > 0 && list.every(x => x.state === 'patched_en');
-        const stg = allId ? tr.installedId : (allEn ? tr.installedEn : tr.origReady);
-        renderProgress(activeCount, 77661, stg);
+        if (targetMode === 'pc') syncHomeProgress();
         break;
       }
       case 'progress':
-        renderProgress(ev.current || 0, ev.total || 77661, ev.stage);
+        renderProgress(ev.current || 0, ev.total || (targetMode === 'android' ? 77190 : 77661), ev.stage);
         break;
       case 'android_devices':
+        androidInited = true;
         androidAdbPath = ev.adb_path || '';
         androidDevices = ev.devices || [];
         if (!androidDevices.length) androidScan = null;
         renderAndroidView();
+        renderDockStrip();
+        updateHeroState();
+        renderVersionSync();
+        renderProcessAlert();
+        if (targetMode === 'android') syncHomeProgress();
         break;
       case 'android_scan_result':
+        androidInited = true;
         androidScan = ev.result || null;
         if (androidScan && androidScan.adb_path) androidAdbPath = androidScan.adb_path;
         renderAndroidView();
+        renderDockStrip();
+        updateHeroState();
+        renderVersionSync();
+        renderProcessAlert();
+        if (targetMode === 'android') syncHomeProgress();
         break;
       case 'android_progress':
         renderAndroidProgress(ev.current || 0, ev.total || 77190, ev.stage);
@@ -2259,8 +2702,27 @@
   for (const el of document.querySelectorAll('.nav-btn')) {
     el.onclick = () => switchTab(el.dataset.tab);
   }
-  $('heroStateBtn').onclick = () => switchTab('packages');
-  $('heroVerBtn').onclick = () => switchTab('packages');
+  $('heroStateBtn').onclick = () => {
+    if (targetMode === 'android') {
+      if (!androidAdbPath || !androidDevices.length) openAdbGuide();
+      else switchTab('android');
+    } else {
+      if (!pcFolderValid) triggerBrowse();
+      else switchTab('packages');
+    }
+  };
+  $('heroVerBtn').onclick = () => switchTab(targetMode === 'android' ? 'android' : 'packages');
+  $('modePc').onclick = () => { if (!busy) setTargetMode('pc'); };
+  $('modeAndroid').onclick = () => { if (!busy) setTargetMode('android'); };
+  $('btnDockGuide').onclick = openAdbGuide;
+  $('btnAnGuide').onclick = openAdbGuide;
+  $('btnGuideClose').onclick = () => $('guideBackdrop').classList.remove('open');
+  $('btnGuideDlTools').onclick = () => send('open_url', { url: 'https://developer.android.com/tools/releases/platform-tools' });
+  $('btnGuideBrowseAdb').onclick = () => {
+    $('guideBackdrop').classList.remove('open');
+    send('android_browse_adb', { adb_path: androidAdbPath || undefined });
+  };
+  $('guideBackdrop').onclick = (e) => { if (e.target === $('guideBackdrop')) $('guideBackdrop').classList.remove('open'); };
   $('btnHomeLogFull').onclick = () => switchTab('log');
   $('btnHomeLogHide').onclick = () => hideHomeLog();
   $('btnShowHomeLog').onclick = () => openHomeLog(false);
@@ -2281,16 +2743,32 @@
     addLog('info', 'Bahasa target patch diatur ke Bahasa Indonesia (ID).');
   };
 
-  // Folder & Log actions
+  // Folder, Device & Log actions
   const triggerAuto = () => send('auto_detect');
   const triggerBrowse = () => send('browse', { path: $('folderInput').value.trim() });
   const triggerScan = () => send('scan', { path: $('folderInput').value.trim() });
+  const triggerAnDetect = () => {
+    androidInited = true;
+    const serial = $('androidDeviceSelect').value;
+    send('android_detect', { adb_path: androidAdbPath || undefined, serial: serial || undefined });
+  };
   $('btnAuto').onclick = triggerAuto;
   $('btnAutoQuick').onclick = triggerAuto;
   $('btnBrowse').onclick = triggerBrowse;
-  $('homePathText').onclick = triggerBrowse;
+  $('homePathText').onclick = () => {
+    if (targetMode === 'pc') {
+      triggerBrowse();
+    } else if (!androidAdbPath || !androidDevices.length) {
+      openAdbGuide();
+    } else {
+      switchTab('android');
+    }
+  };
   $('btnScan').onclick = triggerScan;
-  $('btnScanQuick').onclick = triggerScan;
+  $('btnScanQuick').onclick = () => {
+    if (targetMode === 'pc') triggerScan();
+    else triggerAnDetect();
+  };
 
   $('btnClearLog').onclick = () => { $('termBody').innerHTML = ''; $('homeLogBody').innerHTML = ''; };
   $('btnCopyLog').onclick = () => {
@@ -2298,15 +2776,86 @@
     navigator.clipboard?.writeText(txt).then(() => addLog('info', t().copied));
   };
 
-  // Patch, News, Rollback actions
-  function runPatchNow() {
+  // Smart readiness checks for PC & Android
+  function ensurePcReady() {
+    const tr = t();
+    if (!pcFolderValid || !$('folderInput').value.trim()) {
+      addLog('warn', 'PC client installation folder not detected — prompt user to browse or auto-scan.');
+      openModal(tr.pcMissingTitle, tr.pcMissingBody, [
+        { label: tr.btnSwitchToAndroid, cls: 'btn-white', onClick: () => setTargetMode('android') },
+        { label: tr.btnAuto, cls: 'btn-white', onClick: () => triggerAuto() },
+        { label: tr.btnBrowseFolder, cls: 'btn-charcoal', onClick: () => triggerBrowse() }
+      ]);
+      return false;
+    }
+    return true;
+  }
+
+  function ensureAndroidReady(requireBundles = true) {
+    const tr = t();
+    if (!androidInited) {
+      triggerAnDetect();
+      return false;
+    }
+    if (!androidAdbPath) {
+      openModal(tr.anAdbMissingTitle, tr.anAdbMissingBody, [
+        { label: tr.btnSwitchToPc, cls: 'btn-white', onClick: () => { switchTab('home'); setTargetMode('pc'); } },
+        { label: tr.btnBrowseAdb, cls: 'btn-white', onClick: () => send('android_browse_adb', {}) },
+        { label: tr.btnOpenGuide, cls: 'btn-charcoal', onClick: () => openAdbGuide() }
+      ]);
+      return false;
+    }
+    const dev = getSelectedAndroidDevice();
+    if (!dev) {
+      openModal(tr.anNoDevTitle, tr.anNoDevBody, [
+        { label: tr.btnSwitchToPc, cls: 'btn-white', onClick: () => { switchTab('home'); setTargetMode('pc'); } },
+        { label: tr.btnScanAgain, cls: 'btn-white', onClick: () => triggerAnDetect() },
+        { label: tr.btnOpenGuide, cls: 'btn-charcoal', onClick: () => openAdbGuide() }
+      ]);
+      return false;
+    }
+    if (dev.state !== 'device') {
+      openModal(tr.anUnauthTitle, tr.anUnauthBody(dev.serial), [
+        { label: tr.btnOpenGuide, cls: 'btn-white', onClick: () => openAdbGuide() },
+        { label: tr.btnScanAgain, cls: 'btn-charcoal', onClick: () => triggerAnDetect() }
+      ]);
+      return false;
+    }
+    if (!androidScan || androidScan.serial !== dev.serial) {
+      send('android_scan', { adb_path: androidAdbPath || undefined, serial: dev.serial });
+      return false;
+    }
+    if (!androidScan.installed) {
+      openModal(tr.anNotInstTitle, tr.anNotInstBody(`${dev.model} (${dev.serial})`), [
+        { label: tr.btnSwitchToPc, cls: 'btn-white', onClick: () => { switchTab('home'); setTargetMode('pc'); } },
+        { label: tr.btnSwitchDevice, cls: 'btn-white', onClick: () => switchTab('android') },
+        { label: tr.btnScanAgain, cls: 'btn-charcoal', onClick: () => triggerAnDetect() }
+      ]);
+      return false;
+    }
+    if (androidScan.running_pids && androidScan.running_pids.length > 0) {
+      openModal(tr.anBlockedTitle, tr.anBlockedBody(androidScan.running_pids.join(', ')), [{ label: tr.ok, cls: 'btn-charcoal' }]);
+      return false;
+    }
+    if (requireBundles && (androidScan.targets || []).some(x => x.state === 'missing')) {
+      openModal(tr.anDataMissTitle, tr.anDataMissBody(`${dev.model} (${dev.serial})`), [
+        { label: tr.btnScanAgain, cls: 'btn-charcoal', onClick: () => triggerAnDetect() }
+      ]);
+      return false;
+    }
+    return true;
+  }
+
+  // Unified Patch, News, Rollback actions
+  function runPcPatchNow() {
     switchTab('home');
     openHomeLog(true);
     send('patch', { path: $('folderInput').value.trim() });
   }
 
-  $('btnPatch').onclick = () => {
+  function triggerPcPatch() {
     const tr = t();
+    if (!ensurePcReady()) return;
     if (runningProcs.length > 0) {
       const list = runningProcs.map(p => `• ${p.name} (PID ${p.pid})`).join('\n');
       addLog('err', 'BLOCKED: Close running target processes first!');
@@ -2319,69 +2868,22 @@
       const reasons = (clientVersion.reasons || []).join('; ');
       openModal(tr.mismatchTitle, tr.mismatchBody(det, exp, reasons), [
         { label: tr.waitUpdate, cls: 'btn-white' },
-        { label: tr.installAnyway, cls: 'btn-charcoal', onClick: () => runPatchNow() }
+        { label: tr.installAnyway, cls: 'btn-charcoal', onClick: () => runPcPatchNow() }
       ]);
       return;
     }
-    runPatchNow();
-  };
+    runPcPatchNow();
+  }
 
-  const triggerNews = () => {
+  function triggerAndroidPatch(openLogOnHome = false) {
     const tr = t();
-    if (runningProcs.length > 0) {
-      const list = runningProcs.map(p => `• ${p.name} (PID ${p.pid})`).join('\n');
-      addLog('err', 'BLOCKED: Close running target processes before translating news!');
-      openModal(tr.blockedTitle, tr.blockedNews + list, [{ label: tr.ok, cls: 'btn-charcoal' }]);
-      return;
-    }
-    switchTab('home');
-    openHomeLog(true);
-    send('patch_news');
-  };
-  $('btnNews').onclick = triggerNews;
-  $('btnNewsPage').onclick = triggerNews;
-
-  const triggerRollback = () => {
-    const tr = t();
-    if (runningProcs.length > 0) {
-      const list = runningProcs.map(p => `• ${p.name} (PID ${p.pid})`).join('\n');
-      addLog('err', 'BLOCKED: Close running target processes before rollback!');
-      openModal(tr.blockedTitle, tr.blockedRollback + list, [{ label: tr.ok, cls: 'btn-charcoal' }]);
-      return;
-    }
-    openModal(tr.rollbackTitle, tr.rollbackBody, [
-      { label: tr.cancel, cls: 'btn-white' },
-      { label: tr.confirmRollback, cls: 'btn-danger-pill', onClick: () => { switchTab('home'); openHomeLog(true); send('rollback', { path: $('folderInput').value.trim() }); } }
-    ]);
-  };
-  $('btnRollback').onclick = triggerRollback;
-  $('btnRollbackPkg').onclick = triggerRollback;
-
-  // Android ADB actions
-  $('androidDeviceSelect').onchange = () => {
-    const serial = $('androidDeviceSelect').value;
-    if (serial) send('android_scan', { adb_path: androidAdbPath || undefined, serial });
-  };
-  $('btnAnScan').onclick = () => {
-    const serial = $('androidDeviceSelect').value;
-    send('android_detect', { adb_path: androidAdbPath || undefined, serial: serial || undefined });
-  };
-  $('btnAnBrowseAdb').onclick = () => {
-    send('android_browse_adb', { adb_path: androidAdbPath || undefined });
-  };
-  $('btnAnPatch').onclick = () => {
-    const tr = t();
-    const serial = $('androidDeviceSelect').value;
-    if (!serial) {
-      send('android_detect', { adb_path: androidAdbPath || undefined });
-      return;
-    }
-    if (androidScan && androidScan.running_pids && androidScan.running_pids.length > 0) {
-      openModal(tr.anBlockedTitle, tr.anBlockedBody(androidScan.running_pids.join(', ')), [{ label: tr.ok, cls: 'btn-charcoal' }]);
-      return;
-    }
-    const runAnPatch = () => send('android_patch', { adb_path: androidAdbPath || undefined, serial });
-    if (androidScan && androidScan.version && androidScan.version.status === 'mismatch') {
+    if (!ensureAndroidReady(true)) return;
+    const serial = androidScan.serial;
+    const runAnPatch = () => {
+      if (openLogOnHome) openHomeLog(true);
+      send('android_patch', { adb_path: androidAdbPath || undefined, serial });
+    };
+    if (androidScan.version && androidScan.version.status === 'mismatch') {
       const det = formatClientVer(androidScan.version);
       const exp = `v${androidScan.version.expected_version} (r${androidScan.version.expected_res_rev})`;
       const reasons = (androidScan.version.reasons || []).join('; ');
@@ -2392,30 +2894,69 @@
       return;
     }
     runAnPatch();
-  };
-  $('btnAnNews').onclick = () => {
+  }
+
+  function triggerPcNews() {
     const tr = t();
-    const serial = $('androidDeviceSelect').value;
-    if (!serial) return;
-    if (androidScan && androidScan.running_pids && androidScan.running_pids.length > 0) {
-      openModal(tr.anBlockedTitle, tr.anBlockedBody(androidScan.running_pids.join(', ')), [{ label: tr.ok, cls: 'btn-charcoal' }]);
+    if (!ensurePcReady()) return;
+    if (runningProcs.length > 0) {
+      const list = runningProcs.map(p => `• ${p.name} (PID ${p.pid})`).join('\n');
+      addLog('err', 'BLOCKED: Close running target processes before translating news!');
+      openModal(tr.blockedTitle, tr.blockedNews + list, [{ label: tr.ok, cls: 'btn-charcoal' }]);
       return;
     }
-    send('android_patch_news', { adb_path: androidAdbPath || undefined, serial });
-  };
-  $('btnAnRollback').onclick = () => {
+    switchTab('home');
+    openHomeLog(true);
+    send('patch_news');
+  }
+
+  function triggerAndroidNews(openLogOnHome = false) {
+    if (!ensureAndroidReady(false)) return;
+    if (openLogOnHome) openHomeLog(true);
+    send('android_patch_news', { adb_path: androidAdbPath || undefined, serial: androidScan.serial });
+  }
+
+  function triggerPcRollback() {
     const tr = t();
-    const serial = $('androidDeviceSelect').value;
-    if (!serial) return;
-    if (androidScan && androidScan.running_pids && androidScan.running_pids.length > 0) {
-      openModal(tr.anBlockedTitle, tr.anBlockedBody(androidScan.running_pids.join(', ')), [{ label: tr.ok, cls: 'btn-charcoal' }]);
+    if (!ensurePcReady()) return;
+    if (runningProcs.length > 0) {
+      const list = runningProcs.map(p => `• ${p.name} (PID ${p.pid})`).join('\n');
+      addLog('err', 'BLOCKED: Close running target processes before rollback!');
+      openModal(tr.blockedTitle, tr.blockedRollback + list, [{ label: tr.ok, cls: 'btn-charcoal' }]);
       return;
     }
+    openModal(tr.rollbackTitle, tr.rollbackBody, [
+      { label: tr.cancel, cls: 'btn-white' },
+      { label: tr.confirmRollback, cls: 'btn-danger-pill', onClick: () => { switchTab('home'); openHomeLog(true); send('rollback', { path: $('folderInput').value.trim() }); } }
+    ]);
+  }
+
+  function triggerAndroidRollback(openLogOnHome = false) {
+    const tr = t();
+    if (!ensureAndroidReady(false)) return;
+    const serial = androidScan.serial;
     openModal(tr.anRollbackTitle, tr.anRollbackBody(serial), [
       { label: tr.cancel, cls: 'btn-white' },
-      { label: tr.confirmRollback, cls: 'btn-danger-pill', onClick: () => send('android_rollback', { adb_path: androidAdbPath || undefined, serial }) }
+      { label: tr.confirmRollback, cls: 'btn-danger-pill', onClick: () => { if (openLogOnHome) openHomeLog(true); send('android_rollback', { adb_path: androidAdbPath || undefined, serial }); } }
     ]);
+  }
+
+  $('btnPatch').onclick = () => targetMode === 'android' ? triggerAndroidPatch(true) : triggerPcPatch();
+  $('btnNews').onclick = () => targetMode === 'android' ? triggerAndroidNews(true) : triggerPcNews();
+  $('btnRollback').onclick = () => targetMode === 'android' ? triggerAndroidRollback(true) : triggerPcRollback();
+  $('btnNewsPage').onclick = triggerPcNews;
+  $('btnRollbackPkg').onclick = triggerPcRollback;
+
+  // Android ADB tab controls
+  $('androidDeviceSelect').onchange = () => {
+    const serial = $('androidDeviceSelect').value;
+    if (serial) send('android_scan', { adb_path: androidAdbPath || undefined, serial });
   };
+  $('btnAnScan').onclick = triggerAnDetect;
+  $('btnAnBrowseAdb').onclick = () => send('android_browse_adb', { adb_path: androidAdbPath || undefined });
+  $('btnAnPatch').onclick = () => triggerAndroidPatch(false);
+  $('btnAnNews').onclick = () => triggerAndroidNews(false);
+  $('btnAnRollback').onclick = () => triggerAndroidRollback(false);
 
   window.addEventListener('DOMContentLoaded', () => {
     applyUiLanguage();

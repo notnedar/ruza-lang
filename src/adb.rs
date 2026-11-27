@@ -206,6 +206,44 @@ fn parse_devices_output(stdout: &str) -> Vec<(String, String, String)> {
     out
 }
 
+pub fn connect_tcp_endpoint(adb: &Path, endpoint: &str) -> Result<String, String> {
+    let trimmed = endpoint.trim();
+    if trimmed.is_empty()
+        || trimmed.len() > 80
+        || !trimmed
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b':' | b'-'))
+        || !trimmed.contains(':')
+    {
+        return Err(
+            "Invalid ADB endpoint. Use IP:Port format (example: 192.168.1.25:41235 or 127.0.0.1:5555)."
+                .into(),
+        );
+    }
+    ensure_adb_server(adb)?;
+    let (ok, stdout, stderr) = run_adb_raw(adb, &["connect", trimmed])?;
+    let msg = format!(
+        "{} {}",
+        filter_daemon_lines(&stdout).trim(),
+        filter_daemon_lines(&stderr).trim()
+    )
+    .trim()
+    .to_string();
+    let lower = msg.to_ascii_lowercase();
+    if !ok || lower.contains("failed") || lower.contains("cannot connect") || lower.contains("unable") {
+        return Err(if msg.is_empty() {
+            format!("Could not connect to {}", trimmed)
+        } else {
+            msg
+        });
+    }
+    Ok(if msg.is_empty() {
+        format!("Connected to {}", trimmed)
+    } else {
+        msg
+    })
+}
+
 pub fn list_devices(adb: &Path) -> Result<Vec<AndroidDevice>, String> {
     ensure_adb_server(adb)?;
     let (_, stdout, _) = run_adb_raw(adb, &["devices", "-l"])?;

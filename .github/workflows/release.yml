@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build & publish (e.g. v0.6.0)"
+        description: "Release tag to build & publish (e.g. v0.6.1)"
         required: true
-        default: "v0.6.0"
+        default: "v0.6.1"
 
 permissions:
   contents: write
@@ -101,7 +101,8 @@ jobs:
           ![Settings Menu](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-en.jpg)
 
           ### Highlights / Fitur Utama
-          - **Android (ADB) Patching Mode (`v0.6.0`):** New **Android** tab inside the launcher to patch USB-Debugging Android phones & Windows Android emulators (BlueStacks, LDPlayer, MuMu, MEmu, Nox) with **zero root and zero APK re-signing** — covers **77,190 strings (`99.4%`: `VStringPool` + `Static UI KeyConfig`)** plus **Android Cached News (`EN` / `ID`)**, Android Process Guard (`pidof`), PC backup (`%LOCALAPPDATA%\RuzaLang\AndroidBackups\`), atomic transfer + remote `sha256sum` verification, and one-click **Rollback JP**.
+          - **Home Platform Selector (`PC` | `Android`) & Built-In ADB Connect Guide (`v0.6.1`):** Switch between **PC Client** and **Android (ADB)** directly from the Home bottom dock, with smart missing-install prompts (**Browse Folder / Auto-Scan** for PC; **ADB Setup Guide / Choose Device / Browse `adb.exe`** for Android), **Wireless ADB (`IP:Port`)** connect, and a built-in bilingual USB/Wi-Fi/Emulator ADB connection guide.
+          - **Android (ADB) Patching Mode (`v0.6.0`):** Patch real Android phones (USB/Wi-Fi Debugging) & Windows Android emulators (BlueStacks, LDPlayer, MuMu, MEmu, Nox) with **zero root and zero APK re-signing** — covers **77,190 strings (`99.4%`: `VStringPool` + `Static UI KeyConfig`)** plus **Android Cached News (`EN` / `ID`)**, Android Process Guard (`pidof`), PC backups (`%LOCALAPPDATA%\RuzaLang\AndroidBackups\`), atomic transfer + remote `sha256sum` verification, and one-click **Rollback JP**.
           - **Built-In SHA-256 Auto-Updater (`v0.5.0`):** Checks GitHub Releases automatically on launch (plus manual **Check Updates** in **Files**), verifies downloaded binaries against official `SHA256SUMS.txt` over strict allowlisted HTTPS, swaps the `.exe` atomically in-place, and auto-relaunches.
           - **Cleaner Launcher Polish & Portable Execution (`v0.4.2`–`v0.4.3`):** Removed all uppercase UI eyebrows and Activity Log dot; WebView2 profile stored cleanly in `%LOCALAPPDATA%\RuzaLang\WebView2` (zero `*.exe.WebView2` folder clutter).
           - **Client Version Sync Check (`v0.4.1`):** Checks client version + resource revision sync (PC `v1.0.2 · r3219598`, Android `v1.0.0 · r3219596`) with a non-blocking update recommendation if a newer client build is detected.
