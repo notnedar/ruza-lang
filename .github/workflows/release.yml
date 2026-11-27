@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build & publish (e.g. v0.6.1)"
+        description: "Release tag to build & publish (e.g. v0.7.0)"
         required: true
-        default: "v0.6.1"
+        default: "v0.7.0"
 
 permissions:
   contents: write
@@ -36,64 +36,167 @@ jobs:
         shell: pwsh
         run: cargo build --release --locked --target x86_64-pc-windows-msvc
 
-      - name: Prepare artifacts & SHA-256 checksum
+      - name: Stage Windows artifact
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          New-Item -ItemType Directory -Force release-dist | Out-Null
-          $src = "target/x86_64-pc-windows-msvc/release/RuzaLangPatcher.exe"
-          $dst = "release-dist/RuzaLangPatcher.exe"
-          Copy-Item $src $dst -Force
+          New-Item -ItemType Directory -Force windows-dist | Out-Null
+          Copy-Item "target/x86_64-pc-windows-msvc/release/RuzaLangPatcher.exe" "windows-dist/RuzaLangPatcher.exe" -Force
+          $sha = (Get-FileHash "windows-dist/RuzaLangPatcher.exe" -Algorithm SHA256).Hash
+          Write-Host "Built RuzaLangPatcher.exe SHA256=$sha"
 
-          $sha = (Get-FileHash $dst -Algorithm SHA256).Hash
-          $mb = [math]::Round((Get-Item $dst).Length / 1MB, 2)
-          [System.IO.File]::WriteAllText(
-            (Join-Path (Get-Location) "release-dist/SHA256SUMS.txt"),
-            "$sha  RuzaLangPatcher.exe`n",
-            (New-Object System.Text.UTF8Encoding $false)
-          )
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-dist
+          path: windows-dist/RuzaLangPatcher.exe
+          if-no-files-found: error
 
-          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            "${{ inputs.tag }}"
-          } else {
-            "${{ github.ref_name }}"
-          }
+  build-android:
+    name: Build Universal Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "EXE_SHA256=$sha" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "EXE_MB=$mb" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          Write-Host "Built RuzaLangPatcher.exe ($mb MB) SHA256=$sha for tag $tag"
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
 
-      - name: Attest build provenance
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Ensure Android SDK Platform 36
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Prepare release signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "Configured release signing keystore."
+          else
+            echo "No ANDROID_KEYSTORE_BASE64 secret found; falling back to debug signing."
+          fi
+
+      - name: Run unit tests & build release APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew testDebugUnitTest assembleRelease --no-daemon
+
+      - name: Stage & verify Android APK
+        run: |
+          set -euo pipefail
+          mkdir -p android-dist
+          cp android/app/build/outputs/apk/release/app-release.apk android-dist/RuzaLangPatcher.apk
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)"
+          if [ -n "$APKSIGNER" ]; then
+            "$APKSIGNER" verify --verbose android-dist/RuzaLangPatcher.apk
+          fi
+          sha256sum android-dist/RuzaLangPatcher.apk
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-dist
+          path: android-dist/RuzaLangPatcher.apk
+          if-no-files-found: error
+
+  publish-release:
+    name: Attest & Publish GitHub Release
+    needs: [build-windows, build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-dist
+          path: release-dist
+
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-dist
+          path: release-dist
+
+      - name: Generate combined SHA256SUMS.txt
+        run: |
+          set -euo pipefail
+          EXE_SHA=$(sha256sum release-dist/RuzaLangPatcher.exe | awk '{print toupper($1)}')
+          APK_SHA=$(sha256sum release-dist/RuzaLangPatcher.apk | awk '{print toupper($1)}')
+          EXE_MB=$(awk "BEGIN {printf \"%.2f\", $(stat -c%s release-dist/RuzaLangPatcher.exe)/1048576}")
+          APK_MB=$(awk "BEGIN {printf \"%.2f\", $(stat -c%s release-dist/RuzaLangPatcher.apk)/1048576}")
+
+          printf '%s  RuzaLangPatcher.exe\n%s  RuzaLangPatcher.apk\n' "$EXE_SHA" "$APK_SHA" > release-dist/SHA256SUMS.txt
+          cat release-dist/SHA256SUMS.txt
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+
+          {
+            echo "RELEASE_TAG=$TAG"
+            echo "EXE_SHA256=$EXE_SHA"
+            echo "APK_SHA256=$APK_SHA"
+            echo "EXE_MB=$EXE_MB"
+            echo "APK_MB=$APK_MB"
+          } >> "$GITHUB_ENV"
+
+      - name: Attest build provenance (Windows + Android)
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: release-dist/RuzaLangPatcher.exe
+          subject-path: |
+            release-dist/RuzaLangPatcher.exe
+            release-dist/RuzaLangPatcher.apk
 
       - name: Publish GitHub Release
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         run: |
-          $ErrorActionPreference = "Stop"
-          $tag = $env:RELEASE_TAG
-          $sha = $env:EXE_SHA256
-          $mb  = $env:EXE_MB
-          $runUrl = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-          $template = @'
+          set -euo pipefail
+          NOTES_FILE="$RUNNER_TEMP/release_notes.md"
+          cat <<EOF > "$NOTES_FILE"
           > [!IMPORTANT]
-          > **Tested & Working In-Game · Vibe-Coded Educational Project**
-          > - Confirmed **tested and working in-game** on the current build.
-          > - This is a **vibe-coded educational project** — use at your own risk and always rely on the automatic `_ENPatchBackup\` rollback if a future client update changes asset layouts.
+          > **Tested & Working In-Game (PC & Android) · Vibe-Coded Educational Project**
+          > - Confirmed **tested and working in-game** on both PC and Android clients (standalone APK & PC/ADB).
+          > - This is a **vibe-coded educational project** — use at your own risk and always rely on automatic backups & one-click **Rollback JP** if a future client update changes asset layouts.
 
-          ## Ruza-Lang __TAG__ (EN / ID)
+          ## Ruza-Lang ${RELEASE_TAG} (EN / ID · PC + Standalone Android APK)
 
-          Educational standalone bilingual localization & asset-repacking tool (**English** & **Bahasa Indonesia**).
+          Educational bilingual localization & exact-size asset-repacking suite (**English** & **Bahasa Indonesia**) available for both **Windows PC** (\`RuzaLangPatcher.exe\`) and **Standalone Android** (\`RuzaLangPatcher.apk\` — **no PC & no root required**!).
 
-          ### Usage Walkthrough
-          ![Ruza-Lang Usage Demo](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/usage.webp)
+          ### Downloads
+          | Platform | File | Size | Notes |
+          | :--- | :--- | :---: | :--- |
+          | **Windows PC (x64)** | \`RuzaLangPatcher.exe\` | ${EXE_MB} MB | PC Client + Android ADB patcher |
+          | **Android (Universal APK)** | \`RuzaLangPatcher.apk\` | ${APK_MB} MB | Android 8–17 · No PC, No Root (Shizuku / SAF / Direct) |
 
-          ### In-Game Samples (`EN`)
+          ### Standalone Android APK Preview (Portrait Phone & Landscape Tablet)
+          | Phone (Home) | Phone (Files & Sync) |
+          | :---: | :---: |
+          | ![Android APK Home](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-home.png?v=070) | ![Android APK Files](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-files.png?v=070) |
+
+          ![Android APK Landscape](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-tablet.png?v=070)
+
+          ### Desktop Usage Walkthrough
+          ![Ruza-Lang Usage Demo](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/usage.webp?v=070)
+
+          ### In-Game Samples (\`EN\`)
           | Character Screen | Star Journey Record |
           | :---: | :---: |
           | ![Character Screen](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-character.jpg) | ![Star Journey Record](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-journey.jpg) |
@@ -101,52 +204,48 @@ jobs:
           ![Settings Menu](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-en.jpg)
 
           ### Highlights / Fitur Utama
-          - **Home Platform Selector (`PC` | `Android`) & Built-In ADB Connect Guide (`v0.6.1`):** Switch between **PC Client** and **Android (ADB)** directly from the Home bottom dock, with smart missing-install prompts (**Browse Folder / Auto-Scan** for PC; **ADB Setup Guide / Choose Device / Browse `adb.exe`** for Android), **Wireless ADB (`IP:Port`)** connect, and a built-in bilingual USB/Wi-Fi/Emulator ADB connection guide.
-          - **Android (ADB) Patching Mode (`v0.6.0`):** Patch real Android phones (USB/Wi-Fi Debugging) & Windows Android emulators (BlueStacks, LDPlayer, MuMu, MEmu, Nox) with **zero root and zero APK re-signing** — covers **77,190 strings (`99.4%`: `VStringPool` + `Static UI KeyConfig`)** plus **Android Cached News (`EN` / `ID`)**, Android Process Guard (`pidof`), PC backups (`%LOCALAPPDATA%\RuzaLang\AndroidBackups\`), atomic transfer + remote `sha256sum` verification, and one-click **Rollback JP**.
-          - **Built-In SHA-256 Auto-Updater (`v0.5.0`):** Checks GitHub Releases automatically on launch (plus manual **Check Updates** in **Files**), verifies downloaded binaries against official `SHA256SUMS.txt` over strict allowlisted HTTPS, swaps the `.exe` atomically in-place, and auto-relaunches.
-          - **Cleaner Launcher Polish & Portable Execution (`v0.4.2`–`v0.4.3`):** Removed all uppercase UI eyebrows and Activity Log dot; WebView2 profile stored cleanly in `%LOCALAPPDATA%\RuzaLang\WebView2` (zero `*.exe.WebView2` folder clutter).
-          - **Client Version Sync Check (`v0.4.1`):** Checks client version + resource revision sync (PC `v1.0.2 · r3219598`, Android `v1.0.0 · r3219596`) with a non-blocking update recommendation if a newer client build is detected.
-          - **Frameless PC Game Launcher UI (`v0.4.0`):** Clean `960×580` frameless desktop launcher with Windows 11 native rounded corners, custom draggable top bar (`—` / geometric `✕`), slim frosted left rail (`Home` · `Files` · `Android` · `News` · `Log` + `EN`/`ID`), original painted scenic hero canvas, bottom action dock with prominent **Install Patch** CTA + **Translate News**, and frosted-glass sub-pages.
-          - **UI Fit Pass (`v0.2.1`):** Tightened quick-menu labels, event sidebar tabs, chapter headers, and banner descriptions + conservative TextMeshPro `<size=80%>` scaling on ultra-wide short prefab labels (`EN` & `ID`) to prevent overlap and `...` truncation.
-          - **Bilingual Toggle (`EN` / `ID`):** Switch between English and Bahasa Indonesia anytime right inside the GUI.
-          - **Dedicated `Translate News (EN / ID)` Button:** Translates cached in-game announcement HTML pages (`HTTPCache` + `Library v3`) with automatic backup restore on Rollback.
-          - **PC 4-Store Localization Pipeline (`77,661` strings):**
-            - `VStringPool` — `74,055` strings
-            - `Static UI KeyConfig` — `3,135` strings
-            - `StaticPackage CSV` — `113` strings
-            - `resources.assets` — `358` strings
+          - **NEW — Standalone Universal Android APK (\`RuzaLangPatcher.apk\`, \`v0.7.0\`):** Patch directly on your Android phone with **zero laptop, zero root, and zero APK re-signing**!
+            - Same launcher aesthetic (responsive Portrait phone + Landscape tablet/emulator left-rail, frosted-glass Settings cards, bilingual \`EN\`/\`ID\` toggle, live Activity Log, built-in Update Checker).
+            - **Zero-PC Storage Access:** Supports **Shizuku** (Android 11–17 via on-phone Wireless Debugging), **SAF Folder Picker**, **Direct Storage**, and automatic **Root (\`su\`)** fallback with a built-in bilingual **Setup Guide**.
+            - **Bit-Identical On-Device Repacking (~3 seconds):** Covers **77,190 strings (\`99.4%\`: \`VStringPool\` + \`Static UI KeyConfig\`)** plus **Cached News (\`EN\` / \`ID\`)**, Android Process Guard, automatic local backups, atomic file replacement + SHA-256 verification, and one-click **Rollback JP**.
+          - **Desktop Launcher Platform Selector (\`PC\` | \`Android\`) & Built-In ADB Connect Guide (\`v0.6.1\`):** Switch between **PC Client** and **Android (ADB)** right from Home, with smart setup prompts, Wireless ADB (\`IP:Port\`), and a bilingual USB/Wi-Fi/Emulator ADB guide.
+          - **Built-In SHA-256 Auto-Updater (\`v0.5.0\`):** Automatic update check on launch (plus manual **Check Updates** in **Files**), verified against official \`SHA256SUMS.txt\`.
+          - **PC 4-Store Localization Pipeline (\`77,661\` strings):** \`VStringPool\` (\`74,055\`), \`Static UI KeyConfig\` (\`3,135\`), \`StaticPackage CSV\` (\`113\`), \`resources.assets\` (\`358\`) + **Translate News (\`EN\` / \`ID\`)**.
           - **Safety & Verification:** Live process guard (PC & Android), exact byte-size preservation, automatic backups, SHA-256 verification, and one-click **Rollback to Original JP**.
 
-          ### Verified GitHub Actions Build & Provenance
-          This executable was compiled directly on GitHub's hosted `windows-latest` runner from the public source tree in this commit (not uploaded from a personal machine):
-          - **Workflow Run:** [View full build log](__RUN_URL__)
-          - **File:** `RuzaLangPatcher.exe` (__MB__ MB, Windows x64)
-          - **SHA-256:** `__SHA__`
+          ### Verified GitHub Actions Builds & Provenance
+          Both binaries were compiled directly on GitHub's hosted runners (\`windows-latest\` & \`ubuntu-latest\`) from the public source tree in this commit:
+          - **Workflow Run:** [View full build log](${RUN_URL})
+          - **Windows x64:** \`RuzaLangPatcher.exe\` (${EXE_MB} MB) — SHA-256: \`${EXE_SHA256}\`
+          - **Android APK:** \`RuzaLangPatcher.apk\` (${APK_MB} MB) — SHA-256: \`${APK_SHA256}\`
           - **Verify build attestation locally:**
-            ```bash
+            \`\`\`bash
             gh attestation verify RuzaLangPatcher.exe --owner notnedar
-            ```
+            gh attestation verify RuzaLangPatcher.apk --owner notnedar
+            \`\`\`
 
           > *Educational localization & binary serialization study project. No proprietary assets are included.*
-          '@
+          EOF
 
-          $lines = $template -split "`r?`n" | ForEach-Object { $_ -replace '^          ', '' }
-          $notes = ($lines -join "`n")
-          $notes = $notes.Replace('__TAG__', $tag).Replace('__SHA__', $sha).Replace('__MB__', $mb).Replace('__RUN_URL__', $runUrl)
-          $notesFile = Join-Path $env:RUNNER_TEMP "release_notes.md"
-          [System.IO.File]::WriteAllText($notesFile, $notes, (New-Object System.Text.UTF8Encoding $false))
+          # Remove leading indentation added by YAML block scalar
+          sed -i 's/^          //' "$NOTES_FILE"
 
-          $ErrorActionPreference = "Continue"
-          gh release view $tag --repo "${{ github.repository }}" 2>$null | Out-Null
-          $exists = ($LASTEXITCODE -eq 0)
-          $ErrorActionPreference = "Stop"
-
-          if ($exists) {
-            gh release upload $tag "release-dist/RuzaLangPatcher.exe" "release-dist/SHA256SUMS.txt" --clobber --repo "${{ github.repository }}"
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            gh release edit $tag --title "$tag — Ruza-Lang Bilingual Patcher (EN / ID)" --notes-file $notesFile --repo "${{ github.repository }}"
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          } else {
-            gh release create $tag "release-dist/RuzaLangPatcher.exe" "release-dist/SHA256SUMS.txt" --title "$tag — Ruza-Lang Bilingual Patcher (EN / ID)" --notes-file $notesFile --repo "${{ github.repository }}"
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
+          if gh release view "$RELEASE_TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
+              release-dist/RuzaLangPatcher.exe \
+              release-dist/RuzaLangPatcher.apk \
+              release-dist/SHA256SUMS.txt \
+              --clobber --repo "${{ github.repository }}"
+            gh release edit "$RELEASE_TAG" \
+              --title "$RELEASE_TAG — Ruza-Lang Bilingual Patcher (PC + Android APK)" \
+              --notes-file "$NOTES_FILE" \
+              --repo "${{ github.repository }}"
+          else
+            gh release create "$RELEASE_TAG" \
+              release-dist/RuzaLangPatcher.exe \
+              release-dist/RuzaLangPatcher.apk \
+              release-dist/SHA256SUMS.txt \
+              --title "$RELEASE_TAG — Ruza-Lang Bilingual Patcher (PC + Android APK)" \
+              --notes-file "$NOTES_FILE" \
+              --repo "${{ github.repository }}"
+          fi

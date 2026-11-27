@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.RuzaLang" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">#141B26</item>
+        <item name="android:statusBarColor">#121924</item>
+        <item name="android:navigationBarColor">#101721</item>
+    </style>
+</resources>

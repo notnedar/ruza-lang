@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Ruza-Lang v0.7.0 — EN / ID</title>
+<style>
+  :root {
+    --rail-w: 68px;
+    --rail-bg: rgba(18, 25, 36, 0.86);
+    --dock-bg: rgba(16, 23, 33, 0.84);
+    --glass-sheet: rgba(240, 244, 249, 0.90);
+    --glass-rim: rgba(255, 255, 255, 0.80);
+    --ink: #242932;
+    --ink-soft: #596270;
+    --ink-muted: #7c8594;
+    --slate-bar: #393d45;
+    --slate-bar-2: #494e58;
+    --ivory-top: #faf7f0;
+    --ivory-bot: #ece5d5;
+    --ivory-ink: #161d28;
+    --champagne: #e8d2a0;
+    --sky: #5cb4e6;
+    --sky-deep: #246c99;
+    --jade: #1e7356;
+    --amber: #9b6414;
+    --rose: #b83c42;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #141b26;
+    color: #f4f7fa;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 13.5px;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .hero-bg {
+    position: fixed;
+    inset: 0;
+    background-image: url('hero.webp');
+    background-size: cover;
+    background-position: 68% center;
+    transition: filter 0.25s ease, transform 0.25s ease;
+    z-index: 0;
+  }
+  body.subview .hero-bg {
+    filter: blur(13px) brightness(0.94) saturate(1.06);
+    transform: scale(1.04);
+  }
+  .hero-scrim {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background:
+      radial-gradient(ellipse 70% 55% at 24% 20%, rgba(16, 48, 84, 0.44), transparent 76%),
+      linear-gradient(180deg, rgba(16, 28, 46, 0.34) 0%, rgba(16, 28, 46, 0.14) 45%, rgba(14, 21, 31, 0.58) 100%);
+    transition: opacity 0.22s ease;
+  }
+  body.subview .hero-scrim { opacity: 0.38; }
+
+  /* Responsive Shell: Portrait (top bar + stage + bottom nav) / Landscape (left rail + stage) */
+  .shell {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Portrait Top Header */
+  .mobile-top {
+    height: 52px;
+    flex-shrink: 0;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--rail-bg);
+    backdrop-filter: blur(18px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    z-index: 25;
+  }
+  .brand-row { display: flex; align-items: center; gap: 9px; }
+  .mark-box {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    border: 1px solid rgba(232, 210, 160, 0.44);
+    background: linear-gradient(155deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .brand-name { font-size: 14.5px; font-weight: 600; color: #ffffff; letter-spacing: -0.2px; }
+  .brand-ver {
+    font-family: ui-monospace, "Cascadia Code", monospace;
+    font-size: 10.5px;
+    color: rgba(232, 210, 160, 0.82);
+    margin-left: 2px;
+  }
+  .lang-seg {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+  }
+  .lang-btn {
+    min-width: 34px;
+    height: 24px;
+    padding: 0 7px;
+    border-radius: 4.5px;
+    border: none;
+    background: transparent;
+    color: rgba(226, 234, 244, 0.62);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+  }
+  .lang-btn.active { background: #f3eee2; color: var(--ivory-ink); }
+  .lang-btn:disabled { opacity: 0.45; }
+
+  /* Landscape Left Rail (mirrors desktop PC launcher!) */
+  .rail { display: none; }
+
+  .stage {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Running Process Warning Banner */
+  .proc-alert {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(154, 38, 46, 0.92);
+    border-bottom: 1px solid rgba(255, 200, 204, 0.35);
+    color: #fff6f6;
+    font-size: 11.5px;
+    font-weight: 500;
+    flex-shrink: 0;
+    z-index: 20;
+  }
+  .proc-alert.show { display: flex; }
+  .proc-pulse {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #ffd1d4;
+    animation: pulse 1.2s infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  /* Views */
+  .view { display: none; flex: 1; min-height: 0; flex-direction: column; }
+  .view.active { display: flex; }
+
+  /* ==================== HOME VIEW ==================== */
+  .hero-canvas {
+    flex: 1;
+    min-height: 0;
+    padding: 18px 18px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 12px;
+    overflow-y: auto;
+  }
+  .hero-copy { max-width: 440px; }
+  .hero-title {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.06;
+    letter-spacing: -0.6px;
+    color: #ffffff;
+    text-shadow: 0 3px 18px rgba(14, 42, 74, 0.38);
+  }
+  .hero-rule {
+    width: 34px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--champagne), rgba(255, 255, 255, 0.25));
+    margin: 9px 0 9px;
+  }
+  .hero-desc {
+    font-size: 12.5px;
+    line-height: 1.48;
+    color: rgba(255, 255, 255, 0.93);
+    text-shadow: 0 1px 10px rgba(14, 42, 74, 0.42);
+  }
+  .hero-meta-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 11px;
+  }
+  .hero-state-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-align: left;
+    text-shadow: 0 1px 10px rgba(14, 40, 70, 0.44);
+    cursor: pointer;
+  }
+  .state-diamond {
+    width: 7px;
+    height: 7px;
+    transform: rotate(45deg);
+    background: var(--champagne);
+    flex-shrink: 0;
+  }
+  .state-diamond.en { background: #9be0ff; }
+  .state-diamond.id { background: #8ce5c0; }
+  .state-diamond.warn { background: #f8b4b8; }
+
+  .hero-ver-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .hero-ver-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    background: transparent;
+    color: rgba(242, 248, 255, 0.88);
+    font-family: inherit;
+    font-size: 11.5px;
+    text-shadow: 0 1px 10px rgba(14, 40, 70, 0.42);
+    cursor: pointer;
+  }
+  .hero-ver-dot { width: 5px; height: 5px; border-radius: 50%; background: #8ce5c0; }
+  .hero-ver-btn.mismatch {
+    padding: 4px 9px;
+    border-radius: 5px;
+    background: rgba(146, 84, 14, 0.86);
+    border: 1px solid rgba(255, 224, 162, 0.48);
+    color: #fff7e6;
+    font-weight: 500;
+    text-shadow: none;
+  }
+  .hero-ver-btn.mismatch .hero-ver-dot { background: #ffd479; }
+
+  .hero-update-btn {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 5px;
+    background: rgba(24, 62, 98, 0.86);
+    border: 1px solid rgba(176, 224, 255, 0.48);
+    color: #eef8ff;
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .hero-update-btn.show { display: inline-flex; }
+
+  /* Always-live frosted Home Activity Log */
+  .home-log-box {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 460px;
+    min-height: 120px;
+    flex: 1;
+    max-height: 210px;
+    border-radius: 9px;
+    background: rgba(16, 23, 34, 0.68);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.17);
+    overflow: hidden;
+  }
+  .home-log-head {
+    height: 28px;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+    background: rgba(255, 255, 255, 0.04);
+    flex-shrink: 0;
+  }
+  .home-log-title { font-size: 11px; font-weight: 500; color: rgba(238, 244, 250, 0.90); }
+  .home-log-link {
+    border: none;
+    background: transparent;
+    color: rgba(215, 226, 238, 0.78);
+    font-family: inherit;
+    font-size: 10.5px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 2px 6px;
+  }
+  .home-log-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 7px 10px;
+    font-family: ui-monospace, "Cascadia Code", monospace;
+    font-size: 10.5px;
+    line-height: 1.5;
+    user-select: text;
+  }
+  .home-log-body .log-ts { color: rgba(186, 200, 216, 0.56); margin-right: 5px; }
+  .home-log-body .log-tag { font-weight: 700; margin-right: 5px; }
+  .home-log-body .log-info .log-tag { color: #8ad0f7; }
+  .home-log-body .log-info .log-msg { color: rgba(238, 244, 250, 0.92); }
+  .home-log-body .log-ok .log-tag, .home-log-body .log-ok .log-msg { color: #86e5be; }
+  .home-log-body .log-diff .log-tag { color: #ebd08f; }
+  .home-log-body .log-diff .log-msg { color: rgba(226, 232, 240, 0.86); }
+  .home-log-body .log-warn .log-tag, .home-log-body .log-warn .log-msg { color: #ffd07a; }
+  .home-log-body .log-err .log-tag, .home-log-body .log-err .log-msg { color: #fca5a8; }
+
+  /* Bottom Action Dock */
+  .dock {
+    position: relative;
+    flex-shrink: 0;
+    background: var(--dock-bg);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+    padding: 10px 14px 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .dock-prog-track {
+    position: absolute;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.10);
+  }
+  .bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #6ec4f2 0%, #c8e5f7 55%, #edd49a 100%);
+    transition: width 0.18s ease-out;
+  }
+  .dock-status {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .dock-stage {
+    font-size: 11.8px;
+    font-weight: 500;
+    color: rgba(244, 248, 252, 0.92);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dock-count {
+    font-family: ui-monospace, "Cascadia Code", monospace;
+    font-size: 10.8px;
+    color: rgba(220, 230, 242, 0.68);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+  .dock-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .access-chip {
+    flex: 1;
+    min-width: 0;
+    height: 32px;
+    padding: 0 9px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: rgba(235, 241, 248, 0.90);
+    font-family: inherit;
+    font-size: 11.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .access-chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .btn-dock-sec {
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.09);
+    color: #f4f7fa;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-dock-sec.rose { color: #f6b9bc; border-color: rgba(242, 169, 173, 0.28); }
+  .btn-dock-sec:disabled { opacity: 0.45; }
+
+  .btn-hero-cta {
+    flex: 1;
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.88);
+    background: linear-gradient(180deg, var(--ivory-top) 0%, var(--ivory-bot) 100%);
+    color: var(--ivory-ink);
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(8, 14, 24, 0.34), inset 0 1px 0 #ffffff;
+  }
+  .btn-hero-cta:disabled { opacity: 0.5; }
+
+  /* Portrait Bottom Navigation Bar */
+  .bottom-nav {
+    height: 54px;
+    flex-shrink: 0;
+    background: var(--rail-bg);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 255, 255, 0.13);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 6px;
+    z-index: 25;
+  }
+  .nav-btn {
+    position: relative;
+    flex: 1;
+    height: 44px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: rgba(226, 234, 244, 0.56);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .nav-btn.active { color: #ffffff; background: rgba(255, 255, 255, 0.11); }
+  .nav-lbl { font-size: 10px; font-weight: 500; line-height: 1; }
+  .nav-dot {
+    position: absolute;
+    top: 6px;
+    right: calc(50% - 14px);
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--sky);
+    display: none;
+  }
+  .nav-dot.show { display: block; }
+
+  /* ==================== SUB-VIEWS: AP SETTINGS FROSTED GLASS ==================== */
+  .sub-wrap {
+    flex: 1;
+    min-height: 0;
+    padding: 12px 12px 12px;
+    display: flex;
+    flex-direction: column;
+  }
+  .glass-sheet {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--glass-sheet);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-rim);
+    border-radius: 12px;
+    padding: 14px 14px 13px;
+    color: var(--ink);
+    box-shadow: 0 14px 36px rgba(18, 34, 54, 0.18);
+    overflow-y: auto;
+  }
+  .sec-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: linear-gradient(90deg, var(--slate-bar) 0%, var(--slate-bar-2) 100%);
+    color: #f3f5f8;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .sec-bar-right { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(235, 240, 246, 0.80); }
+  .btn-bar-link {
+    height: 22px;
+    padding: 0 9px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    background: rgba(255, 255, 255, 0.10);
+    color: #eef2f7;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .rows-block { margin: 2px 0 11px; }
+  .set-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 46px;
+    padding: 7px 4px 7px 12px;
+    border-bottom: 1px solid rgba(48, 58, 72, 0.12);
+    flex-wrap: wrap;
+  }
+  .set-row::before {
+    content: ":";
+    position: absolute;
+    left: 2px;
+    bottom: -6px;
+    font-size: 10px;
+    color: rgba(68, 78, 92, 0.38);
+  }
+  .set-label { font-size: 13px; font-weight: 500; color: var(--ink); }
+  .set-sub { font-size: 11.2px; color: var(--ink-muted); margin-top: 1px; }
+  .set-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }
+
+  .pkg-count { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-soft); }
+  .pkg-bak { font-size: 11px; color: var(--ink-muted); }
+  .pkg-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.8px;
+    font-weight: 600;
+  }
+  .pkg-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-muted); }
+  .pkg-state.patched_en { color: var(--sky-deep); }
+  .pkg-state.patched_en .pkg-dot { background: var(--sky-deep); }
+  .pkg-state.patched_id { color: var(--jade); }
+  .pkg-state.patched_id .pkg-dot { background: var(--jade); }
+  .pkg-state.original { color: var(--ink-soft); }
+  .pkg-state.modified { color: var(--amber); }
+  .pkg-state.modified .pkg-dot { background: var(--amber); }
+  .pkg-state.missing { color: var(--rose); }
+  .pkg-state.missing .pkg-dot { background: var(--rose); }
+
+  .btn-white {
+    height: 31px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(55, 68, 86, 0.22);
+    background: #ffffff;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 11.8px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .btn-white:disabled { opacity: 0.45; }
+  .btn-charcoal {
+    height: 34px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: none;
+    background: #2c3037;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+  .btn-charcoal:disabled { opacity: 0.45; }
+  .btn-danger-pill {
+    height: 34px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: none;
+    background: #a83238;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .sheet-footer {
+    margin-top: auto;
+    padding-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .sheet-note { font-size: 11px; color: var(--ink-muted); }
+
+  /* Execution Ledger */
+  .log-ledger {
+    flex: 1;
+    min-height: 180px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.74);
+    border: 1px solid rgba(48, 58, 72, 0.12);
+    overflow-y: auto;
+    font-family: ui-monospace, "Cascadia Code", monospace;
+    font-size: 11px;
+    line-height: 1.56;
+    user-select: text;
+  }
+  .log-line { white-space: pre-wrap; word-break: break-word; }
+  .log-ts { color: #8c95a3; margin-right: 6px; }
+  .log-tag { font-weight: 700; margin-right: 6px; }
+  .log-info .log-tag { color: #2a6a96; }
+  .log-info .log-msg { color: #2b333e; }
+  .log-ok .log-tag, .log-ok .log-msg { color: #1b6b50; }
+  .log-diff .log-tag { color: #8c5c12; }
+  .log-diff .log-msg { color: #4c5563; }
+  .log-warn .log-tag, .log-warn .log-msg { color: #9a5d0c; }
+  .log-err .log-tag, .log-err .log-msg { color: #b53238; }
+
+  /* Frosted Pearl Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(16, 24, 36, 0.50);
+    backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+    z-index: 200;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    width: 100%;
+    max-width: 440px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: rgba(246, 249, 252, 0.97);
+    border: 1px solid #ffffff;
+    border-radius: 12px;
+    padding: 18px 18px;
+    box-shadow: 0 22px 54px rgba(10, 18, 30, 0.36);
+    color: var(--ink);
+  }
+  .modal h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+  .modal p { font-size: 12.2px; color: var(--ink-soft); line-height: 1.52; white-space: pre-line; margin-bottom: 14px; }
+  .modal-btns { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+  .guide-card {
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(48, 58, 72, 0.12);
+    border-radius: 8px;
+    padding: 9px 11px;
+    margin-bottom: 8px;
+  }
+  .guide-card-title { font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+  .guide-card ol, .guide-card p { margin: 0; font-size: 11.5px; line-height: 1.46; color: var(--ink-soft); }
+  .guide-card ol { padding-left: 17px; }
+
+  /* ==================== LANDSCAPE / TABLET / BLUESTACKS (MATCHES DESKTOP LAUNCHER!) ==================== */
+  @media (min-width: 700px) and (orientation: landscape) {
+    .shell { flex-direction: row; }
+    .mobile-top, .bottom-nav { display: none; }
+    .rail {
+      display: flex;
+      width: var(--rail-w);
+      height: 100%;
+      flex-shrink: 0;
+      flex-direction: column;
+      align-items: center;
+      background: var(--rail-bg);
+      backdrop-filter: blur(22px);
+      border-right: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 14px 0;
+      z-index: 25;
+    }
+    .rail-brand { display: flex; flex-direction: column; align-items: center; gap: 5px; padding-bottom: 12px; }
+    .rail-ver { font-family: ui-monospace, monospace; font-size: 9.5px; color: rgba(232, 210, 160, 0.80); }
+    .rail-nav { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+    .rail .nav-btn { flex: none; width: 52px; height: 48px; }
+    .rail .nav-btn.active::before {
+      content: "";
+      position: absolute;
+      left: -8px;
+      top: 11px;
+      bottom: 11px;
+      width: 2.5px;
+      border-radius: 0 2px 2px 0;
+      background: var(--champagne);
+    }
+    .rail-foot {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.10);
+    }
+    .rail-foot .lang-btn { width: 42px; height: 24px; }
+    .hero-canvas { padding: 34px 36px 16px; justify-content: flex-start; gap: 14px; }
+    .hero-title { font-size: 38px; }
+    .home-log-box { max-width: 440px; height: 192px; max-height: 205px; flex: none; }
+    .dock { flex-direction: row; align-items: center; justify-content: space-between; padding: 14px 24px 14px 30px; gap: 18px; }
+    .dock-left-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+    .dock-actions-col { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+    .dock-actions-col .btn-hero-cta { flex: none; min-width: 186px; }
+    .sub-wrap { padding: 24px 28px; }
+    .glass-sheet { padding: 18px 22px 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="hero-bg"></div>
+<div class="hero-scrim"></div>
+
+<div class="shell">
+  <!-- LANDSCAPE LEFT SLIM LAUNCHER RAIL -->
+  <aside class="rail">
+    <div class="rail-brand">
+      <div class="mark-box">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+          <path d="M6.5 4.5H13.8C16.4 4.5 18 6 18 8.3C18 10.3 16.7 11.7 14.5 12L18.5 19.5H15.4L11.8 12.4H9V19.5H6.5V4.5ZM9 6.8V10.3H13.4C14.7 10.3 15.5 9.6 15.5 8.5C15.5 7.4 14.7 6.8 13.4 6.8H9Z" fill="#f3eee2"/>
+          <path d="M16.5 4.5L19.5 4.5L19.5 7.5" stroke="#e8d2a0" stroke-width="1.3"/>
+        </svg>
+      </div>
+      <span class="rail-ver">0.7.0</span>
+    </div>
+    <nav class="rail-nav">
+      <button class="nav-btn active" data-tab="home">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-4.5v-6h-5v6H5a1 1 0 01-1-1v-9.5z"/></svg>
+        <span class="nav-lbl" data-i18n="navHome">Home</span>
+      </button>
+      <button class="nav-btn" data-tab="packages">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8.5 4.8v8.4L12 21l-8.5-4.8V7.8L12 3z"/><path d="M12 12l8.5-4.2M12 12v9M12 12L3.5 7.8"/></svg>
+        <span class="nav-lbl" data-i18n="navPackages">Files</span>
+      </button>
+      <button class="nav-btn" data-tab="news">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+        <span class="nav-lbl" data-i18n="navNews">News</span>
+      </button>
+      <button class="nav-btn" data-tab="log">
+        <span class="nav-dot log-dot-ref"></span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg>
+        <span class="nav-lbl" data-i18n="navLog">Log</span>
+      </button>
+    </nav>
+    <div class="rail-foot">
+      <button class="lang-btn active" data-lang="en">EN</button>
+      <button class="lang-btn" data-lang="id">ID</button>
+    </div>
+  </aside>
+
+  <!-- PORTRAIT TOP BAR -->
+  <header class="mobile-top">
+    <div class="brand-row">
+      <div class="mark-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M6.5 4.5H13.8C16.4 4.5 18 6 18 8.3C18 10.3 16.7 11.7 14.5 12L18.5 19.5H15.4L11.8 12.4H9V19.5H6.5V4.5ZM9 6.8V10.3H13.4C14.7 10.3 15.5 9.6 15.5 8.5C15.5 7.4 14.7 6.8 13.4 6.8H9Z" fill="#f3eee2"/>
+          <path d="M16.5 4.5L19.5 4.5L19.5 7.5" stroke="#e8d2a0" stroke-width="1.3"/>
+        </svg>
+      </div>
+      <span class="brand-name">Ruza-Lang</span>
+      <span class="brand-ver">0.7.0</span>
+    </div>
+    <div class="lang-seg">
+      <button class="lang-btn active" data-lang="en">EN</button>
+      <button class="lang-btn" data-lang="id">ID</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div id="procAlert" class="proc-alert">
+      <span class="proc-pulse"></span>
+      <span id="procAlertText">Game running — Close first</span>
+    </div>
+
+    <!-- VIEW 1: HOME -->
+    <section id="viewHome" class="view active">
+      <div class="hero-canvas">
+        <div class="hero-copy">
+          <h1 class="hero-title">Ruza-Lang</h1>
+          <div class="hero-rule"></div>
+          <p id="heroDesc" class="hero-desc">
+            English &amp; Indonesian Android localization with exact&#8209;size repacking, SHA&#8209;256 verification, and safe one&#8209;click rollback.
+          </p>
+          <div class="hero-meta-stack">
+            <button id="heroStateBtn" class="hero-state-link" type="button">
+              <span id="heroStateDot" class="state-diamond"></span>
+              <span id="heroStateText">Scanning Android installation...</span>
+            </button>
+            <div class="hero-ver-row">
+              <button id="heroVerBtn" class="hero-ver-btn" type="button" style="display:none;">
+                <span class="hero-ver-dot"></span>
+                <span id="heroVerText">Android v1.0.0 (r3219596) &middot; Synced</span>
+              </button>
+            </div>
+            <button id="heroUpdateBtn" class="hero-update-btn" type="button">
+              <span id="heroUpdateText">Update available</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="home-log-box">
+          <div class="home-log-head">
+            <span id="homeLogTitle" class="home-log-title">Activity Log</span>
+            <button id="btnHomeLogFull" class="home-log-link" type="button">Full Log</button>
+          </div>
+          <div id="homeLogBody" class="home-log-body"></div>
+        </div>
+      </div>
+
+      <div class="dock">
+        <div class="dock-prog-track"><div id="barFill" class="bar-fill"></div></div>
+        <div class="dock-left-col">
+          <div class="dock-status">
+            <span id="progStage" class="dock-stage">Scanning storage access...</span>
+            <span id="progCount" class="dock-count">0 / 77,190</span>
+          </div>
+          <div class="dock-row" style="margin-top:4px;">
+            <button id="btnAccessChip" class="access-chip" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" style="flex-shrink:0;"><rect x="6" y="3" width="12" height="18" rx="2.2"/><path d="M10.5 18h3"/></svg>
+              <span id="accessChipText">Checking Shizuku / Storage...</span>
+            </button>
+            <button id="btnQuickScan" class="btn-dock-sec" type="button" title="Scan">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12a8 8 0 10-2.3 5.6M20 12V6m0 6h-6"/></svg>
+            </button>
+            <button id="btnRollback" class="btn-dock-sec rose" type="button">
+              <span id="btnRollbackText">Rollback JP</span>
+            </button>
+          </div>
+        </div>
+        <div class="dock-actions-col" style="display:flex;gap:8px;align-items:center;">
+          <button id="btnNews" class="btn-dock-sec" type="button" style="height:44px;padding:0 14px;">
+            <span id="btnNewsText">News (EN)</span>
+          </button>
+          <button id="btnPatch" class="btn-hero-cta" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 18h16"/></svg>
+            <span id="btnPatchText">Install Patch (EN)</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: FILES & STORAGE ACCESS -->
+    <section id="viewPackages" class="view">
+      <div class="sub-wrap">
+        <div class="glass-sheet">
+          <div class="sec-bar">
+            <span id="lblAccessSec">Android Storage Access (No Root)</span>
+            <div class="sec-bar-right">
+              <button id="btnSetupGuide" class="btn-bar-link" type="button">Setup Guide</button>
+            </div>
+          </div>
+          <div class="rows-block">
+            <div class="set-row">
+              <div>
+                <div id="lblAccessRow" class="set-label">Access Method</div>
+                <div id="lblAccessSub" class="set-sub">Shizuku (Android 11–17, zero PC) or SAF folder picker</div>
+              </div>
+              <div class="set-right">
+                <span id="accessStateBadge" class="pkg-state original"><span class="pkg-dot"></span>—</span>
+                <button id="btnAuthShizuku" class="btn-white" type="button">Shizuku</button>
+                <button id="btnPickSaf" class="btn-white" type="button">Folder</button>
+              </div>
+            </div>
+            <div class="set-row">
+              <div>
+                <div id="lblVerRow" class="set-label">Client Version Sync</div>
+                <div id="lblVerSub" class="set-sub">Verified for Android v1.0.0 (r3219596)</div>
+              </div>
+              <div class="set-right">
+                <span id="pkgVerDetected" class="pkg-count">&mdash;</span>
+                <span id="pkgVerState" class="pkg-state original"><span class="pkg-dot"></span>&mdash;</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="sec-bar">
+            <span id="lblPackagesSec">Android Localization Bundles</span>
+            <span id="pkgSummaryRight" class="sec-bar-right">77,190 verified strings (99.4%)</span>
+          </div>
+          <div id="targetsList" class="rows-block" style="margin-bottom:6px;"></div>
+
+          <div class="sheet-footer">
+            <div id="sheetNote" class="sheet-note">Original backups saved locally &middot; Exact byte sizes &middot; Zero APK re-sign</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button id="btnCheckUpdate" class="btn-white" type="button">Check Updates</button>
+              <button id="btnRollbackPkg" class="btn-charcoal" type="button">
+                <span id="btnRollbackPkgText">Rollback Original JP</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: NEWS -->
+    <section id="viewNews" class="view">
+      <div class="sub-wrap">
+        <div class="glass-sheet">
+          <div class="sec-bar">
+            <span id="lblNewsSec">Cached In-Game Announcements</span>
+            <span class="sec-bar-right">16 HTML pages</span>
+          </div>
+          <div class="rows-block">
+            <div class="set-row">
+              <div>
+                <div id="newsRow1Title" class="set-label">Cache Format</div>
+                <div id="newsRow1Sub" class="set-sub">BestHTTP HTTPCache &amp; Library v3 inside Android/data</div>
+              </div>
+              <div class="set-right"><span id="newsCacheBadge" class="pkg-state original"><span class="pkg-dot"></span>&mdash;</span></div>
+            </div>
+            <div class="set-row">
+              <div>
+                <div id="newsRow2Title" class="set-label">Prerequisite</div>
+                <div id="newsRow2Sub" class="set-sub">Open the in-game News screen once, close the game completely, then patch</div>
+              </div>
+              <div class="set-right"><span id="newsLangTag" class="pkg-state patched_en"><span class="pkg-dot"></span>English (EN)</span></div>
+            </div>
+            <div class="set-row">
+              <div>
+                <div id="newsRow3Title" class="set-label">Backup &amp; Restore</div>
+                <div id="newsRow3Sub" class="set-sub">Original announcements backed up automatically before translating</div>
+              </div>
+              <div class="set-right"><span id="newsBakTag" class="pkg-bak">&mdash;</span></div>
+            </div>
+          </div>
+          <div class="sheet-footer">
+            <div id="newsNote" class="sheet-note">Rollback restores cached announcements automatically if a backup exists.</div>
+            <button id="btnNewsPage" class="btn-charcoal" type="button">
+              <span id="btnNewsPageText">Translate News (EN)</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 4: LOG -->
+    <section id="viewLog" class="view">
+      <div class="sub-wrap">
+        <div class="glass-sheet">
+          <div class="sec-bar">
+            <span id="lblTerm">Execution &amp; Verification Log</span>
+            <div class="sec-bar-right">
+              <button id="btnCopyLog" class="btn-bar-link" type="button">Copy</button>
+              <button id="btnClearLog" class="btn-bar-link" type="button">Clear</button>
+            </div>
+          </div>
+          <div id="termBody" class="log-ledger"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- PORTRAIT BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="home">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-4.5v-6h-5v6H5a1 1 0 01-1-1v-9.5z"/></svg>
+      <span class="nav-lbl" data-i18n="navHome">Home</span>
+    </button>
+    <button class="nav-btn" data-tab="packages">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8.5 4.8v8.4L12 21l-8.5-4.8V7.8L12 3z"/><path d="M12 12l8.5-4.2M12 12v9M12 12L3.5 7.8"/></svg>
+      <span class="nav-lbl" data-i18n="navPackages">Files</span>
+    </button>
+    <button class="nav-btn" data-tab="news">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+      <span class="nav-lbl" data-i18n="navNews">News</span>
+    </button>
+    <button class="nav-btn" data-tab="log">
+      <span class="nav-dot log-dot-ref"></span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg>
+      <span class="nav-lbl" data-i18n="navLog">Log</span>
+    </button>
+  </nav>
+</div>
+
+<!-- Frosted Pearl Modal -->
+<div id="modalBackdrop" class="modal-backdrop">
+  <div class="modal">
+    <h3 id="modalTitle">Notice</h3>
+    <p id="modalBody"></p>
+    <div id="modalBtns" class="modal-btns"></div>
+  </div>
+</div>
+
+<!-- Shizuku / SAF Access Setup Guide Modal -->
+<div id="guideBackdrop" class="modal-backdrop">
+  <div class="modal" style="max-width:490px;">
+    <h3 id="guideTitle">Android Storage Setup (No PC, No Root)</h3>
+    <div id="guideBody"></div>
+    <div class="modal-btns" style="margin-top:10px;">
+      <button id="btnGuideOpenShizuku" class="btn-white" type="button">Open / Get Shizuku</button>
+      <button id="btnGuidePickSaf" class="btn-white" type="button">Pick Folder (SAF)</button>
+      <button id="btnGuideAuth" class="btn-charcoal" type="button">Authorize Shizuku</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let busy = false;
+  let selectedLang = 'en';
+  let activeTab = 'home';
+  let scan = null;
+  let updateInfo = null;
+
+  const I18N = {
+    en: {
+      navHome: 'Home', navPackages: 'Files', navNews: 'News', navLog: 'Log',
+      heroDesc: 'English & Indonesian Android localization with exact\u2011size repacking, SHA\u2011256 verification, and safe one\u2011click rollback.',
+      homeLogTitle: 'Activity Log', fullLog: 'Full Log',
+      btnPatch: 'Install Patch (EN)', btnNews: 'News (EN)', btnNewsLong: 'Translate News (EN)',
+      btnRollback: 'Rollback JP', btnRollbackFull: 'Rollback Original JP',
+      btnCheckUpdate: 'Check Updates', checking: 'Checking...',
+      lblAccessSec: 'Android Storage Access (No Root)', btnSetupGuide: 'Setup Guide',
+      lblAccessRow: 'Access Method', lblAccessSub: 'Shizuku (Android 11–17, zero PC) or SAF folder picker',
+      btnShizuku: 'Shizuku', btnFolder: 'Folder',
+      lblVerRow: 'Client Version Sync', lblVerSubSynced: (e) => `Verified for Android ${e} · Exact-size · No APK re-sign`,
+      verSynced: 'Synced', verMismatch: 'Mismatch',
+      lblPackagesSec: 'Android Localization Bundles', pkgSummary: '77,190 verified strings (99.4%)',
+      sheetNote: 'Original backups saved locally · Exact byte sizes · Zero APK re-sign',
+      lblNewsSec: 'Cached In-Game Announcements',
+      newsRow1Title: 'Cache Format', newsRow1Sub: 'BestHTTP HTTPCache & Library v3 inside Android/data',
+      newsRow2Title: 'Prerequisite', newsRow2Sub: 'Open the in-game News screen once, close the game completely, then patch',
+      newsRow3Title: 'Backup & Restore', newsRow3Sub: 'Original announcements backed up automatically before translating',
+      newsLangTag: 'English (EN)', newsReady: 'Cache Ready', newsEmpty: 'Open News Once',
+      newsNote: 'Rollback restores cached announcements automatically if a backup exists.',
+      lblTerm: 'Execution & Verification Log', copyLog: 'Copy', clearLog: 'Clear', copied: 'Copied log to clipboard.',
+      bakYes: 'Backup OK', bakNo: 'No Backup',
+      badges: { patched_en: 'English OK', patched_id: 'Indo OK', original: 'Original JP', modified: 'Modified', missing: 'Missing' },
+      stateScanning: 'Scanning Android installation...',
+      stateNotInstalled: 'Android client not installed on this device',
+      stateNoAccess: 'Storage access needed · Tap to set up Shizuku / SAF',
+      stateRunning: (p) => `Game running (PID ${p}) · Force-close first`,
+      stateDataMissing: 'In-game asset data missing · Finish download first',
+      stateEnOk: 'English (EN) active · 2/2 bundles verified',
+      stateIdOk: 'Indonesian (ID) active · 2/2 bundles verified',
+      stateOrig: 'Original JP detected · Ready to patch',
+      stateMixed: 'Partial patch state · Tap Files to inspect',
+      stageNeedAccess: 'Tap Setup Access (Shizuku or SAF) to access Android/data.',
+      stageNotInstalled: 'Target Android game not installed on this device.',
+      stageEnOk: 'Installed: English (EN)', stageIdOk: 'Installed: Bahasa Indonesia (ID)', stageOrig: 'Original JP — ready to patch.',
+      chipNeedAccess: 'Setup Access (Shizuku / SAF)',
+      verHeroSynced: (v) => `Android ${v} · Synced`, verHeroMismatch: (v, e) => `Android ${v} ≠ ${e} — Update recommended`,
+      updateBanner: (v) => `Update available: ${v} — Tap to download`,
+      upToDateTitle: 'Up to Date', upToDateBody: (c) => `You are already on the latest version (${c}).`,
+      updateTitle: 'Update Available', updateBody: (c, l, mb) => `A newer Ruza-Lang release is available.\n\nCurrent: ${c}\nLatest: ${l} (${mb} MB)`,
+      downloadApk: 'Download APK', openRelease: 'Release Page', later: 'Later',
+      notInstTitle: 'Game Not Installed', notInstBody: 'The target Android client was not found on this device.\n\nInstall the game, finish downloading the in-game resource data, close the game, then tap Scan.',
+      noAccessTitle: 'Authorize Storage Access First', noAccessBody: 'Android 11+ restricts access to Android/data for normal apps.\n\nUse Shizuku (works right on your phone via Wireless Debugging — zero PC, zero root!) or pick the game folder via SAF.',
+      runningTitle: 'Close Game First', runningBody: (p) => `The game is currently running (PID ${p}).\n\nPlease force-close the game before patching or rollback.`,
+      forceCloseBtn: 'App Info (Force Stop)',
+      dataMissTitle: 'In-Game Data Missing', dataMissBody: 'The game is installed, but its external asset bundles (.res) are missing.\n\nOpen the game once, finish downloading additional resources, close it, then tap Scan.',
+      mismatchTitle: 'Client Version Mismatch', mismatchBody: (d, e, r) => `Detected: ${d}\nVerified for: ${e}\n${r ? 'Details: ' + r + '\n' : ''}\nWaiting for a Ruza-Lang update is recommended, or tap Install Anyway (original backups are saved first).`,
+      waitUpdate: 'Wait for Update', installAnyway: 'Install Anyway',
+      rollbackTitle: 'Confirm Rollback to Original JP', rollbackBody: 'Restore both Android bundles (and cached News if backed up) back to Original JP?\n\nSHA-256 hashes will be verified automatically.',
+      cancel: 'Cancel', confirmRollback: 'Yes, Rollback Now', ok: 'OK',
+      openGuideBtn: 'Open Setup Guide',
+      guideTitle: 'Android Storage Setup (No PC, No Root)',
+      btnGuideOpenShizuku: 'Open / Get Shizuku', btnGuidePickSaf: 'Pick Folder (SAF)', btnGuideAuth: 'Authorize Shizuku',
+      guideHtml: `
+        <div class="guide-card">
+          <div class="guide-card-title">1. Shizuku via Wireless Debugging (Recommended · Android 11–17 · No PC)</div>
+          <ol>
+            <li>Install official <b>Shizuku</b> (Google Play / shizuku.rikka.app).</li>
+            <li>Enable <b>Developer Options &rarr; Wireless Debugging</b> on your phone.</li>
+            <li>Open Shizuku &rarr; tap <b>Pairing</b> &rarr; enter the 6-digit pairing code in the notification &rarr; tap <b>Start</b>.</li>
+            <li>Return to Ruza-Lang and tap <b>Authorize Shizuku</b> below.</li>
+          </ol>
+        </div>
+        <div class="guide-card">
+          <div class="guide-card-title">2. Folder Picker / SAF (Android 11–12 &amp; some devices)</div>
+          <p>Tap <b>Pick Folder (SAF)</b> below and select <code>Android/data/.../files</code> if your system file picker allows it (no Shizuku needed).</p>
+        </div>
+        <div class="guide-card">
+          <div class="guide-card-title">3. Direct Storage / Root</div>
+          <p>Detected automatically on Android 8–10, emulators with direct storage, or rooted devices.</p>
+        </div>`
+    },
+    id: {
+      navHome: 'Utama', navPackages: 'Paket', navNews: 'Berita', navLog: 'Log',
+      heroDesc: 'Lokalisasi Android Inggris & Indonesia dengan repacking ukuran identik, verifikasi SHA\u2011256, dan rollback sekali klik.',
+      homeLogTitle: 'Log Aktivitas', fullLog: 'Log Penuh',
+      btnPatch: 'Pasang Patch (ID)', btnNews: 'Berita (ID)', btnNewsLong: 'Translate News (ID)',
+      btnRollback: 'Rollback JP', btnRollbackFull: 'Rollback Original JP',
+      btnCheckUpdate: 'Cek Update', checking: 'Mengecek...',
+      lblAccessSec: 'Akses Storage Android (Tanpa Root)', btnSetupGuide: 'Panduan',
+      lblAccessRow: 'Metode Akses', lblAccessSub: 'Shizuku (Android 11–17, tanpa laptop) atau pilih folder SAF',
+      btnShizuku: 'Shizuku', btnFolder: 'Folder',
+      lblVerRow: 'Sinkronisasi Versi Klien', lblVerSubSynced: (e) => `Terverifikasi untuk Android ${e} · Ukuran identik · Tanpa re-sign APK`,
+      verSynced: 'Sinkron', verMismatch: 'Tidak Cocok',
+      lblPackagesSec: 'Bundle Lokalisasi Android', pkgSummary: '77.190 string terverifikasi (99,4%)',
+      sheetNote: 'Backup asli tersimpan lokal · Ukuran byte identik · Tanpa re-sign APK',
+      lblNewsSec: 'Cache Pengumuman In-Game',
+      newsRow1Title: 'Format Cache', newsRow1Sub: 'BestHTTP HTTPCache & Library v3 di dalam Android/data',
+      newsRow2Title: 'Syarat Awal', newsRow2Sub: 'Buka menu Berita di game minimal sekali, tutup game total, lalu patch',
+      newsRow3Title: 'Backup & Restore', newsRow3Sub: 'Pengumuman asli otomatis di-backup sebelum diterjemahkan',
+      newsLangTag: 'Bahasa Indonesia (ID)', newsReady: 'Cache Siap', newsEmpty: 'Buka Berita Dulu',
+      newsNote: 'Rollback otomatis mengembalikan cache berita jika backup tersedia.',
+      lblTerm: 'Log Eksekusi & Verifikasi', copyLog: 'Salin', clearLog: 'Bersihkan', copied: 'Log disalin ke clipboard.',
+      bakYes: 'Backup Siap', bakNo: 'Belum Backup',
+      badges: { patched_en: 'English OK', patched_id: 'Indo OK', original: 'Original JP', modified: 'Modifikasi', missing: 'Hilang' },
+      stateScanning: 'Memindai instalasi Android...',
+      stateNotInstalled: 'Game Android belum terpasang di HP ini',
+      stateNoAccess: 'Butuh izin akses storage · Ketuk untuk atur Shizuku / SAF',
+      stateRunning: (p) => `Game sedang berjalan (PID ${p}) · Tutup paksa dulu`,
+      stateDataMissing: 'Data aset in-game belum lengkap · Selesaikan download dulu',
+      stateEnOk: 'Bahasa Inggris (EN) aktif · 2/2 bundle terverifikasi',
+      stateIdOk: 'Bahasa Indonesia (ID) aktif · 2/2 bundle terverifikasi',
+      stateOrig: 'Original JP terdeteksi · Siap dipasang',
+      stateMixed: 'Status patch campuran · Cek di tab Paket',
+      stageNeedAccess: 'Ketuk Atur Akses (Shizuku atau SAF) untuk baca/tulis Android/data.',
+      stageNotInstalled: 'Game Android target belum terpasang di perangkat ini.',
+      stageEnOk: 'Terpasang: Bahasa Inggris (EN)', stageIdOk: 'Terpasang: Bahasa Indonesia (ID)', stageOrig: 'Original JP — siap dipasang.',
+      chipNeedAccess: 'Atur Akses (Shizuku / SAF)',
+      verHeroSynced: (v) => `Android ${v} · Sinkron`, verHeroMismatch: (v, e) => `Android ${v} ≠ ${e} — Disarankan tunggu update`,
+      updateBanner: (v) => `Update tersedia: ${v} — Ketuk untuk unduh`,
+      upToDateTitle: 'Sudah Versi Terbaru', upToDateBody: (c) => `Kamu sudah menggunakan versi terbaru (${c}).`,
+      updateTitle: 'Update Tersedia', updateBody: (c, l, mb) => `Versi baru Ruza-Lang sudah tersedia.\n\nSaat ini: ${c}\nTerbaru: ${l} (${mb} MB)`,
+      downloadApk: 'Unduh APK', openRelease: 'Halaman Release', later: 'Nanti',
+      notInstTitle: 'Game Belum Terpasang', notInstBody: 'Aplikasi game target belum ditemukan di perangkat ini.\n\nInstall game-nya, selesaikan download data tambahan di dalam game, tutup game, lalu ketuk Scan.',
+      noAccessTitle: 'Berikan Izin Akses Storage Dulu', noAccessBody: 'Android 11+ membatasi akses folder Android/data untuk aplikasi biasa.\n\nGunakan Shizuku (langsung di HP lewat Wireless Debugging — tanpa PC & tanpa root!) atau pilih folder lewat SAF.',
+      runningTitle: 'Tutup Game Dulu', runningBody: (p) => `Game sedang berjalan di background (PID ${p}).\n\nHarap paksa berhenti (Force Stop) game sebelum patch atau rollback.`,
+      forceCloseBtn: 'Info Aplikasi (Force Stop)',
+      dataMissTitle: 'Data In-Game Belum Lengkap', dataMissBody: 'Game sudah terpasang, tetapi file aset (.res) belum selesai diunduh.\n\nBuka game sekali, selesaikan download data tambahan, tutup game, lalu ketuk Scan.',
+      mismatchTitle: 'Versi Klien Tidak Cocok', mismatchBody: (d, e, r) => `Terdeteksi: ${d}\nTerverifikasi untuk: ${e}\n${r ? 'Detail: ' + r + '\n' : ''}\nDisarankan menunggu update Ruza-Lang, atau ketuk Tetap Pasang (backup asli tetap disimpan dulu).`,
+      waitUpdate: 'Tunggu Update', installAnyway: 'Tetap Pasang',
+      rollbackTitle: 'Konfirmasi Rollback ke Original JP', rollbackBody: 'Kembalikan kedua bundle Android (dan cache News jika ada backup) ke Original JP?\n\nHash SHA-256 akan diverifikasi otomatis.',
+      cancel: 'Batal', confirmRollback: 'Ya, Rollback Sekarang', ok: 'Mengerti',
+      openGuideBtn: 'Buka Panduan Akses',
+      guideTitle: 'Cara Izin Akses Android (Tanpa PC, Tanpa Root)',
+      btnGuideOpenShizuku: 'Buka / Unduh Shizuku', btnGuidePickSaf: 'Pilih Folder (SAF)', btnGuideAuth: 'Izinkan Shizuku',
+      guideHtml: `
+        <div class="guide-card">
+          <div class="guide-card-title">1. Shizuku via Wireless Debugging (Disarankan · Android 11–17 · Tanpa PC)</div>
+          <ol>
+            <li>Install aplikasi resmi <b>Shizuku</b> (Play Store / shizuku.rikka.app).</li>
+            <li>Aktifkan <b>Opsi Pengembang &rarr; Wireless Debugging</b> di HP kamu.</li>
+            <li>Buka Shizuku &rarr; ketuk <b>Pairing</b> &rarr; masukkan kode 6 digit di notifikasi &rarr; ketuk <b>Start</b>.</li>
+            <li>Kembali ke Ruza-Lang lalu ketuk <b>Izinkan Shizuku</b> di bawah.</li>
+          </ol>
+        </div>
+        <div class="guide-card">
+          <div class="guide-card-title">2. Pilih Folder / SAF (Android 11–12 &amp; sebagian HP)</div>
+          <p>Ketuk <b>Pilih Folder (SAF)</b> di bawah lalu pilih <code>Android/data/.../files</code> jika file manager bawaan mengizinkan (tanpa Shizuku).</p>
+        </div>
+        <div class="guide-card">
+          <div class="guide-card-title">3. Direct Storage / Root</div>
+          <p>Otomatis aktif di Android 8–10, emulator dengan direct storage, atau HP yang sudah root.</p>
+        </div>`
+    }
+  };
+
+  function t() { return I18N[selectedLang]; }
+  function fmt(n) { return Number(n).toLocaleString(selectedLang === 'id' ? 'id-ID' : 'en-US'); }
+  function nowTs() { const d = new Date(); return [d.getHours(), d.getMinutes(), d.getSeconds()].map(x => String(x).padStart(2, '0')).join(':'); }
+  function send(cmd, payload = {}) {
+    if (window.AndroidBridge && window.AndroidBridge.postMessage) {
+      window.AndroidBridge.postMessage(JSON.stringify({ cmd, lang: selectedLang, ...payload }));
+    }
+  }
+
+  function switchTab(tab) {
+    activeTab = tab;
+    document.body.classList.toggle('subview', tab !== 'home');
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    for (const id of ['home', 'packages', 'news', 'log']) {
+      const cap = id.charAt(0).toUpperCase() + id.slice(1);
+      $('view' + cap).classList.toggle('active', id === tab);
+    }
+    if (tab === 'log') document.querySelectorAll('.log-dot-ref').forEach(d => d.classList.remove('show'));
+  }
+
+  function openModal(title, body, buttons) {
+    $('modalTitle').textContent = title;
+    $('modalBody').textContent = body;
+    const box = $('modalBtns');
+    box.innerHTML = '';
+    for (const b of buttons) {
+      const el = document.createElement('button');
+      el.className = b.cls || 'btn-white';
+      el.textContent = b.label;
+      el.onclick = () => { $('modalBackdrop').classList.remove('open'); if (b.onClick) b.onClick(); };
+      box.appendChild(el);
+    }
+    $('modalBackdrop').classList.add('open');
+  }
+
+  function openGuide() {
+    const tr = t();
+    $('guideTitle').textContent = tr.guideTitle;
+    $('guideBody').innerHTML = tr.guideHtml;
+    $('btnGuideOpenShizuku').textContent = tr.btnGuideOpenShizuku;
+    $('btnGuidePickSaf').textContent = tr.btnGuidePickSaf;
+    $('btnGuideAuth').textContent = tr.btnGuideAuth;
+    $('guideBackdrop').classList.add('open');
+  }
+
+  function addLog(level, msg) {
+    const ts = nowTs();
+    const tags = { info: '[INFO]', ok: '[ OK ]', diff: '[DIFF]', warn: '[WARN]', err: '[ERR ]' };
+    const mk = () => {
+      const div = document.createElement('div');
+      div.className = 'log-line log-' + (level || 'info');
+      div.innerHTML = `<span class="log-ts">${ts}</span><span class="log-tag">${tags[level] || '[INFO]'}</span><span class="log-msg"></span>`;
+      div.querySelector('.log-msg').textContent = msg;
+      return div;
+    };
+    const tb = $('termBody'); tb.appendChild(mk()); tb.scrollTop = tb.scrollHeight;
+    const hb = $('homeLogBody'); hb.appendChild(mk()); hb.scrollTop = hb.scrollHeight;
+    if (activeTab !== 'log') document.querySelectorAll('.log-dot-ref').forEach(d => d.classList.add('show'));
+  }
+
+  function setBusy(v) {
+    busy = v;
+    for (const id of ['btnPatch', 'btnNews', 'btnNewsPage', 'btnRollback', 'btnRollbackPkg', 'btnQuickScan', 'btnAuthShizuku', 'btnPickSaf', 'btnCheckUpdate']) {
+      if ($(id)) $(id).disabled = v;
+    }
+    document.querySelectorAll('.lang-btn').forEach(b => b.disabled = v);
+  }
+
+  function renderProgress(cur, tot, stage) {
+    const safeTot = Math.max(1, tot || 77190);
+    const pct = Math.min(100, (cur * 100) / safeTot);
+    $('barFill').style.width = pct.toFixed(2) + '%';
+    $('progCount').textContent = `${fmt(cur)} / ${fmt(safeTot)} · ${pct.toFixed(0)}%`;
+    if (stage) $('progStage').textContent = stage;
+  }
+
+  function formatVer(v) {
+    if (!v) return '';
+    if (v.detected_version && v.detected_res_rev) return `v${v.detected_version} (r${v.detected_res_rev})`;
+    if (v.detected_version) return `v${v.detected_version}`;
+    if (v.detected_res_rev) return `r${v.detected_res_rev}`;
+    return `v${v.expected_version} (r${v.expected_res_rev})`;
+  }
+
+  function renderScan() {
+    const tr = t();
+    const dot = $('heroStateDot');
+    const txt = $('heroStateText');
+    const verBtn = $('heroVerBtn');
+    const procBox = $('procAlert');
+
+    if (!scan) {
+      dot.className = 'state-diamond';
+      txt.textContent = tr.stateScanning;
+      verBtn.style.display = 'none';
+      return;
+    }
+
+    const hasRunning = (scan.running_pids || []).length > 0;
+    procBox.classList.toggle('show', hasRunning);
+    if (hasRunning) $('procAlertText').textContent = tr.stateRunning(scan.running_pids.join(', '));
+
+    const hasAccess = scan.access_mode && scan.access_mode !== 'none';
+    $('accessChipText').textContent = hasAccess ? `${scan.access_label}` : tr.chipNeedAccess;
+    $('accessStateBadge').className = 'pkg-state ' + (hasAccess ? 'patched_id' : 'modified');
+    $('accessStateBadge').innerHTML = `<span class="pkg-dot"></span>${scan.access_label}`;
+
+    const targets = scan.targets || [];
+    const listBox = $('targetsList');
+    listBox.innerHTML = '';
+    const displayList = targets.length ? targets : [
+      { name: 'VStringPool', subtitle: 'Story, Quests, Skills, Kibo, Settings', string_count: 74055, state: 'original', has_backup: false },
+      { name: 'Static UI KeyConfig', subtitle: 'Prefab Buttons, Headers, Notices', string_count: 3135, state: 'original', has_backup: false }
+    ];
+    for (const item of displayList) {
+      const row = document.createElement('div');
+      row.className = 'set-row';
+      const stText = targets.length ? (tr.badges[item.state] || item.state) : '—';
+      row.innerHTML = `
+        <div><div class="set-label"></div><div class="set-sub"></div></div>
+        <div class="set-right">
+          <span class="pkg-count">${fmt(item.string_count)} str</span>
+          <span class="pkg-bak">${targets.length ? (item.has_backup ? tr.bakYes : tr.bakNo) : '—'}</span>
+          <span class="pkg-state ${targets.length ? item.state : 'original'}"><span class="pkg-dot"></span>${stText}</span>
+        </div>`;
+      row.querySelector('.set-label').textContent = item.name;
+      row.querySelector('.set-sub').textContent = item.subtitle;
+      listBox.appendChild(row);
+    }
+
+    const newsReady = (scan.news_cache_bytes || 0) > 16;
+    $('newsCacheBadge').className = 'pkg-state ' + (newsReady ? 'patched_en' : 'original');
+    $('newsCacheBadge').innerHTML = `<span class="pkg-dot"></span>${newsReady ? tr.newsReady : tr.newsEmpty}`;
+    $('newsBakTag').textContent = scan.has_news_backup ? tr.bakYes : tr.bakNo;
+
+    const v = scan.version;
+    if (!scan.game_installed) {
+      dot.className = 'state-diamond warn';
+      txt.textContent = tr.stateNotInstalled;
+      verBtn.style.display = 'none';
+      $('pkgVerDetected').textContent = '—';
+      $('pkgVerState').className = 'pkg-state missing';
+      $('pkgVerState').innerHTML = `<span class="pkg-dot"></span>${tr.verMismatch}`;
+      renderProgress(0, 77190, tr.stageNotInstalled);
+      return;
+    }
+
+    if (!hasAccess) {
+      dot.className = 'state-diamond warn';
+      txt.textContent = tr.stateNoAccess;
+      verBtn.style.display = 'none';
+      renderProgress(0, 77190, tr.stageNeedAccess);
+      return;
+    }
+
+    const det = formatVer(v);
+    const exp = `v${v.expected_version} (r${v.expected_res_rev})`;
+    const isMis = v.status === 'mismatch';
+    verBtn.style.display = 'inline-flex';
+    verBtn.classList.toggle('mismatch', isMis);
+    $('heroVerText').textContent = isMis ? tr.verHeroMismatch(det, `v${v.expected_version}`) : tr.verHeroSynced(det);
+    $('pkgVerDetected').textContent = det;
+    $('pkgVerState').className = 'pkg-state ' + (isMis ? 'modified' : 'patched_id');
+    $('pkgVerState').innerHTML = `<span class="pkg-dot"></span>${isMis ? tr.verMismatch : tr.verSynced}`;
+    $('lblVerSub').textContent = isMis ? (v.reasons || []).join('; ') : tr.lblVerSubSynced(exp);
+
+    if (hasRunning) {
+      dot.className = 'state-diamond warn';
+      txt.textContent = tr.stateRunning(scan.running_pids.join(', '));
+    } else if (targets.some(x => x.state === 'missing')) {
+      dot.className = 'state-diamond warn';
+      txt.textContent = tr.stateDataMissing;
+    } else if (targets.length && targets.every(x => x.state === 'patched_en')) {
+      dot.className = 'state-diamond en';
+      txt.textContent = tr.stateEnOk;
+    } else if (targets.length && targets.every(x => x.state === 'patched_id')) {
+      dot.className = 'state-diamond id';
+      txt.textContent = tr.stateIdOk;
+    } else if (targets.length && targets.every(x => x.state === 'original')) {
+      dot.className = 'state-diamond';
+      txt.textContent = tr.stateOrig;
+    } else {
+      dot.className = 'state-diamond warn';
+      txt.textContent = tr.stateMixed;
+    }
+
+    const activeCnt = targets.filter(x => x.state === 'patched_en' || x.state === 'patched_id').reduce((s, x) => s + x.string_count, 0);
+    const allId = targets.length && targets.every(x => x.state === 'patched_id');
+    const allEn = targets.length && targets.every(x => x.state === 'patched_en');
+    renderProgress(activeCnt, 77190, allId ? tr.stageIdOk : (allEn ? tr.stageEnOk : tr.stageOrig));
+  }
+
+  function applyUiLanguage() {
+    const tr = t();
+    document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === selectedLang));
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const k = el.dataset.i18n;
+      if (tr[k]) el.textContent = tr[k];
+    });
+    $('heroDesc').textContent = tr.heroDesc;
+    $('homeLogTitle').textContent = tr.homeLogTitle;
+    $('btnHomeLogFull').textContent = tr.fullLog;
+    $('btnPatchText').textContent = tr.btnPatch;
+    $('btnNewsText').textContent = tr.btnNews;
+    $('btnNewsPageText').textContent = tr.btnNewsLong;
+    $('btnRollbackText').textContent = tr.btnRollback;
+    $('btnRollbackPkgText').textContent = tr.btnRollbackFull;
+    $('btnCheckUpdate').textContent = tr.btnCheckUpdate;
+    $('lblAccessSec').textContent = tr.lblAccessSec;
+    $('btnSetupGuide').textContent = tr.btnSetupGuide;
+    $('lblAccessRow').textContent = tr.lblAccessRow;
+    $('lblAccessSub').textContent = tr.lblAccessSub;
+    $('btnAuthShizuku').textContent = tr.btnShizuku;
+    $('btnPickSaf').textContent = tr.btnFolder;
+    $('lblVerRow').textContent = tr.lblVerRow;
+    $('lblPackagesSec').textContent = tr.lblPackagesSec;
+    $('pkgSummaryRight').textContent = tr.pkgSummary;
+    $('sheetNote').textContent = tr.sheetNote;
+    $('lblNewsSec').textContent = tr.lblNewsSec;
+    $('newsRow1Title').textContent = tr.newsRow1Title;
+    $('newsRow1Sub').textContent = tr.newsRow1Sub;
+    $('newsRow2Title').textContent = tr.newsRow2Title;
+    $('newsRow2Sub').textContent = tr.newsRow2Sub;
+    $('newsRow3Title').textContent = tr.newsRow3Title;
+    $('newsRow3Sub').textContent = tr.newsRow3Sub;
+    $('newsLangTag').innerHTML = `<span class="pkg-dot"></span>${tr.newsLangTag}`;
+    $('newsLangTag').className = 'pkg-state ' + (selectedLang === 'id' ? 'patched_id' : 'patched_en');
+    $('newsNote').textContent = tr.newsNote;
+    $('lblTerm').textContent = tr.lblTerm;
+    $('btnCopyLog').textContent = tr.copyLog;
+    $('btnClearLog').textContent = tr.clearLog;
+    if (updateInfo && updateInfo.has_update) {
+      $('heroUpdateBtn').classList.add('show');
+      $('heroUpdateText').textContent = tr.updateBanner(updateInfo.latest_version);
+    }
+    renderScan();
+  }
+
+  function ensureReady(requireBundles = true) {
+    const tr = t();
+    if (!scan) { send('scan'); return false; }
+    if (!scan.game_installed) {
+      openModal(tr.notInstTitle, tr.notInstBody, [{ label: tr.ok, cls: 'btn-charcoal' }]);
+      return false;
+    }
+    if (!scan.access_mode || scan.access_mode === 'none') {
+      openModal(tr.noAccessTitle, tr.noAccessBody, [
+        { label: tr.cancel, cls: 'btn-white' },
+        { label: tr.openGuideBtn, cls: 'btn-charcoal', onClick: openGuide }
+      ]);
+      return false;
+    }
+    if ((scan.running_pids || []).length > 0) {
+      openModal(tr.runningTitle, tr.runningBody(scan.running_pids.join(', ')), [
+        { label: tr.forceCloseBtn, cls: 'btn-white', onClick: () => send('open_app_settings') },
+        { label: tr.ok, cls: 'btn-charcoal' }
+      ]);
+      return false;
+    }
+    if (requireBundles && (scan.targets || []).some(x => x.state === 'missing')) {
+      openModal(tr.dataMissTitle, tr.dataMissBody, [{ label: tr.ok, cls: 'btn-charcoal' }]);
+      return false;
+    }
+    return true;
+  }
+
+  window.__onPatcherEvent = function(ev) {
+    const tr = t();
+    switch (ev.type) {
+      case 'log': addLog(ev.level, ev.message); break;
+      case 'busy': setBusy(!!ev.value); break;
+      case 'progress': renderProgress(ev.current || 0, ev.total || 77190, ev.stage); break;
+      case 'scan_result': scan = ev; renderScan(); break;
+      case 'update_checking':
+        $('btnCheckUpdate').disabled = !!ev.value || busy;
+        $('btnCheckUpdate').textContent = ev.value ? tr.checking : tr.btnCheckUpdate;
+        break;
+      case 'update_status':
+        if (ev.info) {
+          updateInfo = ev.info;
+          if (ev.info.has_update) {
+            $('heroUpdateBtn').classList.add('show');
+            $('heroUpdateText').textContent = tr.updateBanner(ev.info.latest_version);
+          }
+          if (!ev.silent) {
+            if (ev.info.has_update) {
+              const mb = ev.info.apk_size ? (ev.info.apk_size / (1024 * 1024)).toFixed(2) : '?';
+              openModal(tr.updateTitle, tr.updateBody(ev.info.current_version, ev.info.latest_version, mb), [
+                { label: tr.later, cls: 'btn-white' },
+                { label: tr.openRelease, cls: 'btn-white', onClick: () => send('open_url', { url: ev.info.release_url }) },
+                { label: tr.downloadApk, cls: 'btn-charcoal', onClick: () => send('open_url', { url: ev.info.apk_url || ev.info.release_url }) }
+              ]);
+            } else {
+              openModal(tr.upToDateTitle, tr.upToDateBody(ev.info.current_version), [{ label: tr.ok, cls: 'btn-charcoal' }]);
+            }
+          }
+        }
+        break;
+      case 'update_error':
+        openModal('Update Check Failed', ev.message || 'Error', [{ label: tr.ok, cls: 'btn-charcoal' }]);
+        break;
+      case 'alert':
+        openModal(ev.title || 'Notice', ev.body || '', [{ label: tr.ok, cls: 'btn-charcoal' }]);
+        break;
+    }
+  };
+
+  document.querySelectorAll('.nav-btn').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
+  document.querySelectorAll('.lang-btn').forEach(b => b.onclick = () => {
+    if (busy || selectedLang === b.dataset.lang) return;
+    selectedLang = b.dataset.lang;
+    applyUiLanguage();
+    addLog('info', selectedLang === 'id' ? 'Bahasa target patch diatur ke Bahasa Indonesia (ID).' : 'Target patch language set to English (EN).');
+  });
+
+  $('heroStateBtn').onclick = () => {
+    if (scan && (!scan.access_mode || scan.access_mode === 'none')) openGuide();
+    else switchTab('packages');
+  };
+  $('heroVerBtn').onclick = () => switchTab('packages');
+  $('btnHomeLogFull').onclick = () => switchTab('log');
+  $('btnAccessChip').onclick = () => {
+    if (scan && (!scan.access_mode || scan.access_mode === 'none')) openGuide();
+    else switchTab('packages');
+  };
+  $('btnQuickScan').onclick = () => send('scan');
+  $('btnSetupGuide').onclick = openGuide;
+  $('btnAuthShizuku').onclick = () => send('request_shizuku');
+  $('btnPickSaf').onclick = () => send('pick_saf');
+  $('btnGuideOpenShizuku').onclick = () => { $('guideBackdrop').classList.remove('open'); send('open_shizuku'); };
+  $('btnGuidePickSaf').onclick = () => { $('guideBackdrop').classList.remove('open'); send('pick_saf'); };
+  $('btnGuideAuth').onclick = () => { $('guideBackdrop').classList.remove('open'); send('request_shizuku'); };
+  $('guideBackdrop').onclick = (e) => { if (e.target === $('guideBackdrop')) $('guideBackdrop').classList.remove('open'); };
+  $('btnCheckUpdate').onclick = () => send('check_update');
+  $('heroUpdateBtn').onclick = () => { if (updateInfo) send('open_url', { url: updateInfo.apk_url || updateInfo.release_url }); };
+
+  $('btnClearLog').onclick = () => { $('termBody').innerHTML = ''; $('homeLogBody').innerHTML = ''; };
+  $('btnCopyLog').onclick = () => {
+    const txt = Array.from($('termBody').children).map(el => el.innerText).join('\n');
+    send('copy_text', { text: txt });
+    addLog('info', t().copied);
+  };
+
+  $('btnPatch').onclick = () => {
+    const tr = t();
+    if (!ensureReady(true)) return;
+    const run = () => { switchTab('home'); send('patch'); };
+    if (scan.version && scan.version.status === 'mismatch') {
+      openModal(tr.mismatchTitle, tr.mismatchBody(formatVer(scan.version), `v${scan.version.expected_version} (r${scan.version.expected_res_rev})`, (scan.version.reasons || []).join('; ')), [
+        { label: tr.waitUpdate, cls: 'btn-white' },
+        { label: tr.installAnyway, cls: 'btn-charcoal', onClick: run }
+      ]);
+      return;
+    }
+    run();
+  };
+
+  const triggerNews = () => {
+    if (!ensureReady(false)) return;
+    switchTab('home');
+    send('patch_news');
+  };
+  $('btnNews').onclick = triggerNews;
+  $('btnNewsPage').onclick = triggerNews;
+
+  const triggerRollback = () => {
+    const tr = t();
+    if (!ensureReady(false)) return;
+    openModal(tr.rollbackTitle, tr.rollbackBody, [
+      { label: tr.cancel, cls: 'btn-white' },
+      { label: tr.confirmRollback, cls: 'btn-danger-pill', onClick: () => { switchTab('home'); send('rollback'); } }
+    ]);
+  };
+  $('btnRollback').onclick = triggerRollback;
+  $('btnRollbackPkg').onclick = triggerRollback;
+
+  window.addEventListener('DOMContentLoaded', () => {
+    applyUiLanguage();
+    send('init');
+  });
+</script>
+</body>
+</html>

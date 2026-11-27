@@ -2,8 +2,19 @@
 /target/
 /dist/
 *.exe
+*.apk
+*.aab
 *.pdb
 *.WebView2/
+
+# Android Gradle & local signing secrets (never commit keystores)
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.jks
+*.keystore
+*.p12
 
 # Local game backups & working caches (never commit game assets)
 /backups/
