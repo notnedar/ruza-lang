@@ -109,7 +109,7 @@ Works on any real Android phone (USB or Android 11+ Wireless Debugging) or Windo
 
 ### Option D — Bring Your Own Language Pack (BYOL) & Language Contributions
 Want to play in another language (Spanish, Portuguese, French, Vietnamese, Thai, Russian, etc.), tweak wording yourself, or help improve `EN` / `ID`?
-- **Use Your AI Agent / Gemini / ChatGPT:** We live in the age of LLMs — just point your coding agent, **Gemini**, or **ChatGPT** at this repository (`https://github.com/notnedar/ruza-lang`) and ask it to generate a translation pack from `patches/custom-pack-template.json` / `patches/full-en-3219598.json` + `patches/static-ui-en-3219598.json` and validate it with `node tools/validate-pack.mjs`! Copy-paste prompts are ready in **[`CONTRIBUTING.md`](CONTRIBUTING.md)**.
+- **Tell Your AI Agent / Gemini / ChatGPT to Do It:** We live in the present age where LLMs are actually good at this — **use it.** Don't suffer hand-translating 77,000 lines in Notepad like it's 2009; just point your coding agent, **Gemini**, or **ChatGPT** at this repo (`https://github.com/notnedar/ruza-lang`), use the copy-paste prompt in **[`CONTRIBUTING.md`](CONTRIBUTING.md)**, and let it generate & validate your `.json` pack with `node tools/validate-pack.mjs`.
 - **Load in 1 Click (PC & Android):** Open **Files → Custom Language Pack → Load JSON** on **Windows PC** or **Android APK**, then click **Install Patch (`<CODE>`)**! One `.json` pack works across both PC and Android automatically (set `"base": "en"`, `"id"`, or `"jp"` for untranslated keys).
 - **Contribute Back:** Open a Pull Request with your `EN`/`ID` fixes or community language pack — see **[`CONTRIBUTING.md`](CONTRIBUTING.md)** for full details.
 

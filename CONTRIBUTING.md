@@ -2,15 +2,17 @@
 
 Welcome to **Ruza-Lang**! Here are the easiest ways to use custom translations or contribute your language:
 
-1. **[Fastest Way: Let Your AI Agent / LLM Translate It for You](#1-fastest-way-let-your-ai-agent--llm-translate-it)** — we live in the age of LLMs, and they are great at contextual game localization! Point your coding agent, Gemini, or ChatGPT at this repo and let it generate & validate a language pack in minutes.
+1. **[Fastest Way: Tell Your AI Agent / LLM to Do It](#1-fastest-way-tell-your-ai-agent--llm-to-do-it)** — we live in the present age where LLMs are actually good at this, **use it.** Point your coding agent, Gemini, or ChatGPT at this repo and let it generate & validate a language pack in minutes.
 2. **[Bring Your Own Language Pack (No Coding Required)](#2-bring-your-own-language-pack-byol)** — load any `.json` pack directly in **`RuzaLangPatcher.exe`** (Windows PC + Android ADB) or **`RuzaLangPatcher.apk`** (Standalone Android, 100% offline!).
 3. **[Contribute Translations via Pull Request](#3-contributing-translations-to-the-repository)** — submit `EN`/`ID` fixes, anti-wrap UI tweaks, or a full community language pack!
 
 ---
 
-## 1. Fastest Way: Let Your AI Agent / LLM Translate It
+## 1. Fastest Way: Tell Your AI Agent / LLM to Do It
 
-You don't have to manually translate 77,000 lines by hand — **just tell your AI agent** (Antigravity, Gemini CLI, Claude Code, Codex, Cursor, etc.) or **Gemini / ChatGPT** to open this repo (`https://github.com/notnedar/ruza-lang`) and build the language pack for you!
+**We live in the present age where LLMs are actually good at this — use it.**
+
+Seriously, nobody is expecting you to sit there hand-translating 77,000 JSON lines in Notepad like it's 2009. Just tell your AI agent (Antigravity, Gemini CLI, Claude Code, Codex, Cursor, etc.) — or literally open **Gemini** or **ChatGPT** — drop this repo link (`https://github.com/notnedar/ruza-lang`), and tell it to build the translation pack for you!
 
 ### Copy-Paste Prompt for AI Coding Agents (Recommended for Full Packs)
 
