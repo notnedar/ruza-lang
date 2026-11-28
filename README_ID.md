@@ -8,6 +8,7 @@
 > **Sudah Dites & Jalan di Dalam Game (PC & Android) · Proyek Edukasi Vibe-Coded**
 > - Sudah **dites langsung dan berjalan normal di dalam game** pada klien PC maupun Android (APK standalone & PC/ADB).
 > - Ini adalah **proyek edukasi vibe-coded** — update besar atau hotfix game di masa depan tetap bisa saja menimbulkan quirk atau perubahan struktur. Selalu simpan backup otomatis (`_ENPatchBackup\` / backup lokal APK) dan gunakan dengan risiko masing-masing.
+> - **Soal badge OpenSSF Scorecard:** Seluruh cek keamanan inti (`SAST/CodeQL`, `Token-Permissions`, `Pinned-Dependencies`, `Dangerous-Workflow`, `Dependency-Update-Tool`, `Security-Policy`, `License`) bernilai **10/10** — skor agregat tertahan terutama karena kriteria proyek solo baru (umur repo < 90 hari, kontributor tunggal, commit langsung, dan warning dependensi transitif non-Windows). Klik badge atau baca [`SECURITY.md`](SECURITY.md) untuk detail lengkapnya.
 
 Suite lokalisasi & asset-repacking edukasional dengan ukuran byte identik (**Bahasa Inggris**, **Bahasa Indonesia**, serta **Bring Your Own Custom Language Pack**) untuk **Windows PC** dan **Android** (tersedia **APK Android standalone tanpa PC** maupun lewat **PC-to-Android ADB**), lengkap dengan verifikasi SHA-256 dan rollback sekali klik.
 

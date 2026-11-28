@@ -8,6 +8,7 @@
 > **Tested & Working In-Game (PC & Android) · Vibe-Coded Educational Project**
 > - Confirmed **tested and working in-game** on both PC and Android clients (standalone APK & PC/ADB).
 > - This is a **vibe-coded educational project** — future client updates or hotfixes may still cause quirks or breaking changes. Always keep automatic backups (`_ENPatchBackup\` / local APK backups) and use at your own risk.
+> - **About the OpenSSF Scorecard badge:** All core security checks (`SAST/CodeQL`, `Token-Permissions`, `Pinned-Dependencies`, `Dangerous-Workflow`, `Dependency-Update-Tool`, `Security-Policy`, `License`) score **10/10** — the aggregate score is lowered mainly by new solo-repo criteria (repo age < 90 days, single contributor, direct commits, and non-Windows transitive warnings). Click the badge or see [`SECURITY.md`](SECURITY.md) for full details.
 
 An educational localization & asset-repacking suite demonstrating exact-size string patching (**English**, **Bahasa Indonesia**, and **Bring Your Own Custom Language Packs**) for **Windows PC** and **Android** (both a **standalone zero-PC Android APK** and **PC-to-Android ADB**), SHA-256 verification, and safe one-click rollback.
 
