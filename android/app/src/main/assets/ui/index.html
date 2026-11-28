@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Ruza-Lang v0.9.4 — EN / ID + Custom Packs</title>
+<title>Ruza-Lang v0.9.5 — EN / ID + Custom Packs</title>
 <style>
   :root {
     --rail-w: 68px;
@@ -504,6 +504,27 @@
     display: none;
   }
   .nav-dot.show { display: block; }
+  .nav-dot.shizuku-ok { display: block; background: #4cd99b; }
+  .nav-dot.shizuku-warn { display: block; background: #f5b942; }
+  .nav-dot.shizuku-off { display: block; background: #ef6f76; }
+  .shizuku-note-box {
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(48, 58, 72, 0.13);
+    border-left: 3px solid var(--sky-deep);
+    border-radius: 7px;
+    padding: 9px 11px;
+    margin: 4px 0 11px;
+    font-size: 11.4px;
+    line-height: 1.48;
+    color: var(--ink-soft);
+  }
+  .shizuku-note-box b { color: var(--ink); }
+  .shizuku-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
 
   /* ==================== SUB-VIEWS: AP SETTINGS FROSTED GLASS ==================== */
   .sub-wrap {
@@ -785,7 +806,7 @@
           <path d="M16.5 4.5L19.5 4.5L19.5 7.5" stroke="#e8d2a0" stroke-width="1.3"/>
         </svg>
       </div>
-      <span class="rail-ver">0.9.4</span>
+      <span class="rail-ver">0.9.5</span>
     </div>
     <nav class="rail-nav">
       <button class="nav-btn active" data-tab="home">
@@ -795,6 +816,11 @@
       <button class="nav-btn" data-tab="packages">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8.5 4.8v8.4L12 21l-8.5-4.8V7.8L12 3z"/><path d="M12 12l8.5-4.2M12 12v9M12 12L3.5 7.8"/></svg>
         <span class="nav-lbl" data-i18n="navPackages">Files</span>
+      </button>
+      <button class="nav-btn" data-tab="shizuku">
+        <span class="nav-dot shizuku-dot-ref"></span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H12L11 22L19.5 10.5H12L13 2Z"/></svg>
+        <span class="nav-lbl" data-i18n="navShizuku">Shizuku</span>
       </button>
       <button class="nav-btn" data-tab="news">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
@@ -822,7 +848,7 @@
         </svg>
       </div>
       <span class="brand-name">Ruza-Lang</span>
-      <span class="brand-ver">0.9.4</span>
+      <span class="brand-ver">0.9.5</span>
     </div>
     <div class="lang-seg">
       <button class="lang-btn active" data-lang="en">EN</button>
@@ -925,7 +951,8 @@
               </div>
               <div class="set-right">
                 <span id="accessStateBadge" class="pkg-state original"><span class="pkg-dot"></span>—</span>
-                <button id="btnAuthShizuku" class="btn-white" type="button">Shizuku</button>
+                <button id="btnOpenShizukuPkg" class="btn-white" type="button">Open Shizuku</button>
+                <button id="btnAuthShizuku" class="btn-white" type="button">Authorize</button>
                 <button id="btnPickSaf" class="btn-white" type="button">Folder</button>
               </div>
             </div>
@@ -967,6 +994,49 @@
               </button>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2B: SHIZUKU STATUS & QUICK LAUNCH -->
+    <section id="viewShizuku" class="view">
+      <div class="sub-wrap">
+        <div class="glass-sheet">
+          <div class="sec-bar">
+            <span id="lblShizukuSec">Shizuku Service (No Root)</span>
+            <div class="sec-bar-right">
+              <button id="btnShizukuRefresh" class="btn-bar-link" type="button">Refresh</button>
+            </div>
+          </div>
+          <div class="rows-block">
+            <div class="set-row">
+              <div>
+                <div id="lblShizukuStatusRow" class="set-label">Current Status</div>
+                <div id="lblShizukuStatusSub" class="set-sub">Checking Shizuku service...</div>
+              </div>
+              <div class="set-right">
+                <span id="shizukuLiveBadge" class="pkg-state original"><span class="pkg-dot"></span>Checking...</span>
+              </div>
+            </div>
+            <div class="set-row">
+              <div style="width:100%;">
+                <div id="lblShizukuActionRow" class="set-label">Quick Navigation</div>
+                <div id="lblShizukuActionSub" class="set-sub">Jump directly to Shizuku to start or check it, then return here</div>
+                <div class="shizuku-actions">
+                  <button id="btnShizukuOpenMain" class="btn-charcoal" type="button">Open Shizuku</button>
+                  <button id="btnShizukuAuthMain" class="btn-white" type="button">Authorize</button>
+                  <button id="btnShizukuSafMain" class="btn-white" type="button">Pick Folder (SAF)</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="shizukuFaqBox" class="shizuku-note-box"></div>
+
+          <div class="sec-bar">
+            <span id="lblShizukuGuideSec">How to Start Shizuku (No PC, No Root)</span>
+          </div>
+          <div id="shizukuGuideBody" style="margin-top:8px;"></div>
         </div>
       </div>
     </section>
@@ -1039,6 +1109,11 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8.5 4.8v8.4L12 21l-8.5-4.8V7.8L12 3z"/><path d="M12 12l8.5-4.2M12 12v9M12 12L3.5 7.8"/></svg>
       <span class="nav-lbl" data-i18n="navPackages">Files</span>
     </button>
+    <button class="nav-btn" data-tab="shizuku">
+      <span class="nav-dot shizuku-dot-ref"></span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 13.5H12L11 22L19.5 10.5H12L13 2Z"/></svg>
+      <span class="nav-lbl" data-i18n="navShizuku">Shizuku</span>
+    </button>
     <button class="nav-btn" data-tab="news">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
       <span class="nav-lbl" data-i18n="navNews">News</span>
@@ -1085,7 +1160,7 @@
 
   const I18N = {
     en: {
-      navHome: 'Home', navPackages: 'Files', navNews: 'News', navLog: 'Log',
+      navHome: 'Home', navPackages: 'Files', navShizuku: 'Shizuku', navNews: 'News', navLog: 'Log',
       heroDesc: 'English & Indonesian Android localization with exact\u2011size repacking, SHA\u2011256 verification, and safe one\u2011click rollback.',
       homeLogTitle: 'Activity Log', fullLog: 'Full Log',
       btnPatch: 'Install Patch (EN)', btnPatchCustom: (c) => `Install Patch (${c})`, btnPatchBlocked: 'Close Game First', btnNews: 'News (EN)', btnNewsLong: 'Translate News (EN)',
@@ -1099,7 +1174,24 @@
       btnCheckUpdate: 'Check Updates', checking: 'Checking...',
       lblAccessSec: 'Android Storage Access (No Root)', btnSetupGuide: 'Setup Guide',
       lblAccessRow: 'Access Method', lblAccessSub: 'Shizuku (Android 11–17, zero PC) or SAF folder picker',
-      btnShizuku: 'Shizuku', btnFolder: 'Folder',
+      btnOpenShizuku: 'Open Shizuku', btnDownloadShizuku: 'Get Shizuku', btnShizuku: 'Authorize', btnFolder: 'Folder',
+      lblShizukuSec: 'Shizuku Service (No Root)', btnShizukuRefresh: 'Refresh',
+      lblShizukuStatusRow: 'Current Status', lblShizukuActionRow: 'Quick Navigation',
+      lblShizukuActionSub: 'Jump straight to Shizuku to start or check it — returning here auto-refreshes status',
+      lblShizukuGuideSec: 'How to Start Shizuku (No PC, No Root)',
+      shizukuFaqHtml: '<b>Does Shizuku need to stay running?</b><br/>Only while installing the patch, translating news, or rolling back. Once patched, you can stop Shizuku or turn off Wireless Debugging — the game stays translated! After a phone reboot, just open Shizuku and tap Start again whenever you need to re-patch.',
+      shStateChecking: 'Checking...', shSubChecking: 'Checking Shizuku installation and service status...',
+      shStateMissing: 'Not Installed', shSubMissing: 'Shizuku is not installed yet. Tap Get Shizuku below to install the official app.',
+      shStateStopped: 'Stopped (Inactive)', shSubStopped: 'Shizuku is installed, but not running right now. Tap Open Shizuku → Start via Wireless Debugging.',
+      shStateNeedAuth: 'Running · Needs Permission', shSubNeedAuth: 'Shizuku is running! Tap Authorize below to grant Ruza-Lang access.',
+      shStateBlocked: 'Permission OK · Service Blocked', shSubBlocked: 'Permission granted, but the background service did not connect. Check the HyperOS / OPPO tips below, then restart Shizuku.',
+      shStateActive: 'Active & Connected', shSubActive: 'Shizuku is running and connected to Ruza-Lang — ready to patch, translate news, or rollback!',
+      chipShizukuMissing: 'Install Shizuku · Tap to Open',
+      chipShizukuStopped: 'Shizuku Stopped · Tap to Open',
+      chipShizukuNeedAuth: 'Shizuku Ready · Tap to Authorize',
+      chipShizukuBlocked: 'Shizuku Blocked · Tap for Tips',
+      shNotRunTitle: 'Shizuku Is Not Running',
+      shNotRunBody: 'Open the Shizuku app and tap Start via Wireless Debugging (no PC & no root), then return to Ruza-Lang — status refreshes automatically.',
       lblVerRow: 'Client Version Sync', lblVerSubSynced: (e) => `Verified for Android ${e} · Exact-size · No APK re-sign`,
       verSynced: 'Synced', verMismatch: 'Mismatch',
       lblPackagesSec: 'Android Localization Bundles', pkgSummary: '79,315 verified strings (99.4%)',
@@ -1169,7 +1261,7 @@
         </div>`
     },
     id: {
-      navHome: 'Utama', navPackages: 'Paket', navNews: 'Berita', navLog: 'Log',
+      navHome: 'Utama', navPackages: 'Paket', navShizuku: 'Shizuku', navNews: 'Berita', navLog: 'Log',
       heroDesc: 'Lokalisasi Android Inggris & Indonesia dengan repacking ukuran identik, verifikasi SHA\u2011256, dan rollback sekali klik.',
       homeLogTitle: 'Log Aktivitas', fullLog: 'Log Penuh',
       btnPatch: 'Pasang Patch (ID)', btnPatchCustom: (c) => `Pasang Patch (${c})`, btnPatchBlocked: 'Tutup Game Dulu', btnNews: 'Berita (ID)', btnNewsLong: 'Translate News (ID)',
@@ -1183,7 +1275,24 @@
       btnCheckUpdate: 'Cek Update', checking: 'Mengecek...',
       lblAccessSec: 'Akses Storage Android (Tanpa Root)', btnSetupGuide: 'Panduan',
       lblAccessRow: 'Metode Akses', lblAccessSub: 'Shizuku (Android 11–17, tanpa laptop) atau pilih folder SAF',
-      btnShizuku: 'Shizuku', btnFolder: 'Folder',
+      btnOpenShizuku: 'Buka Shizuku', btnDownloadShizuku: 'Unduh Shizuku', btnShizuku: 'Izinkan', btnFolder: 'Folder',
+      lblShizukuSec: 'Layanan Shizuku (Tanpa Root)', btnShizukuRefresh: 'Refresh',
+      lblShizukuStatusRow: 'Status Saat Ini', lblShizukuActionRow: 'Navigasi Cepat',
+      lblShizukuActionSub: 'Langsung buka aplikasi Shizuku untuk menyalakan/cek status — saat kembali ke sini status otomatis diperbarui',
+      lblShizukuGuideSec: 'Cara Menyalakan Shizuku (Tanpa PC, Tanpa Root)',
+      shizukuFaqHtml: '<b>Apakah Shizuku harus selalu aktif?</b><br/>Hanya perlu aktif saat pasang patch, translate news, atau rollback. Begitu patch selesai, Shizuku dan Wireless Debugging bebas dimatikan — game tetap berbahasa Inggris/Indonesia! Jika HP di-restart, cukup buka Shizuku lalu ketuk Start lagi nanti saat mau patch ulang.',
+      shStateChecking: 'Mengecek...', shSubChecking: 'Memeriksa instalasi dan status layanan Shizuku...',
+      shStateMissing: 'Belum Terpasang', shSubMissing: 'Aplikasi Shizuku belum terpasang di HP ini. Ketuk Unduh Shizuku di bawah untuk install aplikasi resminya.',
+      shStateStopped: 'Mati (Belum Aktif)', shSubStopped: 'Shizuku sudah terpasang tapi sedang tidak berjalan. Ketuk Buka Shizuku → Start lewat Wireless Debugging.',
+      shStateNeedAuth: 'Aktif · Belum Diizinkan', shSubNeedAuth: 'Shizuku sudah berjalan! Ketuk Izinkan di bawah untuk memberi izin akses ke Ruza-Lang.',
+      shStateBlocked: 'Izin Ada · Service Terblokir', shSubBlocked: 'Izin sudah diberikan, tapi service background belum terhubung. Cek tips HyperOS / OPPO di bawah, lalu restart Shizuku.',
+      shStateActive: 'Aktif & Terhubung', shSubActive: 'Shizuku berjalan dan terhubung ke Ruza-Lang — siap pasang patch, translate news, atau rollback!',
+      chipShizukuMissing: 'Unduh Shizuku · Ketuk',
+      chipShizukuStopped: 'Shizuku Mati · Ketuk Buka',
+      chipShizukuNeedAuth: 'Shizuku Siap · Ketuk Izinkan',
+      chipShizukuBlocked: 'Shizuku Terblokir · Cek Tips',
+      shNotRunTitle: 'Shizuku Belum Berjalan',
+      shNotRunBody: 'Buka aplikasi Shizuku lalu ketuk Start lewat Wireless Debugging (tanpa PC & tanpa root), lalu kembali ke Ruza-Lang — status akan otomatis ter-refresh.',
       lblVerRow: 'Sinkronisasi Versi Klien', lblVerSubSynced: (e) => `Terverifikasi untuk Android ${e} · Ukuran identik · Tanpa re-sign APK`,
       verSynced: 'Sinkron', verMismatch: 'Tidak Cocok',
       lblPackagesSec: 'Bundle Lokalisasi Android', pkgSummary: '79.315 string terverifikasi (99,4%)',
@@ -1267,7 +1376,7 @@
     activeTab = tab;
     document.body.classList.toggle('subview', tab !== 'home');
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-    for (const id of ['home', 'packages', 'news', 'log']) {
+    for (const id of ['home', 'packages', 'shizuku', 'news', 'log']) {
       const cap = id.charAt(0).toUpperCase() + id.slice(1);
       $('view' + cap).classList.toggle('active', id === tab);
     }
@@ -1330,7 +1439,7 @@
 
   function setBusy(v) {
     busy = v;
-    for (const id of ['btnPatch', 'btnNews', 'btnNewsPage', 'btnRollback', 'btnRollbackPkg', 'btnQuickScan', 'btnAuthShizuku', 'btnPickSaf', 'btnCheckUpdate', 'btnLoadCustom', 'btnClearCustom']) {
+    for (const id of ['btnPatch', 'btnNews', 'btnNewsPage', 'btnRollback', 'btnRollbackPkg', 'btnQuickScan', 'btnOpenShizukuPkg', 'btnAuthShizuku', 'btnPickSaf', 'btnShizukuRefresh', 'btnShizukuOpenMain', 'btnShizukuAuthMain', 'btnShizukuSafMain', 'btnCheckUpdate', 'btnLoadCustom', 'btnClearCustom']) {
       if ($(id)) $(id).disabled = v;
     }
     document.querySelectorAll('.lang-btn').forEach(b => b.disabled = v);
@@ -1376,12 +1485,66 @@
     return `v${v.expected_version} (r${v.expected_res_rev})`;
   }
 
+  function getShizukuState() {
+    if (!scan) return 'checking';
+    if (scan.access_mode === 'shizuku') return 'active';
+    if (!scan.shizuku_installed) return 'missing';
+    if (!scan.shizuku_running) return 'stopped';
+    if (!scan.shizuku_granted) return 'need_auth';
+    return 'blocked';
+  }
+
+  function renderShizukuView() {
+    const tr = t();
+    const st = getShizukuState();
+    $('lblShizukuSec').textContent = tr.lblShizukuSec;
+    $('btnShizukuRefresh').textContent = tr.btnShizukuRefresh;
+    $('lblShizukuStatusRow').textContent = tr.lblShizukuStatusRow;
+    $('lblShizukuActionRow').textContent = tr.lblShizukuActionRow;
+    $('lblShizukuActionSub').textContent = tr.lblShizukuActionSub;
+    $('lblShizukuGuideSec').textContent = tr.lblShizukuGuideSec;
+    $('shizukuFaqBox').innerHTML = tr.shizukuFaqHtml;
+    $('shizukuGuideBody').innerHTML = tr.guideHtml;
+    $('btnShizukuSafMain').textContent = tr.btnGuidePickSaf;
+    $('btnShizukuAuthMain').textContent = tr.btnGuideAuth;
+
+    const openLbl = st === 'missing' ? tr.btnDownloadShizuku : tr.btnOpenShizuku;
+    $('btnShizukuOpenMain').textContent = openLbl;
+    $('btnOpenShizukuPkg').textContent = openLbl;
+
+    let badgeCls = 'original', badgeTxt = tr.shStateChecking, subTxt = tr.shSubChecking, dotCls = '';
+    if (st === 'active') {
+      badgeCls = 'patched_id'; badgeTxt = tr.shStateActive; subTxt = tr.shSubActive; dotCls = 'shizuku-ok';
+    } else if (st === 'need_auth') {
+      badgeCls = 'modified'; badgeTxt = tr.shStateNeedAuth; subTxt = tr.shSubNeedAuth; dotCls = 'shizuku-warn';
+    } else if (st === 'blocked') {
+      badgeCls = 'modified'; badgeTxt = tr.shStateBlocked; subTxt = tr.shSubBlocked; dotCls = 'shizuku-warn';
+    } else if (st === 'stopped') {
+      badgeCls = 'missing'; badgeTxt = tr.shStateStopped; subTxt = tr.shSubStopped; dotCls = 'shizuku-off';
+    } else if (st === 'missing') {
+      badgeCls = 'missing'; badgeTxt = tr.shStateMissing; subTxt = tr.shSubMissing; dotCls = 'shizuku-off';
+    }
+
+    $('shizukuLiveBadge').className = 'pkg-state ' + badgeCls;
+    $('shizukuLiveBadge').innerHTML = `<span class="pkg-dot"></span>${badgeTxt}`;
+    $('lblShizukuStatusSub').textContent = subTxt;
+    document.querySelectorAll('.shizuku-dot-ref').forEach(el => {
+      el.className = 'nav-dot shizuku-dot-ref' + (dotCls ? ' ' + dotCls : '');
+    });
+
+    // Highlight primary action button depending on state
+    $('btnShizukuAuthMain').style.display = (st === 'need_auth' || st === 'blocked' || st === 'stopped') ? '' : 'none';
+    $('btnShizukuAuthMain').className = st === 'need_auth' ? 'btn-charcoal' : 'btn-white';
+    $('btnShizukuOpenMain').className = st === 'need_auth' ? 'btn-white' : 'btn-charcoal';
+  }
+
   function renderScan() {
     const tr = t();
     const dot = $('heroStateDot');
     const txt = $('heroStateText');
     const verBtn = $('heroVerBtn');
     const procBox = $('procAlert');
+    renderShizukuView();
 
     if (!scan) {
       dot.className = 'state-diamond';
@@ -1396,7 +1559,14 @@
     updateActionLockState();
 
     const hasAccess = scan.access_mode && scan.access_mode !== 'none';
-    $('accessChipText').textContent = hasAccess ? `${scan.access_label}` : tr.chipNeedAccess;
+    const shSt = getShizukuState();
+    let chipTxt = tr.chipNeedAccess;
+    if (hasAccess) chipTxt = `${scan.access_label}`;
+    else if (shSt === 'missing') chipTxt = tr.chipShizukuMissing;
+    else if (shSt === 'stopped') chipTxt = tr.chipShizukuStopped;
+    else if (shSt === 'need_auth') chipTxt = tr.chipShizukuNeedAuth;
+    else if (shSt === 'blocked') chipTxt = tr.chipShizukuBlocked;
+    $('accessChipText').textContent = chipTxt;
     $('accessStateBadge').className = 'pkg-state ' + (hasAccess ? 'patched_id' : 'modified');
     $('accessStateBadge').innerHTML = `<span class="pkg-dot"></span>${scan.access_label}`;
 
@@ -1547,7 +1717,8 @@
     if (!scan.access_mode || scan.access_mode === 'none') {
       openModal(tr.noAccessTitle, tr.noAccessBody, [
         { label: tr.cancel, cls: 'btn-white' },
-        { label: tr.openGuideBtn, cls: 'btn-charcoal', onClick: openGuide }
+        { label: tr.openGuideBtn, cls: 'btn-white', onClick: () => switchTab('shizuku') },
+        { label: scan.shizuku_installed ? tr.btnOpenShizuku : tr.btnDownloadShizuku, cls: 'btn-charcoal', onClick: () => send('open_shizuku') }
       ]);
       return false;
     }
@@ -1615,6 +1786,12 @@
         customPack = ev.pack || null;
         renderCustomPack();
         break;
+      case 'shizuku_not_running':
+        openModal(tr.shNotRunTitle, tr.shNotRunBody, [
+          { label: tr.cancel, cls: 'btn-white' },
+          { label: tr.btnOpenShizuku, cls: 'btn-charcoal', onClick: () => send('open_shizuku') }
+        ]);
+        break;
       case 'alert':
         openModal(ev.title || 'Notice', ev.body || '', [{ label: tr.ok, cls: 'btn-charcoal' }]);
         break;
@@ -1630,20 +1807,22 @@
   });
 
   $('heroStateBtn').onclick = () => {
-    if (scan && (!scan.access_mode || scan.access_mode === 'none')) openGuide();
+    if (scan && (!scan.access_mode || scan.access_mode === 'none')) switchTab('shizuku');
     else switchTab('packages');
   };
   $('heroVerBtn').onclick = () => switchTab('packages');
   $('btnHomeLogFull').onclick = () => switchTab('log');
-  $('btnAccessChip').onclick = () => {
-    if (scan && (!scan.access_mode || scan.access_mode === 'none')) openGuide();
-    else switchTab('packages');
-  };
+  $('btnAccessChip').onclick = () => switchTab('shizuku');
   $('btnQuickScan').onclick = () => send('scan');
   $('procAlert').onclick = () => send('open_app_settings');
-  $('btnSetupGuide').onclick = openGuide;
+  $('btnSetupGuide').onclick = () => switchTab('shizuku');
+  $('btnOpenShizukuPkg').onclick = () => send('open_shizuku');
   $('btnAuthShizuku').onclick = () => send('request_shizuku');
   $('btnPickSaf').onclick = () => send('pick_saf');
+  $('btnShizukuRefresh').onclick = () => send('scan');
+  $('btnShizukuOpenMain').onclick = () => send('open_shizuku');
+  $('btnShizukuAuthMain').onclick = () => send('request_shizuku');
+  $('btnShizukuSafMain').onclick = () => send('pick_saf');
   $('btnGuideOpenShizuku').onclick = () => { $('guideBackdrop').classList.remove('open'); send('open_shizuku'); };
   $('btnGuidePickSaf').onclick = () => { $('guideBackdrop').classList.remove('open'); send('pick_saf'); };
   $('btnGuideAuth').onclick = () => { $('guideBackdrop').classList.remove('open'); send('request_shizuku'); };

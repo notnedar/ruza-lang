@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build & publish (e.g. v0.9.4)"
+        description: "Release tag to build & publish (e.g. v0.9.5)"
         required: true
-        default: "v0.9.4"
+        default: "v0.9.5"
 
 permissions: {}
 
@@ -219,10 +219,10 @@ jobs:
           ### Standalone Android APK Preview
           | Phone (Home) | Phone (Files & Sync) |
           | :---: | :---: |
-          | ![Android APK Home](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-home.png?v=094) | ![Android APK Files](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-files.png?v=094) |
+          | ![Android APK Home](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-home.png?v=095) | ![Android APK Files](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-files.png?v=095) |
 
           ### Desktop Usage Walkthrough
-          ![Ruza-Lang Usage Demo](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/usage.webp?v=094)
+          ![Ruza-Lang Usage Demo](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/usage.webp?v=095)
 
           ### In-Game Samples (\`EN\`) — Original Font vs. Compact Font (PC Only)
           | Original Font (Default) | Compact Font (\`Barlow Semi Condensed\` · PC Only) |
@@ -233,7 +233,9 @@ jobs:
           ![Star Journey Record](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-journey.jpg)
 
           ### Highlights / Fitur Utama
-          - **NEW — Compact Font Info Tooltip (\`?\`) & Security/CI Hardening (\`v0.9.4\`):**
+          - **NEW — Dedicated Android Shizuku Navigation Menu & Live Status (\`v0.9.5\`):**
+            - **Dedicated \`Shizuku\` Tab (Portrait & Landscape APK):** Added a direct \`Shizuku\` tab right in the mobile navigation bar with a live color-coded status dot (Green = Active & Connected, Amber = Needs Permission / Blocked, Red = Stopped / Not Installed), 1-tap **Open Shizuku** / **Authorize Shizuku** buttons, an in-app FAQ explaining that Shizuku only needs to stay running while patching, and automatic live refresh when returning from the Shizuku app.
+          - **Compact Font Info Tooltip (\`?\`) & Security/CI Hardening (\`v0.9.4\`):**
             - **Compact Font \`?\` Info Tooltip (\`EN\` & \`ID\`):** Added a clickable/hoverable \`?\` icon right beside \`Compact font (PC Only)\` with a plain-language explanation of what Compact Font does, how to toggle it on/off anytime, and why it's 100% safe & reversible.
             - **Continuous Security CI & Transparency:** Added **GitHub CodeQL**, **Dependabot**, **OpenSSF Scorecard**, automated **ClamAV** release scanning, direct **VirusTotal** links, \`SECURITY.md\`, and \`node tools/verify-resources.mjs\` payload verification.
           - **Raw \`<size=...%>\` Tag Hotfix (\`v0.9.3\`):**

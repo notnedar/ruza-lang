@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.9.4`)
+# Ruza-Lang (`v0.9.5`)
 
 🌐 **Language:** **English** | [Bahasa Indonesia (`README_ID.md`)](README_ID.md)
 
@@ -16,10 +16,10 @@ An educational localization & asset-repacking suite demonstrating exact-size str
 
 ---
 
-## What's New in `v0.9.4`
+## What's New in `v0.9.5`
 
-- **Compact Font `?` Info Tooltip (`EN` & `ID`):** Added a `?` help icon next to `Compact font (PC Only)` with a clear, plain-language tooltip explaining what Compact Font does, how to switch between Compact and Default anytime, and why Japanese text and rollback remain 100% safe.
-- **Security CI & Transparency Suite:** Added **GitHub CodeQL**, **Dependabot**, **OpenSSF Scorecard**, automated **ClamAV** release scanning, direct **VirusTotal** links, [`SECURITY.md`](SECURITY.md), and `node tools/verify-resources.mjs` payload verification.
+- **Dedicated Android `Shizuku` Menu & Live Status (`RuzaLangPatcher.apk`):** Added a direct **`Shizuku`** tab in the Android navigation bar with a live status dot (Green = Connected, Amber = Needs Permission / Blocked, Red = Stopped / Not Installed), 1-tap **Open Shizuku** & **Authorize** controls, a built-in FAQ explaining Shizuku is only needed while patching, and automatic live status refresh when switching back from the Shizuku app.
+- **Compact Font `?` Info Tooltip & Security CI Suite (`v0.9.4`):** Added a `?` help icon next to `Compact font (PC Only)` with a plain-language tooltip (`EN` & `ID`), plus **GitHub CodeQL**, **Dependabot**, **OpenSSF Scorecard**, automated **ClamAV** release scans, direct **VirusTotal** links, [`SECURITY.md`](SECURITY.md), and `node tools/verify-resources.mjs`.
 - **Raw `<size=...%>` Tag Hotfix (`EN` & `ID` · `v0.9.3`):** Removed all `167` injected percentage `<size=NN%>` tags across `Static UI` and `VStringPool` (`EN` & `ID`) that rendered literally on non-RichText controls (such as the Gacha `10x Observe` / `10x Observasi` buttons), and fixed a duplicated Indonesian label (`Pemeliharaan`).
 - **Optional Compact PC UI Font (`Compact font (PC Only)` · `v0.9.2`):** Toggleable checkbox directly above **Install Patch** on Home. Swaps Latin UI glyphs across all active PC font packages to **Barlow Semi Condensed** (~15% narrower for tighter English/Indonesian UI fit) while keeping all original CJK glyphs intact (zero `□□□` missing boxes), exact `0 B` file size delta, automatic original backups, and automatic restore when unchecked or on **Rollback JP**.
 - **Loading Screen Tip Wrapping (`EN` & `ID` · `v0.9.2`):** Wrapped all long loading-screen tips onto 2 balanced lines so text no longer overflows off-screen horizontally, and aligned official terms (`Astral Insight`, `Star Journey Record`).

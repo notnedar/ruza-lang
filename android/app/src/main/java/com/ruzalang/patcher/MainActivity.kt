@@ -54,6 +54,7 @@ class MainActivity : AppCompatActivity() {
     @Volatile private var hasScannedOnce = false
     @Volatile private var lastDetectedRunning = false
     @Volatile private var scanBusy = false
+    @Volatile private var launchedExternalApp = false
 
     private val userServiceArgs by lazy {
         Shizuku.UserServiceArgs(ComponentName(packageName, PatcherFileService::class.java.name))
@@ -233,9 +234,19 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Auto re-check after returning from App Info (Force Stop) or Shizuku app
-        if (hasScannedOnce && !scanBusy && (lastDetectedRunning || bridge.shizukuService == null)) {
-            if (isShizukuGranted() && bridge.shizukuService == null) {
+        // Auto re-check after returning from Shizuku app or App Info (Force Stop)
+        val shouldRescan = hasScannedOnce && !scanBusy && (
+            launchedExternalApp ||
+            lastDetectedRunning ||
+            bridge.shizukuService == null ||
+            !isShizukuRunning()
+        )
+        launchedExternalApp = false
+        if (shouldRescan) {
+            if (!isShizukuRunning()) {
+                bridge.shizukuService = null
+                shizukuBound = false
+            } else if (isShizukuGranted() && bridge.shizukuService == null) {
                 bindShizukuIfReady()
             }
             triggerScanAsync()
@@ -479,13 +490,7 @@ class MainActivity : AppCompatActivity() {
                 "request_shizuku" -> {
                     runOnUiThread {
                         if (!isShizukuRunning()) {
-                            val title = if (lang == PatchLang.ID) "Shizuku Belum Berjalan" else "Shizuku Not Running"
-                            val body = if (lang == PatchLang.ID) {
-                                "Buka aplikasi Shizuku dulu lalu klik Start lewat Wireless Debugging di HP (tanpa PC & tanpa root), lalu kembali ke Ruza-Lang dan ketuk Izinkan Shizuku."
-                            } else {
-                                "Open the Shizuku app and start it via Wireless Debugging on your phone (no PC & no root), then return to Ruza-Lang and tap Authorize Shizuku."
-                            }
-                            pushEvent(JSONObject().put("type", "alert").put("title", title).put("body", body))
+                            pushEvent(JSONObject().put("type", "shizuku_not_running"))
                             return@runOnUiThread
                         }
                         if (isShizukuGranted()) {
@@ -503,6 +508,7 @@ class MainActivity : AppCompatActivity() {
 
                 "open_shizuku" -> {
                     runOnUiThread {
+                        launchedExternalApp = true
                         val launch = packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
                         if (launch != null) {
                             startActivity(launch)
@@ -534,6 +540,7 @@ class MainActivity : AppCompatActivity() {
 
                 "open_app_settings" -> {
                     runOnUiThread {
+                        launchedExternalApp = true
                         try {
                             val intent = Intent(
                                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS,

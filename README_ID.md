@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.9.4`)
+# Ruza-Lang (`v0.9.5`)
 
 🌐 **Bahasa:** [English (`README.md`)](README.md) | **Bahasa Indonesia**
 
@@ -16,10 +16,10 @@ Suite lokalisasi & asset-repacking edukasional dengan ukuran byte identik (**Bah
 
 ---
 
-## Yang Baru di `v0.9.4`
+## Yang Baru di `v0.9.5`
 
-- **Tooltip Info `?` untuk Compact Font (`EN` & `ID`):** Menambahkan ikon bantuan `?` tepat di sebelah `Compact font (PC Only)` lengkap dengan penjelasan singkat non-teknis tentang fungsi Compact Font, cara mengaktifkan/mematikan kapan saja, serta jaminan huruf Jepang tetap normal dan bisa balik lewat **Rollback JP**.
-- **Rangkaian Keamanan CI & Transparansi:** Menambahkan **GitHub CodeQL**, **Dependabot**, **OpenSSF Scorecard**, pemindaian **ClamAV** otomatis di setiap rilis, tautan langsung **VirusTotal**, [`SECURITY.md`](SECURITY.md), dan skrip audit `node tools/verify-resources.mjs`.
+- **Tab Menu `Shizuku` & Status Live di APK Android (`RuzaLangPatcher.apk`):** Menambahkan tab **`Shizuku`** langsung di navigasi utama HP/tablet dengan indikator titik status live (Hijau = Aktif & Terhubung, Kuning = Perlu Izin / Terblokir, Merah = Mati / Belum Terpasang), tombol 1-ketuk **Buka Shizuku** & **Izinkan Shizuku**, ringkasan FAQ bahwa Shizuku hanya perlu nyala saat patching, serta auto-refresh saat kembali dari aplikasi Shizuku.
+- **Tooltip Info `?` Compact Font & Rangkaian Keamanan CI (`v0.9.4`):** Menambahkan ikon bantuan `?` non-teknis di sebelah `Compact font (PC Only)` (`EN` & `ID`), plus **GitHub CodeQL**, **Dependabot**, **OpenSSF Scorecard**, scan **ClamAV** otomatis di setiap rilis, link **VirusTotal**, [`SECURITY.md`](SECURITY.md), dan `node tools/verify-resources.mjs`.
 - **Hotfix Tag `<size=...%>` Mentah (`EN` & `ID` · `v0.9.3`):** Menghapus seluruh `167` tag persentase `<size=NN%>` di `Static UI` & `VStringPool` (`EN` & `ID`) yang sempat tercetak mentah di tombol non-RichText (seperti tombol Gacha `10x Observe` / `10x Observasi`), serta merapikan kata ganda `Pemeliharaan`.
 - **Opsi Font UI PC Ringkas (`Compact font (PC Only)` · `v0.9.2`):** Checkbox langsung di atas tombol **Pasang Patch** pada halaman Utama. Mengganti glyph Latin di seluruh paket font UI PC aktif ke **Barlow Semi Condensed** (~15% lebih ramping agar teks Inggris/Indonesia lebih lega di tombol & menu) sambil menjaga seluruh glyph CJK/JP tetap utuh (bebas kotak `□□□`), ukuran file identik (`0 B` delta), backup asli otomatis, dan otomatis kembali ke font bawaan saat centang dimatikan atau saat **Rollback JP**.
 - **Perbaikan Loading Screen Tips (`EN` & `ID` · `v0.9.2`):** Membagi seluruh tips loading screen yang terlalu panjang menjadi 2 baris seimbang agar tidak keluar batas layar, serta merapikan istilah resmi (`Astral Insight`, `Star Journey Record`, `Level Astrologi`).
