@@ -2554,7 +2554,7 @@ dependencies = [
  "sha2",
  "sysinfo",
  "tao",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
  "wry",
 ]
 
