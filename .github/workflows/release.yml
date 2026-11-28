@@ -11,26 +11,25 @@ on:
         required: true
         default: "v0.9.3"
 
-permissions:
-  contents: write
-  id-token: write
-  attestations: write
+permissions: {}
 
 jobs:
   build-windows:
     name: Build Windows x64 Binary
     runs-on: windows-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup stable toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
           targets: x86_64-pc-windows-msvc
 
       - name: Cache build artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
       - name: Build release executable
         shell: pwsh
@@ -46,7 +45,7 @@ jobs:
           Write-Host "Built RuzaLangPatcher.exe SHA256=$sha"
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-dist
           path: windows-dist/RuzaLangPatcher.exe
@@ -55,18 +54,20 @@ jobs:
   build-android:
     name: Build Universal Android APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Setup Gradle cache
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
 
       - name: Ensure Android SDK Platform 36
         run: |
@@ -108,7 +109,7 @@ jobs:
           sha256sum android-dist/RuzaLangPatcher.apk
 
       - name: Upload Android artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: android-dist
           path: android-dist/RuzaLangPatcher.apk
@@ -118,18 +119,32 @@ jobs:
     name: Attest & Publish GitHub Release
     needs: [build-windows, build-android]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: Download Windows artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: windows-dist
           path: release-dist
 
       - name: Download Android artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: android-dist
           path: release-dist
+
+      - name: Scan release binaries with ClamAV
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clamav
+          sudo systemctl stop clamav-freshclam 2>/dev/null || true
+          sudo freshclam --quiet || true
+          clamscan --infected --no-summary release-dist/RuzaLangPatcher.exe release-dist/RuzaLangPatcher.apk
+          echo "ClamAV scan clean (0 threats detected)."
 
       - name: Generate combined SHA256SUMS.txt
         run: |
@@ -156,8 +171,23 @@ jobs:
             echo "APK_MB=$APK_MB"
           } >> "$GITHUB_ENV"
 
+      - name: Submit to VirusTotal (optional if VT_API_KEY secret is configured)
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+        run: |
+          if [ -n "$VT_API_KEY" ]; then
+            for f in release-dist/RuzaLangPatcher.exe release-dist/RuzaLangPatcher.apk; do
+              echo "Submitting $f to VirusTotal..."
+              curl -sS -X POST "https://www.virustotal.com/api/v3/files" \
+                -H "x-apikey: $VT_API_KEY" \
+                -F "file=@$f" >/dev/null || echo "VirusTotal upload skipped for $f"
+            done
+          else
+            echo "VT_API_KEY secret not set; publishing direct SHA-256 VirusTotal lookup links."
+          fi
+
       - name: Attest build provenance (Windows + Android)
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-path: |
             release-dist/RuzaLangPatcher.exe
@@ -234,16 +264,17 @@ jobs:
           - **PC 4-Store Localization Pipeline (\`79,786\` strings):** \`VStringPool\` (\`76,180\`), \`Static UI KeyConfig\` (\`3,135\`), \`StaticPackage CSV\` (\`113\`), \`resources.assets\` (\`358\`) + **Translate News (\`EN\` / \`ID\`)**.
           - **Safety & Verification:** Live process guard (PC & Android), exact byte-size preservation, automatic backups, SHA-256 verification, and one-click **Rollback to Original JP**.
 
-          ### Verified GitHub Actions Builds & Provenance
-          Both binaries were compiled directly on GitHub's hosted runners (\`windows-latest\` & \`ubuntu-latest\`) from the public source tree in this commit:
-          - **Workflow Run:** [View full build log](${RUN_URL})
-          - **Windows x64:** \`RuzaLangPatcher.exe\` (${EXE_MB} MB) — SHA-256: \`${EXE_SHA256}\`
-          - **Android APK:** \`RuzaLangPatcher.apk\` (${APK_MB} MB) — SHA-256: \`${APK_SHA256}\`
+          ### Verified GitHub Actions Builds, Security & Provenance
+          Both binaries were compiled directly on GitHub's hosted runners (\`windows-latest\` & \`ubuntu-latest\`) from the public source tree in this commit, scanned with **ClamAV** (0 threats), and signed with **GitHub Build Provenance Attestation**:
+          - **Workflow Run:** [View full build & ClamAV scan log](${RUN_URL})
+          - **Windows x64:** \`RuzaLangPatcher.exe\` (${EXE_MB} MB) — SHA-256: \`${EXE_SHA256}\` · [VirusTotal Report](https://www.virustotal.com/gui/file/${EXE_SHA256})
+          - **Android APK:** \`RuzaLangPatcher.apk\` (${APK_MB} MB) — SHA-256: \`${APK_SHA256}\` · [VirusTotal Report](https://www.virustotal.com/gui/file/${APK_SHA256})
           - **Verify build attestation locally:**
             \`\`\`bash
             gh attestation verify RuzaLangPatcher.exe --owner notnedar
             gh attestation verify RuzaLangPatcher.apk --owner notnedar
             \`\`\`
+          - **Security Policy & Payload Audit:** See [\`SECURITY.md\`](https://github.com/notnedar/ruza-lang/blob/main/SECURITY.md) or run \`node tools/verify-resources.mjs\`.
 
           > *Educational localization & binary serialization study project. No proprietary assets are included.*
           EOF

@@ -2,7 +2,7 @@
 
 🌐 **Bahasa:** [English (`README.md`)](README.md) | **Bahasa Indonesia**
 
-[![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
+[![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml) [![Security Checks](https://github.com/notnedar/ruza-lang/actions/workflows/security.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/security.yml) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/notnedar/ruza-lang/badge)](https://scorecard.dev/viewer/?uri=github.com/notnedar/ruza-lang)
 
 > [!IMPORTANT]
 > **Sudah Dites & Jalan di Dalam Game (PC & Android) · Proyek Edukasi Vibe-Coded**
@@ -135,15 +135,23 @@ Mau main pakai bahasa lain (Spanyol, Portugis, Prancis, Vietnam, Thailand, Rusia
 
 ---
 
-## Transparansi Build & Verifikasi
+## Keamanan, Transparansi Build & Verifikasi
 
-Semua binary resmi (`RuzaLangPatcher.exe` dan `RuzaLangPatcher.apk`) dikompilasi langsung di server **GitHub Actions** (`windows-latest` & `ubuntu-latest`) dari source code publik di repositori ini lewat [`.github/workflows/release.yml`](.github/workflows/release.yml) dan ditandatangani dengan **GitHub Artifact Build Provenance Attestation**.
+Semua binary resmi (`RuzaLangPatcher.exe` dan `RuzaLangPatcher.apk`) dikompilasi langsung di server **GitHub Actions** (`windows-latest` & `ubuntu-latest`) dari source code publik di repositori ini lewat [`.github/workflows/release.yml`](.github/workflows/release.yml), dipindai dengan **ClamAV**, dirilis bersama `SHA256SUMS.txt` + tautan **VirusTotal**, dan ditandatangani dengan **GitHub Artifact Build Provenance Attestation**.
 
-Kamu bisa verifikasi keaslian kedua file secara lokal:
+- **Patching 100% Offline & Tanpa Telemetri:** Satu-satunya akses internet hanyalah cek update opsional ke GitHub Releases dengan allowlist HTTPS ketat (`github.com` / `api.github.com` / `objects.githubusercontent.com` / `release-assets.githubusercontent.com`).
+- **Tanpa Admin/UAC, Tanpa Root, Tanpa Injeksi:** Tidak meminta izin Administrator maupun root, tidak memasang driver/service, dan tidak menyuntikkan DLL atau menyentuh memori proses game.
+- **Audit Keamanan CI Otomatis:** Dilengkapi **GitHub CodeQL**, **Dependabot**, **audit celah dependensi**, **OpenSSF Scorecard**, serta verifikasi integritas payload otomatis ([`.github/workflows/security.yml`](.github/workflows/security.yml)). Baca detail lengkap (termasuk izin APK Android & penjelasan Windows SmartScreen) di [`SECURITY.md`](SECURITY.md).
+
+Verifikasi keaslian binary dan seluruh payload secara lokal:
 
 ```bash
+# 1. Verifikasi bukti build kriptografis dari GitHub Actions
 gh attestation verify RuzaLangPatcher.exe --owner notnedar
 gh attestation verify RuzaLangPatcher.apk --owner notnedar
+
+# 2. Audit seluruh payload terkompresi di resources/ terhadap kamus JSON terbuka & font OFL
+node tools/verify-resources.mjs
 ```
 
 ---

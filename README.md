@@ -2,7 +2,7 @@
 
 🌐 **Language:** **English** | [Bahasa Indonesia (`README_ID.md`)](README_ID.md)
 
-[![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml)
+[![Build & Release](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/release.yml) [![Security Checks](https://github.com/notnedar/ruza-lang/actions/workflows/security.yml/badge.svg)](https://github.com/notnedar/ruza-lang/actions/workflows/security.yml) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/notnedar/ruza-lang/badge)](https://scorecard.dev/viewer/?uri=github.com/notnedar/ruza-lang)
 
 > [!IMPORTANT]
 > **Tested & Working In-Game (PC & Android) · Vibe-Coded Educational Project**
@@ -135,15 +135,23 @@ Want to play in another language (Spanish, Portuguese, French, Vietnamese, Thai,
 
 ---
 
-## Build Transparency & Verification
+## Security, Build Transparency & Verification
 
-Official release binaries (`RuzaLangPatcher.exe` and `RuzaLangPatcher.apk`) are compiled directly on **GitHub Actions** (`windows-latest` & `ubuntu-latest`) from this public source tree via [`.github/workflows/release.yml`](.github/workflows/release.yml) and signed with **GitHub Artifact Build Provenance Attestation**.
+Official release binaries (`RuzaLangPatcher.exe` and `RuzaLangPatcher.apk`) are compiled directly on **GitHub Actions** (`windows-latest` & `ubuntu-latest`) from this public source tree via [`.github/workflows/release.yml`](.github/workflows/release.yml), scanned with **ClamAV**, published with `SHA256SUMS.txt` + **VirusTotal** links, and signed with **GitHub Artifact Build Provenance Attestation**.
 
-Verify both binaries locally:
+- **100% Offline Patching & Zero Telemetry:** The only network call is an optional GitHub Releases update check restricted to a hardcoded HTTPS allowlist (`github.com` / `api.github.com` / `objects.githubusercontent.com` / `release-assets.githubusercontent.com`).
+- **No Admin/UAC, No Root, No Injection:** Does not require Administrator privileges or root, installs no drivers/services, and never injects DLLs or modifies process memory.
+- **Automated Continuous Security CI:** Protected by **GitHub CodeQL**, **Dependabot**, **dependency advisory audits**, **OpenSSF Scorecard**, and automated payload verification ([`.github/workflows/security.yml`](.github/workflows/security.yml)). See [`SECURITY.md`](SECURITY.md) for the full breakdown (including Android permissions and SmartScreen details).
+
+Verify official binaries and embedded payloads locally:
 
 ```bash
+# 1. Verify cryptographic GitHub Actions build provenance
 gh attestation verify RuzaLangPatcher.exe --owner notnedar
 gh attestation verify RuzaLangPatcher.apk --owner notnedar
+
+# 2. Audit all compressed payloads in resources/ against open JSON dictionaries & OFL fonts
+node tools/verify-resources.mjs
 ```
 
 ---
