@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Ruza-Lang Patcher v0.9.3 — EN / ID + Custom Packs</title>
+<title>Ruza-Lang Patcher v0.9.4 — EN / ID + Custom Packs</title>
 <style>
   :root {
     --rail-w: 68px;
@@ -580,6 +580,7 @@
   /* ==================== BOTTOM LAUNCHER ACTION DOCK ==================== */
   .dock {
     position: relative;
+    z-index: 30;
     height: var(--dock-h);
     flex-shrink: 0;
     background: var(--dock-bg);
@@ -782,12 +783,19 @@
     box-shadow: none;
   }
 
+  .dock-font-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    position: relative;
+  }
   .dock-font-check {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 1px 4px;
+    padding: 1px 2px;
     cursor: pointer;
     font-size: 11.2px;
     font-weight: 500;
@@ -798,6 +806,97 @@
   }
   .dock-font-check:hover { color: #ffffff; }
   .dock-font-check.disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+  .font-tip-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+  .font-help-btn {
+    width: 15px;
+    height: 15px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.34);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(235, 241, 248, 0.86);
+    font-family: inherit;
+    font-size: 9.8px;
+    font-weight: 700;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.14s ease;
+  }
+  .font-help-btn:hover,
+  .font-help-btn:focus-visible,
+  .font-tip-wrap.open .font-help-btn {
+    background: rgba(232, 210, 160, 0.24);
+    border-color: rgba(232, 210, 160, 0.82);
+    color: #ffffff;
+    outline: none;
+  }
+  .font-tooltip {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    right: -10px;
+    width: 292px;
+    padding: 11px 13px;
+    border-radius: 9px;
+    background: rgba(15, 22, 34, 0.96);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(232, 210, 160, 0.40);
+    box-shadow: 0 14px 36px rgba(6, 10, 18, 0.58);
+    color: rgba(238, 244, 250, 0.92);
+    text-align: left;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 180;
+  }
+  .font-tooltip::before {
+    content: "";
+    position: absolute;
+    top: 100%;
+    right: 10.5px;
+    border: 7px solid transparent;
+    border-top-color: rgba(232, 210, 160, 0.40);
+  }
+  .font-tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    right: 11.5px;
+    border: 6px solid transparent;
+    border-top-color: rgba(15, 22, 34, 0.96);
+  }
+  .font-tip-wrap:hover .font-tooltip,
+  .font-tip-wrap:focus-within .font-tooltip,
+  .font-tip-wrap.open .font-tooltip {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  .font-tip-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--champagne);
+    margin-bottom: 6px;
+    letter-spacing: 0.15px;
+  }
+  .font-tip-list {
+    margin: 0;
+    padding-left: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 11.3px;
+    line-height: 1.46;
+    color: rgba(230, 238, 246, 0.90);
+  }
+  .font-tip-list b { color: #ffffff; font-weight: 600; }
   .dock-font-check input {
     position: absolute;
     opacity: 0;
@@ -1294,14 +1393,14 @@
 <div class="shell">
   <!-- LEFT SLIM LAUNCHER RAIL -->
   <aside class="rail">
-    <div class="rail-brand" data-drag="1" title="Ruza-Lang v0.9.3">
+    <div class="rail-brand" data-drag="1" title="Ruza-Lang v0.9.4">
       <div class="mark-box">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <path d="M6.5 4.5H13.8C16.4 4.5 18 6 18 8.3C18 10.3 16.7 11.7 14.5 12L18.5 19.5H15.4L11.8 12.4H9V19.5H6.5V4.5ZM9 6.8V10.3H13.4C14.7 10.3 15.5 9.6 15.5 8.5C15.5 7.4 14.7 6.8 13.4 6.8H9Z" fill="#f3eee2"/>
           <path d="M16.5 4.5L19.5 4.5L19.5 7.5" stroke="#e8d2a0" stroke-width="1.3"/>
         </svg>
       </div>
-      <span class="rail-ver">0.9.3</span>
+      <span class="rail-ver">0.9.4</span>
     </div>
 
     <nav class="rail-nav">
@@ -1448,13 +1547,22 @@
             <span id="btnNewsText">Translate News (EN)</span>
           </button>
           <div id="dockCtaCard" class="dock-cta-card">
-            <label id="fontOptWrap" class="dock-font-check" title="Use Barlow Semi Condensed (~15% narrower Latin UI font, PC only)">
-              <input id="chkBarlowFont" type="checkbox" />
-              <span class="chk-box" aria-hidden="true">
-                <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#161d28" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2.2 6.2L4.8 8.8L9.8 3.2"/></svg>
+            <div id="fontOptRow" class="dock-font-row">
+              <label id="fontOptWrap" class="dock-font-check">
+                <input id="chkBarlowFont" type="checkbox" />
+                <span class="chk-box" aria-hidden="true">
+                  <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#161d28" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2.2 6.2L4.8 8.8L9.8 3.2"/></svg>
+                </span>
+                <span id="chkBarlowLabel">Compact font (PC Only)</span>
+              </label>
+              <span id="fontTipWrap" class="font-tip-wrap">
+                <button id="btnFontHelp" class="font-help-btn" type="button" aria-label="About Compact font" aria-describedby="fontTooltip">?</button>
+                <div id="fontTooltip" class="font-tooltip" role="tooltip">
+                  <div id="fontTipTitle" class="font-tip-title">What is Compact Font?</div>
+                  <ul id="fontTipList" class="font-tip-list"></ul>
+                </div>
               </span>
-              <span id="chkBarlowLabel">Compact font (PC Only)</span>
-            </label>
+            </div>
             <button id="btnPatch" class="btn-hero-cta" type="button">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 18h16"/></svg>
               <span id="btnPatchText">Install Patch (EN)</span>
@@ -1808,7 +1916,8 @@
       btnClearCustom: 'Clear',
       heroCustomFmt: (p) => `Custom Pack: ${p.name} (${p.code}) · ${fmt(p.total_count)} overrides`,
       chkBarlowLabel: 'Compact font (PC Only)',
-      chkBarlowTitle: 'Swap Latin UI font to Barlow Semi Condensed (~15% narrower) · PC only',
+      fontTipTitle: 'What is Compact Font?',
+      fontTipHtml: '<li>Uses a cleaner, slightly slimmer font (<b>Barlow Semi Condensed</b>) so translated text fits menus and buttons better with less cut-off or awkward wrapping.</li><li><b>Optional &amp; PC only</b> — check or uncheck it, then click <b>Install Patch</b> to switch between Compact and Default anytime.</li><li><b>100% safe &amp; reversible</b> — Japanese text stays normal (no missing boxes), and <b>Rollback JP</b> automatically restores the original font.</li>',
       btnNews: 'Translate News (EN)',
       btnRollbackShort: 'Rollback JP',
       btnRollbackFull: 'Rollback Original JP',
@@ -2015,7 +2124,8 @@
       btnLoadCustom: 'Muat JSON',
       btnClearCustom: 'Hapus',
       chkBarlowLabel: 'Compact font (PC Only)',
-      chkBarlowTitle: 'Ganti font Latin UI ke Barlow Semi Condensed (~15% lebih ramping) · Khusus PC',
+      fontTipTitle: 'Apa itu Compact Font?',
+      fontTipHtml: '<li>Memakai font yang lebih rapi dan sedikit lebih ramping (<b>Barlow Semi Condensed</b>) supaya teks terjemahan lebih pas di tombol dan menu tanpa gampang kepotong.</li><li><b>Opsional &amp; khusus PC</b> — cukup centang atau lepas centang, lalu klik <b>Pasang Patch</b> untuk mengaktifkan atau kembali ke font asli kapan saja.</li><li><b>100% aman</b> — huruf Jepang tetap tampil normal (tidak jadi kotak), dan tombol <b>Rollback JP</b> otomatis mengembalikan font bawaan.</li>',
       heroCustomFmt: (p) => `Paket Kustom: ${p.name} (${p.code}) · ${fmt(p.total_count)} string`,
       btnNews: 'Translate News (ID)',
       btnRollbackShort: 'Rollback JP',
@@ -2981,6 +3091,20 @@
   $('btnShowHomeLog').onclick = () => openHomeLog(false);
   $('heroUpdateBtn').onclick = () => { if (updateInfo && updateInfo.has_update) showUpdateModal(updateInfo); };
   $('heroCustomBtn').onclick = () => switchTab('packages');
+  $('btnFontHelp').onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    $('fontTipWrap').classList.toggle('open');
+  };
+  document.addEventListener('click', (e) => {
+    const w = $('fontTipWrap');
+    if (w && w.classList.contains('open') && !w.contains(e.target)) {
+      w.classList.remove('open');
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && $('fontTipWrap')) $('fontTipWrap').classList.remove('open');
+  });
   $('chkBarlowFont').onchange = () => {
     if (busy) {
       $('chkBarlowFont').checked = selectedFontMode === 'barlow';
@@ -3122,18 +3246,23 @@
   // Unified Patch, News, Rollback actions
   function renderFontMode() {
     const tr = t();
+    const row = $('fontOptRow');
     const wrap = $('fontOptWrap');
     const card = $('dockCtaCard');
     const chk = $('chkBarlowFont');
     const lbl = $('chkBarlowLabel');
+    const tipTitle = $('fontTipTitle');
+    const tipList = $('fontTipList');
     if (!wrap || !chk || !lbl) return;
     lbl.textContent = tr.chkBarlowLabel;
-    wrap.title = tr.chkBarlowTitle;
+    if (tipTitle) tipTitle.textContent = tr.fontTipTitle;
+    if (tipList) tipList.innerHTML = tr.fontTipHtml;
     chk.checked = selectedFontMode === 'barlow';
     chk.disabled = busy;
     wrap.classList.toggle('disabled', busy);
     const isPc = targetMode === 'pc';
-    wrap.style.display = isPc ? 'inline-flex' : 'none';
+    if (row) row.style.display = isPc ? 'flex' : 'none';
+    if (!isPc && $('fontTipWrap')) $('fontTipWrap').classList.remove('open');
     if (card) card.classList.toggle('compact', !isPc);
   }
 
