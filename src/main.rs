@@ -49,6 +49,7 @@ struct IpcCommand {
     adb_path: Option<String>,
     endpoint: Option<String>,
     custom_pack_path: Option<String>,
+    font_mode: Option<String>,
 }
 
 enum UserEvent {
@@ -467,7 +468,7 @@ fn main() {
     let proxy = event_loop.create_proxy();
 
     let window = WindowBuilder::new()
-        .with_title("Ruza-Lang Patcher v0.9.1 — EN / ID + Custom Packs")
+        .with_title("Ruza-Lang Patcher v0.9.2 — EN / ID + Custom Packs")
         .with_inner_size(LogicalSize::new(960.0, 580.0))
         .with_decorations(false)
         .with_resizable(false)
@@ -537,7 +538,7 @@ fn main() {
                     }
                     thread::spawn(move || {
                         if is_init {
-                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.9.1 (Hotfix-Proof Universal Engine · EN / ID + Custom Packs · PC + Android ADB) initialized.");
+                            push_log(&p, LogLevel::Info, "Ruza-Lang Translation Patcher v0.9.2 (Hotfix-Proof Universal Engine · EN / ID + Custom Packs · PC + Android ADB) initialized.");
                             push_log(&p, LogLevel::Info, "Safety: Dynamic bundle auto-discovery, exact byte sizes & SHA-256 verification.");
                         }
                         let procs = patch_engine::find_running_game_processes();
@@ -649,6 +650,7 @@ fn main() {
                 "patch" => {
                     let dir = parsed.path.unwrap_or_default();
                     let custom_path = parsed.custom_pack_path;
+                    let font_mode = patch_engine::FontMode::from_opt(parsed.font_mode.as_deref());
                     thread::spawn(move || {
                         let path = PathBuf::from(&dir);
                         if !patch_engine::is_valid_game_folder(&path) {
@@ -703,6 +705,7 @@ fn main() {
                             &path,
                             lang,
                             custom_pack.as_ref(),
+                            font_mode,
                             |m, l| push_log(&p, l, m),
                             |cur, tot, st| {
                                 push_event(&p, json!({ "type": "progress", "current": cur, "total": tot, "stage": st }));
@@ -1273,8 +1276,9 @@ fn do_scan(proxy: &tao::event_loop::EventLoopProxy<UserEvent>, dir_str: &str) {
     } else {
         format!("Scan done: Original JP (0 / {} strings translated).", patch_engine::TOTAL_STRINGS)
     };
+    let st = patch_engine::load_patch_state(&dir.join("_ENPatchBackup"));
     push_log(proxy, LogLevel::Ok, &summary);
-    push_event(proxy, json!({ "type": "scan_result", "targets": targets, "version": ver }));
+    push_event(proxy, json!({ "type": "scan_result", "targets": targets, "version": ver, "font_mode": st.font_mode }));
 }
 
 fn do_android_detect(

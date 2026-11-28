@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.9.1`)
+# Ruza-Lang (`v0.9.2`)
 
 🌐 **Language:** **English** | [Bahasa Indonesia (`README_ID.md`)](README_ID.md)
 
@@ -15,10 +15,11 @@ An educational localization & asset-repacking suite demonstrating exact-size str
 
 ---
 
-## What's New in `v0.9.1`
+## What's New in `v0.9.2`
 
-- **Clean Single-Line Gacha Buttons (`EN` & `ID`):** Fixed truncated and 3-line wrapped Gacha UI labels (`1x Observation` → `1x Observe`, `10 Observations` → `<size=88%>10x Observe</size>`, `ID` `<size=82%>1x Observasi</size>` / `<size=76%>10x Observasi</size>`, `Startrail Exchange` → `Exchange` / `Penukaran`, and `Observation Details` → `Details` / `Detail`).
-- **Android Shizuku Reliability & HyperOS / ColorOS Setup Guide:** Polls Shizuku `UserService` connection up to `2s`, auto-rescans upon returning from Shizuku, logs OEM permission diagnostics if bind times out, and includes Xiaomi/POCO (HyperOS/MIUI) & OPPO/Realme setup steps inside the in-app Setup Guide.
+- **Optional Compact PC UI Font (`Compact font (PC Only)`):** Toggleable checkbox directly above **Install Patch** on Home. Swaps Latin UI glyphs across all active PC font packages to **Barlow Semi Condensed** (~15% narrower for tighter English/Indonesian UI fit) while keeping all original CJK glyphs intact (zero `□□□` missing boxes), exact `0 B` file size delta, automatic original backups, and automatic restore when unchecked or on **Rollback JP**.
+- **Loading Screen Tip Wrapping (`EN` & `ID`):** Wrapped all long loading-screen tips onto 2 balanced lines so text no longer overflows off-screen horizontally, and aligned official terms (`Astral Insight`, `Star Journey Record`).
+- **Gacha UI Fit Fixes & Android HyperOS Shizuku Improvements (`v0.9.1`):** Fixed truncated Gacha buttons (`1x Observe`, `10x Observe`, `Exchange`, `Details` in `EN` & `ID`), added `2s` Shizuku `UserService` polling + HyperOS/ColorOS guidance, and published [`README_ID.md`](README_ID.md).
 - **Hotfix-Proof Universal Engine & Full `r3273853` / `r3273851` Support (`v0.9.0`):**
   - **Dynamic Bundle Auto-Discovery:** Automatically locates the active `VStringPool` (`raw_base_package`) and `Static UI KeyConfig` (`default_package`, via constant Unity CAB signature) `.r` files on both PC and Android (Shizuku, SAF, Direct, and ADB) — zero hardcoded `.r` filenames or sub-bundle byte offsets!
   - **Universal Content-Hash Matching (`RZV2`):** Matches all **`76,180`** `VStringPool` strings by `FNV-1a64` content hash + byte length with dynamic contiguous span repacking across builds (`r3219596`, `r3219598`, `r3273851`, `r3273853`, and future resource hotfixes!) — removing the legacy platform remap table completely.

@@ -626,7 +626,12 @@ pub struct UnityCnBundle<'a> {
     pub fsize: usize,
     pub fsize_off: usize,
     pub cinfo_off: usize,
+    #[allow(dead_code)]
+    pub c_info: usize,
+    #[allow(dead_code)]
+    pub u_info: usize,
     pub blocks_info_off: usize,
+    pub blocks_info: Vec<u8>,
     pub data_start: usize,
     pub header_prefix: Vec<u8>,
     pub data_hash: [u8; 16],
@@ -754,7 +759,10 @@ impl<'a> UnityCnBundle<'a> {
             fsize,
             fsize_off,
             cinfo_off,
+            c_info,
+            u_info,
             blocks_info_off,
+            blocks_info,
             data_start,
             header_prefix,
             data_hash,

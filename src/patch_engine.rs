@@ -24,6 +24,31 @@ const EMBED_RESOURCES_DIFF_ID_GZ: &[u8] = include_bytes!("../resources/resources
 const EMBED_NEWS_EN_GZ: &[u8] = include_bytes!("../resources/news_en.bin.gz");
 const EMBED_NEWS_ID_GZ: &[u8] = include_bytes!("../resources/news_id.bin.gz");
 
+const EMBED_FONT_BARLOW_MED_GZ: &[u8] = include_bytes!("../resources/font_barlow_med.ttf.gz");
+const EMBED_FONT_BARLOW_SEMI_GZ: &[u8] = include_bytes!("../resources/font_barlow_semi.ttf.gz");
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FontMode {
+    Default,
+    Barlow,
+}
+
+impl FontMode {
+    pub fn from_opt(s: Option<&str>) -> Self {
+        match s.unwrap_or("default").to_ascii_lowercase().as_str() {
+            "barlow" => FontMode::Barlow,
+            _ => FontMode::Default,
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            FontMode::Default => "Default (MiSans)",
+            FontMode::Barlow => "Barlow Semi Condensed (Compact)",
+        }
+    }
+}
+
 pub const VSTRING_STRINGS: usize = 76180;
 pub const STATIC_UI_STRINGS: usize = 3135;
 pub const STATIC_PKG_STRINGS: usize = 113;
@@ -50,6 +75,17 @@ pub const RAW_BUNDLE_REL_DIR: &str = r"AzurPromiliaJP_Data\.res\raw_base_package
 pub const DEFAULT_BUNDLE_REL_DIR: &str = r"AzurPromiliaJP_Data\.res\default_package\BundleFiles";
 pub const STATIC_PKG_REL: &str = r"AzurPromiliaJP_Data\StreamingAssets\.res\static_package\6pq4a7hlp7zidu91dvvww.r";
 pub const RESOURCES_REL: &str = r"AzurPromiliaJP_Data\resources.assets";
+pub const SHAREDASSETS0_REL: &str = r"AzurPromiliaJP_Data\sharedassets0.assets";
+
+// Active PC default_package font bundles (JP ResourcesLang/jp + fallback MiSans prefabs)
+const PC_FONT_JP_SDF_REL: &str = r"AzurPromiliaJP_Data\StreamingAssets\.res\default_package\hqqoy0ojvzpggukcf5m85w.r";
+const PC_FONT_JP_A00_REL: &str = r"AzurPromiliaJP_Data\StreamingAssets\.res\default_package\xlpsyuxnoz1cjmawi1wcxa.r";
+const PC_FONT_JP_B00_REL: &str = r"AzurPromiliaJP_Data\StreamingAssets\.res\default_package\awcxxitzquckttvmx0c5q.r";
+const PC_FONT_DEF_SDF_REL: &str = r"AzurPromiliaJP_Data\StreamingAssets\.res\default_package\xyqjdcxirj4zgne0y168pw.r";
+const PC_FONT_DEF_A00_REL: &str = r"AzurPromiliaJP_Data\StreamingAssets\.res\default_package\0cisenmukjlgwwq2lypujw.r";
+
+const JP_SDF_A00_CAB: &str = "CAB-85b17a1d6be0078245e2c5a5522a9a8c";
+const JP_SDF_B00_CAB: &str = "CAB-90bbe303cefb1750e1bd4584679caf08";
 
 // Known Original JP SHA-256 hashes (r3219598 & r3273853 PC + r3219596 Android)
 pub const VSTRING_ORIG_SHAS: &[&str] = &[
@@ -71,12 +107,16 @@ pub const VSTRING_KNOWN_EN_SHAS: &[&str] = &[
     "9C4283483E66F334929C92E620BB1A7345E83CBF10DF29DF4BD17CBB20687F05", // v0.9.0 PC r3273853
     "61A6FCC2A32950381D5468AC5D1E6C02651D6B89BC846E220EC266395EDE1E7E", // v0.9.1 PC r3219598
     "D3749817194F947BE336AE855300EF9AE8CB59CCA6EC2B18D85AA93A006589D8", // v0.9.1 PC r3273853
+    "A9EB1A961D611BB6A0899A5CB7C038B6F3C93590A971F0B0C98B332380A229EA", // v0.9.2 PC r3219598
+    "2C9AB1152E21BFDC05B8C218EC8F81B4947B31CDE99DE67948D51A94B5899D40", // v0.9.2 PC r3273853
 ];
 pub const VSTRING_KNOWN_ID_SHAS: &[&str] = &[
     "ED57A17D9C884CE436C81533D1A772C30AEE3FBCD85093C694B6973097BB904F", // v0.9.0 PC r3219598
     "5B0C27CBBA77FD7B9BCAC0D4A263177FCAEFE7FAEBB20A1516BA802028183D4A", // v0.9.0 PC r3273853
     "25B6E35D1CDC49E2F49315DD98C7538692082C350B54650CD5A9EC68919AE524", // v0.9.1 PC r3219598
     "2FC141815581A91928C2B8E730666D7EC6A831E0F7B3C59F0B85C8D78BF57433", // v0.9.1 PC r3273853
+    "FB63C80B5326FD74A448DF3F44A4CB4A196C977EB220BD085589A748663063E3", // v0.9.2 PC r3219598
+    "33A485100DC66FC37DAF9181E2EF6D7E7DCE83C564F5D23DC0B12BB6AEC4FAE8", // v0.9.2 PC r3273853
 ];
 pub const STATIC_UI_KNOWN_EN_SHAS: &[&str] = &[
     "8679E44FF0EA0493F464201DD26AC9D4185935CB3A98F99649559066C492BFDA", // v0.9.0 PC r3219598
@@ -95,11 +135,13 @@ pub const ANDROID_VSTRING_KNOWN_EN_SHAS: &[&str] = &[
     "0739151C287863A4CD45150CC85DE3DDFDD3A7587FB159437F3F5FEED513A4E5", // v0.8.x Android r3219596
     "3216E4E2A56F2BC36EAA2FFF79B203C854FA834A93A97C2CA218B40E909FF5F1", // v0.9.0 Android r3219596
     "2124FBF99624837DD6C36F0712EDB573ACFDE62DAC304FEF87678E6B91EDE1FF", // v0.9.1 Android r3219596
+    "08DC13585E76D90C11784B3B5F17E5A829FC353FFADE19A744FF9936477EBBBF", // v0.9.2 Android r3219596
 ];
 pub const ANDROID_VSTRING_KNOWN_ID_SHAS: &[&str] = &[
     "BD9A20B6BE6F9228E12F435F72374386F8C15D270E30B442927401A2EB36A0AF", // v0.8.x Android r3219596
     "EBC5EE0155910A58D3B62AB978A886CCD1BA4FA68F4CE929B7763E32454531DE", // v0.9.0 Android r3219596
     "43DA80F93DACA269313BCBF0B6D14BC3685F25AE479806419DFF848E24AD7150", // v0.9.1 Android r3219596
+    "42B324F18C05D8F4DFEFCA605F82D082526CB54C1F621BE77991CD3F13EE305D", // v0.9.2 Android r3219596
 ];
 pub const ANDROID_STATIC_UI_KNOWN_EN_SHAS: &[&str] = &[
     "2A4428AE21009DB19621A123B1A2561ED1F83A685B4C9160B94BA74CD50E8DAC", // v0.9.0 Android r3219596
@@ -136,10 +178,12 @@ pub struct BundlePatchState {
 #[serde(default)]
 pub struct PatchStateFile {
     pub schema: u32,
+    pub font_mode: String, // "default" | "barlow"
     pub vstring: BundlePatchState,
     pub static_ui: BundlePatchState,
     pub static_pkg: BundlePatchState,
     pub resources: BundlePatchState,
+    pub font_bundles: Vec<BundlePatchState>,
 }
 
 pub fn load_patch_state(bak_dir: &Path) -> PatchStateFile {
@@ -1469,6 +1513,7 @@ pub fn apply_patch<L, P>(
     game_dir: &Path,
     lang: PatchLang,
     custom: Option<&CustomPack>,
+    font_mode: FontMode,
     log: L,
     on_progress: P,
 ) -> Result<usize, String>
@@ -1477,7 +1522,7 @@ where
     P: FnMut(usize, usize, &str),
 {
     ensure_no_running_game_processes("patching")?;
-    apply_patch_inner(game_dir, lang, custom, log, on_progress)
+    apply_patch_inner(game_dir, lang, custom, font_mode, log, on_progress)
 }
 
 pub fn apply_patch_for_selftest<L, P>(
@@ -1491,13 +1536,14 @@ where
     L: FnMut(&str, LogLevel),
     P: FnMut(usize, usize, &str),
 {
-    apply_patch_inner(game_dir, lang, custom, log, on_progress)
+    apply_patch_inner(game_dir, lang, custom, FontMode::Default, log, on_progress)
 }
 
 fn apply_patch_inner<L, P>(
     game_dir: &Path,
     lang: PatchLang,
     custom: Option<&CustomPack>,
+    font_mode: FontMode,
     mut log: L,
     mut on_progress: P,
 ) -> Result<usize, String>
@@ -1566,9 +1612,13 @@ where
     )?;
     save_patch_state(&bak_dir, &state_file);
 
-    // [3/4] StaticPackage updatableBuiltInLangString (113 strings)
+    // [3/4] StaticPackage updatableBuiltInLangString (113 strings) + optional PC UI Font swap
     log(
-        &format!("=== [3/4] Patching Startup/Updater StaticPackage ({}) ===", active_code),
+        &format!(
+            "=== [3/4] Patching Startup/Updater StaticPackage ({} · Font: {}) ===",
+            active_code,
+            font_mode.label()
+        ),
         LogLevel::Info,
     );
     rewritten += patch_static_pkg(
@@ -1577,6 +1627,7 @@ where
         &mut state_file,
         lang,
         custom,
+        font_mode,
         &mut log,
         &mut |delta, stage| on_progress(rewritten + delta, TOTAL_STRINGS, stage),
     )?;
@@ -1593,10 +1644,30 @@ where
         &mut state_file,
         lang,
         custom,
+        font_mode,
         &mut log,
         &mut |delta, stage| on_progress(rewritten + delta, TOTAL_STRINGS, stage),
     )?;
     save_patch_state(&bak_dir, &state_file);
+
+    // [Font] Active In-Game PC UI Font Pack (default_package + sharedassets0)
+    match font_mode {
+        FontMode::Barlow => {
+            log(
+                "=== [Font] Applying Barlow Semi Condensed (Compact) to Active In-Game Fonts ===",
+                LogLevel::Info,
+            );
+            on_progress(rewritten, TOTAL_STRINGS, "Applying Barlow Semi Condensed UI font...");
+            apply_pc_extra_barlow_fonts(game_dir, &bak_dir, &mut state_file, &mut log)?;
+            state_file.font_mode = "barlow".into();
+            save_patch_state(&bak_dir, &state_file);
+        }
+        FontMode::Default => {
+            restore_pc_extra_barlow_fonts(game_dir, &bak_dir, &mut state_file, &mut log)?;
+            state_file.font_mode = "default".into();
+            save_patch_state(&bak_dir, &state_file);
+        }
+    }
 
     on_progress(
         rewritten,
@@ -2291,12 +2362,1023 @@ fn has_cjk(s: &str) -> bool {
     })
 }
 
+fn parse_ttf_cmap_unicodes(ttf: &[u8]) -> Result<std::collections::HashSet<u32>, String> {
+    if ttf.len() < 12 {
+        return Err("TTF too small".into());
+    }
+    let u16be = |b: &[u8], o: usize| u16::from_be_bytes([b[o], b[o + 1]]);
+    let u32be = |b: &[u8], o: usize| u32::from_be_bytes([b[o], b[o + 1], b[o + 2], b[o + 3]]);
+    let num_tables = u16be(ttf, 4) as usize;
+    let mut cmap_off = 0usize;
+    for i in 0..num_tables {
+        let o = 12 + i * 16;
+        if o + 16 > ttf.len() {
+            break;
+        }
+        if &ttf[o..o + 4] == b"cmap" {
+            cmap_off = u32be(ttf, o + 8) as usize;
+            break;
+        }
+    }
+    if cmap_off == 0 || cmap_off + 4 > ttf.len() {
+        return Err("TTF cmap table not found".into());
+    }
+    let num_sub = u16be(ttf, cmap_off + 2) as usize;
+    let mut set = std::collections::HashSet::with_capacity(600);
+    for i in 0..num_sub {
+        let so = cmap_off + 4 + i * 8;
+        if so + 8 > ttf.len() {
+            break;
+        }
+        let sub_off = cmap_off + u32be(ttf, so + 4) as usize;
+        if sub_off + 14 > ttf.len() {
+            continue;
+        }
+        if u16be(ttf, sub_off) == 4 {
+            let seg_count = (u16be(ttf, sub_off + 6) as usize) >> 1;
+            let end_codes = sub_off + 14;
+            let start_codes = end_codes + seg_count * 2 + 2;
+            if start_codes + seg_count * 2 > ttf.len() {
+                continue;
+            }
+            for s in 0..seg_count {
+                let sc = u16be(ttf, start_codes + s * 2) as u32;
+                let ec = u16be(ttf, end_codes + s * 2) as u32;
+                if sc == 0xFFFF {
+                    break;
+                }
+                for u in sc..=ec {
+                    set.insert(u);
+                }
+            }
+        }
+    }
+    Ok(set)
+}
+
+fn should_redirect_to_barlow(u: u32, supported: &std::collections::HashSet<u32>) -> bool {
+    if !supported.contains(&u) {
+        return false;
+    }
+    if (0x0020..=0x007E).contains(&u) {
+        return true;
+    }
+    if (0x00A0..=0x00FF).contains(&u) && u != 0x00A5 {
+        return true;
+    }
+    matches!(
+        u,
+        0x2013 | 0x2014 | 0x2018 | 0x2019 | 0x201C | 0x201D | 0x2022 | 0x2026
+    )
+}
+
+fn repack_unitycn_subbundle_exact(
+    orig_buf: &[u8],
+    sub_offset: usize,
+    bundle: &UnityCnBundle<'_>,
+    dirty_blocks: &HashMap<usize, Vec<u8>>,
+    preferred_absorber: Option<usize>,
+) -> Result<Vec<u8>, String> {
+    if dirty_blocks.is_empty() {
+        return Ok(orig_buf[sub_offset..sub_offset + bundle.fsize].to_vec());
+    }
+    let mut dirty_ids: Vec<usize> = dirty_blocks.keys().copied().collect();
+    dirty_ids.sort_unstable();
+
+    // Fast path: try compressing every dirty block into its OWN original compressed size (zero blocksInfo changes!)
+    let mut fast_comp: HashMap<usize, Vec<u8>> = HashMap::with_capacity(dirty_ids.len());
+    let mut all_fit_in_place = true;
+    for &bi in &dirty_ids {
+        let bk = &bundle.blocks[bi];
+        if (bk.flags & 0x3F) == 0 {
+            if dirty_blocks[&bi].len() == bk.c_size {
+                fast_comp.insert(bi, dirty_blocks[&bi].clone());
+            } else {
+                all_fit_in_place = false;
+                break;
+            }
+        } else {
+            match lz4_compress_exact(&dirty_blocks[&bi], bk.c_size, 1024) {
+                Ok(c) => {
+                    fast_comp.insert(bi, c);
+                }
+                Err(_) => {
+                    all_fit_in_place = false;
+                    break;
+                }
+            }
+        }
+    }
+    if all_fit_in_place {
+        let mut out = orig_buf[sub_offset..sub_offset + bundle.fsize].to_vec();
+        for &bi in &dirty_ids {
+            let bk = &bundle.blocks[bi];
+            let mut enc = fast_comp.remove(&bi).unwrap();
+            if (bk.flags & 0x100) != 0 {
+                bundle.cipher.encrypt_block_in_place(&mut enc, bi);
+            }
+            out[bk.file_offset..bk.file_offset + enc.len()].copy_from_slice(&enc);
+        }
+        let v_bundle = UnityCnBundle::parse(&out, 0)?;
+        for &bi in &dirty_ids {
+            if v_bundle.read_block(bi)? != dirty_blocks[&bi] {
+                return Err(format!("In-place UnityCN round-trip mismatch on block #{}", bi));
+            }
+        }
+        return Ok(out);
+    }
+
+    // Multi-block exact path: pool LZ4HC slack across modified blocks (+ sibling blocks on small sub-bundles)
+    let mut work_blocks: HashMap<usize, Vec<u8>> = dirty_blocks.clone();
+    if bundle.blocks.len() <= 8 {
+        for bi in 0..bundle.blocks.len() {
+            if !work_blocks.contains_key(&bi) {
+                work_blocks.insert(bi, bundle.read_block(bi)?);
+            }
+        }
+    }
+    if let Some(abs) = preferred_absorber {
+        if abs < bundle.blocks.len() && !work_blocks.contains_key(&abs) {
+            work_blocks.insert(abs, bundle.read_block(abs)?);
+        }
+    }
+    let mut work_ids: Vec<usize> = work_blocks.keys().copied().collect();
+    work_ids.sort_unstable();
+
+    let mut min_comp: HashMap<usize, Vec<u8>> = HashMap::with_capacity(work_ids.len());
+    let mut min_c: HashMap<usize, usize> = HashMap::with_capacity(work_ids.len());
+    let mut max_c: HashMap<usize, usize> = HashMap::with_capacity(work_ids.len());
+    for &bi in &work_ids {
+        let bk = &bundle.blocks[bi];
+        if (bk.flags & 0x3F) == 0 {
+            let len = work_blocks[&bi].len();
+            min_c.insert(bi, len);
+            max_c.insert(bi, len);
+            min_comp.insert(bi, work_blocks[&bi].clone());
+        } else {
+            let c = lz4_compress(&work_blocks[&bi], 1024);
+            let raw_len = work_blocks[&bi].len();
+            // Max LZ4 literal-only encoded size: 1 + ((len-15)/255 + 1) + len
+            let raw_cap = if raw_len >= 15 {
+                1 + ((raw_len - 15) / 255 + 1) + raw_len
+            } else {
+                1 + raw_len
+            };
+            min_c.insert(bi, c.len());
+            max_c.insert(bi, raw_cap);
+            min_comp.insert(bi, c);
+        }
+    }
+
+    // Balance per-block compressed sizes cleanly within [min_c, max_c] so sum(cur_c) == sum(orig_c)
+    let mut cur_c: HashMap<usize, usize> = HashMap::with_capacity(work_ids.len());
+    let mut deficit: i64 = 0;
+    for &bi in &work_ids {
+        let orig = bundle.blocks[bi].c_size;
+        let clamped = orig.clamp(min_c[&bi], max_c[&bi]);
+        cur_c.insert(bi, clamped);
+        deficit += clamped as i64 - orig as i64;
+    }
+
+    // Order donors: preferred_absorber first, then descending available slack
+    let mut donors: Vec<usize> = work_ids
+        .iter()
+        .copied()
+        .filter(|&bi| (bundle.blocks[bi].flags & 0x3F) != 0)
+        .collect();
+    donors.sort_by_key(|&bi| {
+        let pref = if Some(bi) == preferred_absorber { 0 } else { 1 };
+        let slack = cur_c[&bi].saturating_sub(min_c[&bi]);
+        (pref, std::cmp::Reverse(slack))
+    });
+
+    if deficit > 0 {
+        for &bi in &donors {
+            if deficit <= 0 {
+                break;
+            }
+            let avail = (cur_c[&bi] - min_c[&bi]) as i64;
+            let take = deficit.min(avail);
+            *cur_c.get_mut(&bi).unwrap() -= take as usize;
+            deficit -= take;
+        }
+        if deficit > 0 {
+            return Err(format!(
+                "Insufficient multi-block LZ4HC slack across {} blocks (short by {} B)",
+                work_ids.len(),
+                deficit
+            ));
+        }
+    } else if deficit < 0 {
+        let mut surplus = (-deficit) as usize;
+        for &bi in &donors {
+            if surplus == 0 {
+                break;
+            }
+            let room = max_c[&bi] - cur_c[&bi];
+            let add = surplus.min(room);
+            *cur_c.get_mut(&bi).unwrap() += add;
+            surplus -= add;
+        }
+        if surplus > 0 {
+            return Err(format!(
+                "Cannot absorb surplus {} B across {} blocks",
+                surplus,
+                work_ids.len()
+            ));
+        }
+    }
+
+    // Converge blocksInfo compressed size + 16-byte aligned dataStart
+    let mut est_shift: i64 = 0;
+    let mut final_info_comp: Option<Vec<u8>> = None;
+    let mut final_targets: HashMap<usize, usize> = HashMap::new();
+    let mut final_data_start: usize = bundle.data_start;
+
+    for _ in 0..8 {
+        let mut trial_c = cur_c.clone();
+        let adj = -est_shift; // positive => add bytes to blocks; negative => remove bytes from blocks
+        if adj < 0 {
+            let mut need = (-adj) as usize;
+            for &bi in &donors {
+                if need == 0 {
+                    break;
+                }
+                let avail = trial_c[&bi] - min_c[&bi];
+                let take = need.min(avail);
+                *trial_c.get_mut(&bi).unwrap() -= take;
+                need -= take;
+            }
+            if need > 0 {
+                return Err(format!("Cannot absorb blocksInfo shift {} B (short {} B)", est_shift, need));
+            }
+        } else if adj > 0 {
+            let mut add_rem = adj as usize;
+            for &bi in &donors {
+                if add_rem == 0 {
+                    break;
+                }
+                let room = max_c[&bi] - trial_c[&bi];
+                let give = add_rem.min(room);
+                *trial_c.get_mut(&bi).unwrap() += give;
+                add_rem -= give;
+            }
+            if add_rem > 0 {
+                return Err(format!("Cannot pad blocksInfo shift {} B (rem {} B)", est_shift, add_rem));
+            }
+        }
+        let mut info_buf = bundle.blocks_info.clone();
+        for (&bi, &sz) in &trial_c {
+            let off = 20 + bi * 10 + 4;
+            info_buf[off..off + 4].copy_from_slice(&(sz as u32).to_be_bytes());
+        }
+        let info_comp = lz4_compress(&info_buf, 256);
+        let new_data_start = (bundle.blocks_info_off + info_comp.len() + 15) & !15;
+        let shift = new_data_start as i64 - bundle.data_start as i64;
+        if shift == est_shift {
+            final_info_comp = Some(info_comp);
+            final_targets = trial_c;
+            final_data_start = new_data_start;
+            break;
+        }
+        est_shift = shift;
+    }
+    let info_comp = final_info_comp.ok_or("blocksInfo alignment shift failed to converge")?;
+
+    let mut new_comp: HashMap<usize, Vec<u8>> = HashMap::with_capacity(work_ids.len());
+    for &bi in &work_ids {
+        let bk = &bundle.blocks[bi];
+        let target = final_targets[&bi];
+        if (bk.flags & 0x3F) == 0 {
+            new_comp.insert(bi, work_blocks[&bi].clone());
+        } else if target == min_c[&bi] {
+            new_comp.insert(bi, min_comp.remove(&bi).unwrap());
+        } else {
+            new_comp.insert(bi, lz4_compress_exact(&work_blocks[&bi], target, 1024)?);
+        }
+    }
+
+    let mut out = vec![0u8; bundle.fsize];
+    out[..bundle.blocks_info_off]
+        .copy_from_slice(&orig_buf[sub_offset..sub_offset + bundle.blocks_info_off]);
+    out[bundle.cinfo_off..bundle.cinfo_off + 4]
+        .copy_from_slice(&(info_comp.len() as u32).to_be_bytes());
+    out[bundle.blocks_info_off..bundle.blocks_info_off + info_comp.len()]
+        .copy_from_slice(&info_comp);
+
+    let mut wp = final_data_start;
+    for (i, bk) in bundle.blocks.iter().enumerate() {
+        if let Some(comp) = new_comp.get(&i) {
+            let mut enc = comp.clone();
+            if (bk.flags & 0x100) != 0 {
+                bundle.cipher.encrypt_block_in_place(&mut enc, i);
+            }
+            if wp + enc.len() > out.len() {
+                return Err("Repacked UnityCN sub-bundle overflowed size".into());
+            }
+            out[wp..wp + enc.len()].copy_from_slice(&enc);
+            wp += enc.len();
+        } else {
+            if wp + bk.c_size > out.len() {
+                return Err("Repacked UnityCN sub-bundle overflowed on untouched block".into());
+            }
+            out[wp..wp + bk.c_size].copy_from_slice(
+                &orig_buf[sub_offset + bk.file_offset..sub_offset + bk.file_offset + bk.c_size],
+            );
+            wp += bk.c_size;
+        }
+    }
+    if wp != bundle.fsize {
+        return Err(format!(
+            "UnityCN sub-bundle exact-size mismatch: {} != {}",
+            wp, bundle.fsize
+        ));
+    }
+
+    let v_bundle = UnityCnBundle::parse(&out, 0)?;
+    for &bi in &work_ids {
+        if v_bundle.read_block(bi)? != work_blocks[&bi] {
+            return Err(format!(
+                "UnityCN sub-bundle round-trip mismatch on block #{}",
+                bi
+            ));
+        }
+    }
+    Ok(out)
+}
+
+fn redirect_tmp_obj_in_place(
+    buf: &mut [u8],
+    name: &str,
+    supported: &std::collections::HashSet<u32>,
+    zero_static_free_rects: bool,
+) -> Result<usize, String> {
+    let v_idx = find_bytes(buf, b"1.1.0")
+        .ok_or_else(|| format!("TMP_FontAsset '1.1.0' header not found in {}", name))?;
+    let mut q = v_idx + 8;
+    let g_len = read_i32_le(buf, q) as usize;
+    q += 4 + align4(g_len);
+    let pop_mode = read_i32_le(buf, q + 12);
+    q += 12 + 4 + 4;
+    let f_len = read_i32_le(buf, q) as usize;
+    q += 4 + align4(f_len);
+    let s_len = read_i32_le(buf, q) as usize;
+    q += 4 + align4(s_len);
+    q += 18 * 4;
+    let glyph_count = read_i32_le(buf, q) as usize;
+    q += 4;
+    let char_table_off = q + glyph_count * 52;
+    if char_table_off + 4 > buf.len() {
+        return Err(format!("TMP m_CharacterTable OOB in {}", name));
+    }
+    let cc = read_i32_le(buf, char_table_off) as usize;
+    let mut redirected = 0usize;
+    for i in 0..cc {
+        let u_rel = char_table_off + 4 + i * 16 + 4;
+        if u_rel + 4 > buf.len() {
+            break;
+        }
+        let u = read_u32_le(buf, u_rel);
+        if should_redirect_to_barlow(u, supported) {
+            let pua = (0x000F_0000u32 + u).to_le_bytes();
+            buf[u_rel..u_rel + 4].copy_from_slice(&pua);
+            redirected += 1;
+        }
+    }
+    // On Static (popMode == 0) TMP_FontAssets, m_FreeGlyphRects holds editor-time atlas-packing
+    // leftover slivers that Unity never reads at runtime; zeroing them to GlyphRect(0,0,0,0)
+    // provides clean LZ4HC compression slack for exact 0B-delta repacking.
+    if zero_static_free_rects && pop_mode == 0 && redirected > 0 {
+        let mut a = char_table_off + 4 + cc * 16;
+        if a + 4 <= buf.len() {
+            let tex_cnt = read_i32_le(buf, a) as usize;
+            a += 4 + tex_cnt * 12 + 12; // atlasTextures + atlasTexIdx + isMulti + clearDyn
+            if a + 4 <= buf.len() {
+                let used_cnt = read_i32_le(buf, a) as usize;
+                a += 4 + used_cnt * 16;
+                if a + 4 <= buf.len() {
+                    let free_cnt = read_i32_le(buf, a) as usize;
+                    let free_start = a + 4;
+                    let free_end = free_start.saturating_add(free_cnt.saturating_mul(16));
+                    if free_cnt > 0 && free_end <= buf.len() {
+                        buf[free_start..free_end].fill(0);
+                    }
+                }
+            }
+        }
+    }
+    Ok(redirected)
+}
+
+fn patch_unitycn_subbundle_fonts(
+    orig_buf: &[u8],
+    sub_offset: usize,
+    tmp_names: &[&str],
+    font_swaps: &[(&str, &[u8])],
+    supported: &std::collections::HashSet<u32>,
+    extra_dirty: Option<(usize, Vec<u8>)>,
+) -> Result<(Vec<u8>, usize, usize), String> {
+    let bundle = UnityCnBundle::parse(orig_buf, sub_offset)?;
+    if bundle.dirs.is_empty() || bundle.blocks.is_empty() {
+        return Err("UnityCN sub-bundle has no directories/blocks".into());
+    }
+    let blk_unit = bundle.blocks[0].u_size;
+    if blk_unit == 0 {
+        return Err("Invalid block unit size".into());
+    }
+    let dir0_off = bundle.dirs[0].offset as usize;
+
+    let mut read_cache: HashMap<usize, Vec<u8>> = HashMap::new();
+    let mut dirty_blocks: HashMap<usize, Vec<u8>> = HashMap::new();
+    if let Some((bi, data)) = extra_dirty {
+        dirty_blocks.insert(bi, data);
+    }
+
+    let read_cab = |cab_off: usize,
+                    len: usize,
+                    read_cache: &mut HashMap<usize, Vec<u8>>,
+                    dirty_blocks: &HashMap<usize, Vec<u8>>|
+     -> Result<Vec<u8>, String> {
+        let mut out = vec![0u8; len];
+        let mut rem = len;
+        let mut dst = 0usize;
+        let mut cur = dir0_off + cab_off;
+        while rem > 0 {
+            let bi = cur / blk_unit;
+            let bo = cur % blk_unit;
+            if bi >= bundle.blocks.len() {
+                return Err(format!("CAB read OOB block {}", bi));
+            }
+            let take = rem.min(bundle.blocks[bi].u_size - bo);
+            let src_blk: &[u8] = if let Some(d) = dirty_blocks.get(&bi) {
+                d
+            } else {
+                if !read_cache.contains_key(&bi) {
+                    read_cache.insert(bi, bundle.read_block(bi)?);
+                }
+                read_cache.get(&bi).unwrap()
+            };
+            out[dst..dst + take].copy_from_slice(&src_blk[bo..bo + take]);
+            cur += take;
+            dst += take;
+            rem -= take;
+        }
+        Ok(out)
+    };
+
+    let write_cab = |cab_off: usize,
+                     src: &[u8],
+                     read_cache: &mut HashMap<usize, Vec<u8>>,
+                     dirty_blocks: &mut HashMap<usize, Vec<u8>>|
+     -> Result<(), String> {
+        let mut rem = src.len();
+        let mut sp = 0usize;
+        let mut cur = dir0_off + cab_off;
+        while rem > 0 {
+            let bi = cur / blk_unit;
+            let bo = cur % blk_unit;
+            if bi >= bundle.blocks.len() {
+                return Err(format!("CAB write OOB block {}", bi));
+            }
+            let take = rem.min(bundle.blocks[bi].u_size - bo);
+            if !dirty_blocks.contains_key(&bi) {
+                let base = if let Some(c) = read_cache.get(&bi) {
+                    c.clone()
+                } else {
+                    bundle.read_block(bi)?
+                };
+                dirty_blocks.insert(bi, base);
+            }
+            let dst_blk = dirty_blocks.get_mut(&bi).unwrap();
+            dst_blk[bo..bo + take].copy_from_slice(&src[sp..sp + take]);
+            cur += take;
+            sp += take;
+            rem -= take;
+        }
+        Ok(())
+    };
+
+    // Dynamically parse SerializedFile header (version 22+)
+    let hdr48 = read_cab(0, 48, &mut read_cache, &dirty_blocks)?;
+    let sf_ver = u32::from_be_bytes([hdr48[8], hdr48[9], hdr48[10], hdr48[11]]);
+    if sf_ver < 22 {
+        return Err(format!("Unsupported SerializedFile version {} for font swap", sf_ver));
+    }
+    let meta_size = u32::from_be_bytes([hdr48[20], hdr48[21], hdr48[22], hdr48[23]]) as usize;
+    let data_offset = u64::from_be_bytes([
+        hdr48[32], hdr48[33], hdr48[34], hdr48[35], hdr48[36], hdr48[37], hdr48[38], hdr48[39],
+    ]) as usize;
+    let max_meta = (bundle.dirs[0].size as usize).min(meta_size + 64);
+    let meta_buf = read_cab(0, max_meta, &mut read_cache, &dirty_blocks)?;
+
+    let mut p = 48usize;
+    let z = meta_buf[p..]
+        .iter()
+        .position(|&b| b == 0)
+        .ok_or("Missing unity version string")?;
+    p += z + 1 + 4;
+    let enable_type_tree = meta_buf[p] != 0;
+    p += 1;
+    let type_count = read_i32_le(&meta_buf, p) as usize;
+    p += 4;
+    let mut type_cids: Vec<i32> = Vec::with_capacity(type_count);
+    for _ in 0..type_count {
+        let cid = read_i32_le(&meta_buf, p);
+        p += 4 + 3;
+        if cid == 114 {
+            p += 16;
+        }
+        p += 16;
+        if enable_type_tree {
+            let nc = read_i32_le(&meta_buf, p) as usize;
+            let sb = read_i32_le(&meta_buf, p + 4) as usize;
+            p += 8 + nc * 32 + sb;
+            let dc = read_i32_le(&meta_buf, p) as usize;
+            p += 4 + dc * 4;
+        }
+        type_cids.push(cid);
+    }
+
+    let obj_count = read_i32_le(&meta_buf, p) as usize;
+    p += 4;
+    let mut tmp_targets: Vec<(String, usize, usize)> = Vec::new();
+    let mut font_targets: Vec<(String, usize, usize)> = Vec::new();
+
+    for _ in 0..obj_count {
+        p = align4(p);
+        let byte_start = u64::from_le_bytes([
+            meta_buf[p + 8],
+            meta_buf[p + 9],
+            meta_buf[p + 10],
+            meta_buf[p + 11],
+            meta_buf[p + 12],
+            meta_buf[p + 13],
+            meta_buf[p + 14],
+            meta_buf[p + 15],
+        ]) as usize;
+        let byte_size = read_u32_le(&meta_buf, p + 16) as usize;
+        let type_idx = read_i32_le(&meta_buf, p + 20) as usize;
+        p += 24;
+        let cid = *type_cids.get(type_idx).unwrap_or(&0);
+        if cid != 114 && cid != 128 {
+            continue;
+        }
+        let abs_off = data_offset + byte_start;
+        let name_off = if cid == 128 { abs_off } else { abs_off + 28 };
+        if byte_size < 40 {
+            continue;
+        }
+        let head = read_cab(name_off, 48.min(byte_size), &mut read_cache, &dirty_blocks)?;
+        let nl = read_i32_le(&head, 0);
+        if nl <= 0 || nl > 40 || (4 + nl as usize) > head.len() {
+            continue;
+        }
+        let name = String::from_utf8_lossy(&head[4..4 + nl as usize]).into_owned();
+        if cid == 114 && tmp_names.iter().any(|&t| t == name) {
+            tmp_targets.push((name, abs_off, byte_size));
+        } else if cid == 128 && font_swaps.iter().any(|&(fnm, _)| fnm == name) {
+            font_targets.push((name, abs_off, byte_size));
+        }
+    }
+
+    let mut total_redirected = 0usize;
+    for (name, obj_off, obj_sz) in &tmp_targets {
+        let mut obj_buf = read_cab(*obj_off, *obj_sz, &mut read_cache, &dirty_blocks)?;
+        let red = redirect_tmp_obj_in_place(&mut obj_buf, name, supported, true)?;
+        if red > 0 {
+            write_cab(*obj_off, &obj_buf, &mut read_cache, &mut dirty_blocks)?;
+            total_redirected += red;
+        }
+    }
+
+    let mut swapped_fonts = 0usize;
+    let mut preferred_absorber: Option<usize> = None;
+    for (name, obj_off, obj_sz) in &font_targets {
+        let Some(&(_, ttf)) = font_swaps.iter().find(|&&(fnm, _)| fnm == name) else {
+            continue;
+        };
+        let hdr = read_cab(*obj_off, 256.min(*obj_sz), &mut read_cache, &dirty_blocks)?;
+        let otto_rel = find_bytes(&hdr, b"OTTO")
+            .ok_or_else(|| format!("OTTO header not found in Font '{}'", name))?;
+        let data_len = read_u32_le(&hdr, otto_rel - 4) as usize;
+        if ttf.len() > data_len {
+            return Err(format!("Replacement TTF larger than '{}' slot ({} > {})", name, ttf.len(), data_len));
+        }
+        let font_off = *obj_off + otto_rel;
+        write_cab(font_off, ttf, &mut read_cache, &mut dirty_blocks)?;
+        if preferred_absorber.is_none() {
+            preferred_absorber = Some((dir0_off + font_off) / blk_unit);
+        }
+        swapped_fonts += 1;
+    }
+
+    let out_sub = repack_unitycn_subbundle_exact(
+        orig_buf,
+        sub_offset,
+        &bundle,
+        &dirty_blocks,
+        preferred_absorber,
+    )?;
+    Ok((out_sub, total_redirected, swapped_fonts))
+}
+
+fn patch_raw_sf_fonts(
+    sf: &mut [u8],
+    tmp_names: &[&str],
+    font_swaps: &[(&str, &[u8])],
+    supported: &std::collections::HashSet<u32>,
+) -> Result<(usize, usize), String> {
+    if sf.len() < 64 {
+        return Err("SerializedFile too small".into());
+    }
+    let sf_ver = u32::from_be_bytes([sf[8], sf[9], sf[10], sf[11]]);
+    if sf_ver < 22 {
+        return Err(format!("Unsupported raw SerializedFile version {}", sf_ver));
+    }
+    let data_offset = u64::from_be_bytes([
+        sf[32], sf[33], sf[34], sf[35], sf[36], sf[37], sf[38], sf[39],
+    ]) as usize;
+
+    let mut p = 48usize;
+    let z = sf[p..]
+        .iter()
+        .position(|&b| b == 0)
+        .ok_or("Missing unity version string in raw SF")?;
+    p += z + 1 + 4;
+    let enable_type_tree = sf[p] != 0;
+    p += 1;
+    let type_count = read_i32_le(sf, p) as usize;
+    p += 4;
+    let mut type_cids: Vec<i32> = Vec::with_capacity(type_count);
+    for _ in 0..type_count {
+        let cid = read_i32_le(sf, p);
+        p += 4 + 3;
+        if cid == 114 {
+            p += 16;
+        }
+        p += 16;
+        if enable_type_tree {
+            let nc = read_i32_le(sf, p) as usize;
+            let sb = read_i32_le(sf, p + 4) as usize;
+            p += 8 + nc * 32 + sb;
+            let dc = read_i32_le(sf, p) as usize;
+            p += 4 + dc * 4;
+        }
+        type_cids.push(cid);
+    }
+
+    let obj_count = read_i32_le(sf, p) as usize;
+    p += 4;
+    let mut tmp_targets: Vec<(String, usize, usize)> = Vec::new();
+    let mut font_targets: Vec<(String, usize, usize)> = Vec::new();
+
+    for _ in 0..obj_count {
+        p = align4(p);
+        let byte_start = u64::from_le_bytes([
+            sf[p + 8], sf[p + 9], sf[p + 10], sf[p + 11],
+            sf[p + 12], sf[p + 13], sf[p + 14], sf[p + 15],
+        ]) as usize;
+        let byte_size = read_u32_le(sf, p + 16) as usize;
+        let type_idx = read_i32_le(sf, p + 20) as usize;
+        p += 24;
+        let cid = *type_cids.get(type_idx).unwrap_or(&0);
+        if cid != 114 && cid != 128 {
+            continue;
+        }
+        let abs_off = data_offset + byte_start;
+        if abs_off + byte_size > sf.len() || byte_size < 40 {
+            continue;
+        }
+        let name_off = if cid == 128 { abs_off } else { abs_off + 28 };
+        let nl = read_i32_le(sf, name_off);
+        if nl <= 0 || nl > 40 || name_off + 4 + nl as usize > sf.len() {
+            continue;
+        }
+        let name = String::from_utf8_lossy(&sf[name_off + 4..name_off + 4 + nl as usize]).into_owned();
+        if cid == 114 && tmp_names.iter().any(|&t| t == name) {
+            tmp_targets.push((name, abs_off, byte_size));
+        } else if cid == 128 && font_swaps.iter().any(|&(fnm, _)| fnm == name) {
+            font_targets.push((name, abs_off, byte_size));
+        }
+    }
+
+    let mut total_redirected = 0usize;
+    for (name, obj_off, obj_sz) in tmp_targets {
+        total_redirected += redirect_tmp_obj_in_place(&mut sf[obj_off..obj_off + obj_sz], &name, supported, false)?;
+    }
+
+    let mut swapped = 0usize;
+    for (name, obj_off, obj_sz) in font_targets {
+        let Some(&(_, ttf)) = font_swaps.iter().find(|&&(fnm, _)| fnm == name) else {
+            continue;
+        };
+        let hdr_end = (obj_off + 256).min(obj_off + obj_sz);
+        let otto_rel = find_bytes(&sf[obj_off..hdr_end], b"OTTO")
+            .ok_or_else(|| format!("OTTO header not found in raw SF Font '{}'", name))?;
+        let data_len = read_u32_le(sf, obj_off + otto_rel - 4) as usize;
+        if ttf.len() > data_len {
+            return Err(format!("TTF too large for raw SF Font '{}'", name));
+        }
+        sf[obj_off + otto_rel..obj_off + otto_rel + ttf.len()].copy_from_slice(ttf);
+        swapped += 1;
+    }
+    Ok((total_redirected, swapped))
+}
+
+fn patch_jp_sdf_container_bytes(
+    orig_buf: &[u8],
+    supported: &std::collections::HashSet<u32>,
+) -> Result<(Vec<u8>, usize), String> {
+    const MAGIC: &[u8; 8] = b"UnityFS\0";
+    let mut out = orig_buf.to_vec();
+    let mut pos = 0usize;
+    let mut total_red = 0usize;
+    let mut found = 0usize;
+    while pos + 8 <= orig_buf.len() {
+        let Some(rel) = find_bytes(&orig_buf[pos..], MAGIC) else {
+            break;
+        };
+        let off = pos + rel;
+        let bundle = match UnityCnBundle::parse(orig_buf, off) {
+            Ok(b) => b,
+            Err(_) => {
+                pos = off + 8;
+                continue;
+            }
+        };
+        let fsize = bundle.fsize;
+        let is_target = bundle
+            .dirs
+            .iter()
+            .any(|d| d.name == JP_SDF_A00_CAB || d.name == JP_SDF_B00_CAB);
+        if is_target {
+            let (new_sub, red, _) = patch_unitycn_subbundle_fonts(
+                orig_buf,
+                off,
+                &["sdf_a00", "sdf_b00"],
+                &[],
+                supported,
+                None,
+            )?;
+            if new_sub.len() != fsize {
+                return Err(format!(
+                    "JP SDF sub-bundle size mismatch ({} != {})",
+                    new_sub.len(),
+                    fsize
+                ));
+            }
+            out[off..off + fsize].copy_from_slice(&new_sub);
+            total_red += red;
+            found += 1;
+        }
+        pos = off + fsize.max(8);
+    }
+    if found < 2 {
+        return Err(format!(
+            "Expected 2 JP SDF sub-bundles (sdf_a00 & sdf_b00), found {}",
+            found
+        ));
+    }
+    Ok((out, total_red))
+}
+
+fn apply_barlow_font_to_static_pkg_bytes<L>(
+    orig_buf: &[u8],
+    _bundle: &UnityCnBundle<'_>,
+    csv_blk_idx: usize,
+    csv_blk_data: Vec<u8>,
+    log: &mut L,
+) -> Result<Vec<u8>, String>
+where
+    L: FnMut(&str, LogLevel),
+{
+    let ttf_med = gunzip(EMBED_FONT_BARLOW_MED_GZ)?;
+    let ttf_semi = gunzip(EMBED_FONT_BARLOW_SEMI_GZ)?;
+    let supported = parse_ttf_cmap_unicodes(&ttf_med)?;
+
+    let (out, total_redirected, swapped_fonts) = patch_unitycn_subbundle_fonts(
+        orig_buf,
+        0,
+        &["sdf_a00", "sdf_b00", "fallback_sdf_a00", "fallback_sdf_b00"],
+        &[("a00", &ttf_med), ("b00", &ttf_semi)],
+        &supported,
+        Some((csv_blk_idx, csv_blk_data)),
+    )?;
+    if swapped_fonts < 2 {
+        return Err(format!(
+            "Expected 2 swapped fonts (a00/b00) in StaticPackage, got {}",
+            swapped_fonts
+        ));
+    }
+    log(
+        &format!(
+            "  UI Font [Barlow] applied to Boot StaticPackage: {} fonts swapped, {} Latin glyphs redirected (0B delta).",
+            swapped_fonts, total_redirected
+        ),
+        LogLevel::Ok,
+    );
+    Ok(out)
+}
+
+#[derive(Clone, Copy)]
+enum PcFontTargetKind {
+    JpSdfContainer,
+    UnityCnFontA00,
+    UnityCnFontB00,
+    UnityCnDefSdf,
+    RawSfFontA00,
+}
+
+const PC_EXTRA_FONT_SPECS: &[(&str, &str, PcFontTargetKind)] = &[
+    (PC_FONT_JP_SDF_REL, "hqqoy0ojvzpggukcf5m85w.r", PcFontTargetKind::JpSdfContainer),
+    (PC_FONT_JP_A00_REL, "xlpsyuxnoz1cjmawi1wcxa.r", PcFontTargetKind::UnityCnFontA00),
+    (PC_FONT_JP_B00_REL, "awcxxitzquckttvmx0c5q.r", PcFontTargetKind::UnityCnFontB00),
+    (PC_FONT_DEF_SDF_REL, "xyqjdcxirj4zgne0y168pw.r", PcFontTargetKind::UnityCnDefSdf),
+    (PC_FONT_DEF_A00_REL, "0cisenmukjlgwwq2lypujw.r", PcFontTargetKind::UnityCnFontA00),
+    (SHAREDASSETS0_REL, "sharedassets0.assets", PcFontTargetKind::RawSfFontA00),
+];
+
+fn apply_pc_extra_barlow_fonts<L>(
+    game_dir: &Path,
+    bak_dir: &Path,
+    state_file: &mut PatchStateFile,
+    log: &mut L,
+) -> Result<(), String>
+where
+    L: FnMut(&str, LogLevel),
+{
+    let ttf_med = gunzip(EMBED_FONT_BARLOW_MED_GZ)?;
+    let ttf_semi = gunzip(EMBED_FONT_BARLOW_SEMI_GZ)?;
+    let supported = parse_ttf_cmap_unicodes(&ttf_med)?;
+
+    let mut new_states: Vec<BundlePatchState> = Vec::with_capacity(PC_EXTRA_FONT_SPECS.len());
+    let mut applied = 0usize;
+
+    for &(rel_path, fname, kind) in PC_EXTRA_FONT_SPECS {
+        let target = game_dir.join(rel_path);
+        if !target.is_file() {
+            log(
+                &format!("  [WARN] Optional font target not found: {} (skipped)", rel_path),
+                LogLevel::Warn,
+            );
+            continue;
+        }
+        let bak = bak_dir.join(format!("{}.original", fname));
+        let prev_state = state_file
+            .font_bundles
+            .iter()
+            .find(|s| s.file_name == fname)
+            .cloned()
+            .unwrap_or_default();
+        let orig_sha = ensure_backup_v2(&target, &bak, fname, &prev_state, &[], &[], log)?;
+        let src_path = if bak.is_file() { &bak } else { &target };
+        let orig_buf = fs::read(src_path)
+            .map_err(|e| format!("Read font target {} failed: {}", fname, e))?;
+
+        let (out_buf, desc) = match kind {
+            PcFontTargetKind::JpSdfContainer => {
+                let (out, red) = patch_jp_sdf_container_bytes(&orig_buf, &supported)?;
+                (out, format!("JP sdf_a00/b00 ({} glyphs redirected)", red))
+            }
+            PcFontTargetKind::UnityCnFontA00 => {
+                let (out, _, sw) = patch_unitycn_subbundle_fonts(
+                    &orig_buf,
+                    0,
+                    &[],
+                    &[("a00", &ttf_med)],
+                    &supported,
+                    None,
+                )?;
+                if sw == 0 {
+                    return Err(format!("Font 'a00' not found in {}", fname));
+                }
+                (out, "a00 -> Barlow Medium".to_string())
+            }
+            PcFontTargetKind::UnityCnFontB00 => {
+                let (out, _, sw) = patch_unitycn_subbundle_fonts(
+                    &orig_buf,
+                    0,
+                    &[],
+                    &[("b00", &ttf_semi)],
+                    &supported,
+                    None,
+                )?;
+                if sw == 0 {
+                    return Err(format!("Font 'b00' not found in {}", fname));
+                }
+                (out, "b00 -> Barlow SemiBold".to_string())
+            }
+            PcFontTargetKind::UnityCnDefSdf => {
+                let (out, red, _) = patch_unitycn_subbundle_fonts(
+                    &orig_buf,
+                    0,
+                    &["sdf_a00", "fallback_sdf_a00"],
+                    &[],
+                    &supported,
+                    None,
+                )?;
+                (out, format!("Default sdf_a00 ({} glyphs redirected)", red))
+            }
+            PcFontTargetKind::RawSfFontA00 => {
+                let mut out = orig_buf.clone();
+                let (_, sw) = patch_raw_sf_fonts(&mut out, &[], &[("a00", &ttf_med)], &supported)?;
+                if sw == 0 {
+                    return Err(format!("Font 'a00' not found in {}", fname));
+                }
+                (out, "Startup a00 -> Barlow Medium".to_string())
+            }
+        };
+
+        if out_buf.len() != orig_buf.len() {
+            return Err(format!(
+                "Font target {} size mismatch ({} != {})",
+                fname,
+                out_buf.len(),
+                orig_buf.len()
+            ));
+        }
+        write_exclusive_verified(&target, &out_buf, &bak)?;
+        let post_sha = sha256_file(&target)?;
+        new_states.push(BundlePatchState {
+            file_name: fname.to_string(),
+            sub_offset: 0,
+            lang: "barlow".into(),
+            custom_code: rel_path.to_string(),
+            orig_sha: if orig_sha.is_empty() { prev_state.orig_sha } else { orig_sha },
+            patched_sha: post_sha.clone(),
+            matched_count: 1,
+        });
+        applied += 1;
+        log(
+            &format!(
+                "  [FONT OK] {} — {} (0B delta, SHA256={}...)",
+                fname,
+                desc,
+                &post_sha[..12]
+            ),
+            LogLevel::Ok,
+        );
+    }
+    state_file.font_bundles = new_states;
+    log(
+        &format!(
+            "  Barlow Semi Condensed active across {}/{} PC in-game font packages.",
+            applied,
+            PC_EXTRA_FONT_SPECS.len()
+        ),
+        LogLevel::Ok,
+    );
+    Ok(())
+}
+
+fn restore_pc_extra_barlow_fonts<L>(
+    game_dir: &Path,
+    bak_dir: &Path,
+    state_file: &mut PatchStateFile,
+    log: &mut L,
+) -> Result<usize, String>
+where
+    L: FnMut(&str, LogLevel),
+{
+    let mut restored = 0usize;
+    for &(rel_path, fname, _) in PC_EXTRA_FONT_SPECS {
+        let target = game_dir.join(rel_path);
+        let bak = bak_dir.join(format!("{}.original", fname));
+        if !target.is_file() || !bak.is_file() {
+            continue;
+        }
+        let bak_sha = sha256_file(&bak)?;
+        let cur_sha = sha256_file(&target)?;
+        if !cur_sha.eq_ignore_ascii_case(&bak_sha) {
+            let bak_bytes = fs::read(&bak)
+                .map_err(|e| format!("Read font backup {} failed: {}", fname, e))?;
+            write_exclusive_verified(&target, &bak_bytes, &target)?;
+            let post_sha = sha256_file(&target)?;
+            if !post_sha.eq_ignore_ascii_case(&bak_sha) {
+                return Err(format!("Font rollback SHA-256 mismatch for {}", fname));
+            }
+            log(
+                &format!(
+                    "  [RESTORED FONT] {} -> Original JP (SHA256={}...)",
+                    fname,
+                    &post_sha[..12]
+                ),
+                LogLevel::Ok,
+            );
+            restored += 1;
+        }
+    }
+    state_file.font_bundles.clear();
+    Ok(restored)
+}
+
 fn patch_static_pkg<L, P>(
     game_dir: &Path,
     bak_dir: &Path,
     state_file: &mut PatchStateFile,
     lang: PatchLang,
     custom: Option<&CustomPack>,
+    font_mode: FontMode,
     log: &mut L,
     on_sub: &mut P,
 ) -> Result<usize, String>
@@ -2319,16 +3401,19 @@ where
         &[STATIC_PKG_ID_SHA],
         log,
     )?;
-    if check_no_backup_switch_guard_v2(
-        &target,
-        &bak,
-        fname,
-        lang,
-        custom,
-        &state_file.static_pkg,
-        &[STATIC_PKG_EN_SHA],
-        &[STATIC_PKG_ID_SHA],
-    )? {
+    if font_mode == FontMode::Default
+        && state_file.font_mode != "barlow"
+        && check_no_backup_switch_guard_v2(
+            &target,
+            &bak,
+            fname,
+            lang,
+            custom,
+            &state_file.static_pkg,
+            &[STATIC_PKG_EN_SHA],
+            &[STATIC_PKG_ID_SHA],
+        )?
+    {
         log(
             &format!("  Startup StaticPackage already matches {} (113 strings).", lang.short_code()),
             LogLevel::Ok,
@@ -2482,22 +3567,28 @@ where
     new_csv[wp..wp + body.len()].copy_from_slice(body);
     blk5[csv_data_off..csv_data_off + csv_byte_len].copy_from_slice(&new_csv);
 
-    on_sub(replaced, &format!("Compressing (LZ4HC exact) & UnityCN encrypting Block #{}...", blk_idx));
-    let blk5_info = &bundle.blocks[blk_idx];
-    let mut comp5 = lz4_compress_exact(&blk5, blk5_info.c_size, 1024)?;
-    if (blk5_info.flags & 0x100) != 0 {
-        bundle.cipher.encrypt_block_in_place(&mut comp5, blk_idx);
-    }
+    let out_buf = if font_mode == FontMode::Barlow {
+        on_sub(replaced, "Injecting Barlow Semi Condensed UI font (exact-size)...");
+        apply_barlow_font_to_static_pkg_bytes(&orig_buf, &bundle, blk_idx, blk5, log)?
+    } else {
+        on_sub(replaced, &format!("Compressing (LZ4HC exact) & UnityCN encrypting Block #{}...", blk_idx));
+        let blk5_info = &bundle.blocks[blk_idx];
+        let mut comp5 = lz4_compress_exact(&blk5, blk5_info.c_size, 1024)?;
+        if (blk5_info.flags & 0x100) != 0 {
+            bundle.cipher.encrypt_block_in_place(&mut comp5, blk_idx);
+        }
 
-    let mut out_buf = orig_buf.clone();
-    out_buf[blk5_info.file_offset..blk5_info.file_offset + comp5.len()].copy_from_slice(&comp5);
+        let mut buf = orig_buf.clone();
+        buf[blk5_info.file_offset..blk5_info.file_offset + comp5.len()].copy_from_slice(&comp5);
 
-    // Round-trip verify Block
-    let v_bundle = UnityCnBundle::parse(&out_buf, 0)?;
-    let v_blk5 = v_bundle.read_block(blk_idx)?;
-    if v_blk5 != blk5 {
-        return Err("StaticPackage round-trip verification failed".into());
-    }
+        // Round-trip verify Block
+        let v_bundle = UnityCnBundle::parse(&buf, 0)?;
+        let v_blk5 = v_bundle.read_block(blk_idx)?;
+        if v_blk5 != blk5 {
+            return Err("StaticPackage round-trip verification failed".into());
+        }
+        buf
+    };
 
     write_exclusive_verified(&target, &out_buf, &bak)?;
     let post_sha = sha256_file(&target)?;
@@ -2529,6 +3620,7 @@ fn patch_resources_assets<L, P>(
     state_file: &mut PatchStateFile,
     lang: PatchLang,
     custom: Option<&CustomPack>,
+    font_mode: FontMode,
     log: &mut L,
     on_sub: &mut P,
 ) -> Result<usize, String>
@@ -2551,16 +3643,19 @@ where
         &[RESOURCES_ID_SHA],
         log,
     )?;
-    if check_no_backup_switch_guard_v2(
-        &target,
-        &bak,
-        fname,
-        lang,
-        custom,
-        &state_file.resources,
-        &[RESOURCES_EN_SHA],
-        &[RESOURCES_ID_SHA],
-    )? {
+    if font_mode == FontMode::Default
+        && state_file.font_mode != "barlow"
+        && check_no_backup_switch_guard_v2(
+            &target,
+            &bak,
+            fname,
+            lang,
+            custom,
+            &state_file.resources,
+            &[RESOURCES_EN_SHA],
+            &[RESOURCES_ID_SHA],
+        )?
+    {
         log(
             &format!("  resources.assets already matches {} (358 strings).", lang.short_code()),
             LogLevel::Ok,
@@ -2578,15 +3673,21 @@ where
         },
     };
     if effective_base == CustomBase::Jp {
-        let orig_buf = fs::read(src_path).map_err(|e| format!("Read resources.assets failed: {}", e))?;
+        let mut orig_buf = fs::read(src_path).map_err(|e| format!("Read resources.assets failed: {}", e))?;
+        if font_mode == FontMode::Barlow {
+            let ttf_med = gunzip(EMBED_FONT_BARLOW_MED_GZ)?;
+            let supported = parse_ttf_cmap_unicodes(&ttf_med)?;
+            let _ = patch_raw_sf_fonts(&mut orig_buf, &["sdf_a00", "fallback_sdf_a00"], &[], &supported);
+        }
         write_exclusive_verified(&target, &orig_buf, &bak)?;
+        let post_sha = sha256_bytes(&orig_buf);
         state_file.resources = BundlePatchState {
             file_name: fname.to_string(),
             sub_offset: 0,
             lang: "original".into(),
             custom_code: String::new(),
             orig_sha: if orig_sha.is_empty() { state_file.resources.orig_sha.clone() } else { orig_sha },
-            patched_sha: String::new(),
+            patched_sha: if font_mode == FontMode::Barlow { post_sha } else { String::new() },
             matched_count: 0,
         };
         log(
@@ -2640,6 +3741,18 @@ where
         on_sub(0, "resources.assets skipped (layout changed)");
         return Ok(0);
     }
+    let final_sha = if font_mode == FontMode::Barlow {
+        let ttf_med = gunzip(EMBED_FONT_BARLOW_MED_GZ)?;
+        let supported = parse_ttf_cmap_unicodes(&ttf_med)?;
+        let (red, _) = patch_raw_sf_fonts(&mut out_buf, &["sdf_a00", "fallback_sdf_a00"], &[], &supported)?;
+        log(
+            &format!("  UI Font [Barlow] applied to resources.assets sdf_a00 ({} glyphs redirected).", red),
+            LogLevel::Ok,
+        );
+        sha256_bytes(&out_buf)
+    } else {
+        cand_sha
+    };
     write_exclusive_verified(&target, &out_buf, &bak)?;
     state_file.resources = BundlePatchState {
         file_name: fname.to_string(),
@@ -2647,14 +3760,14 @@ where
         lang: state_tag_for(lang, custom),
         custom_code: custom.map(|c| c.meta.code.clone()).unwrap_or_default(),
         orig_sha: if orig_sha.is_empty() { state_file.resources.orig_sha.clone() } else { orig_sha },
-        patched_sha: cand_sha.clone(),
+        patched_sha: final_sha.clone(),
         matched_count: RESOURCES_STRINGS,
     };
     log(
         &format!(
             "  resources.assets [{}] installed & verified! Rewritten=358, SHA256={}",
             base_code,
-            cand_sha
+            final_sha
         ),
         LogLevel::Ok,
     );
@@ -2750,6 +3863,14 @@ where
         }
         restored += 1;
     }
+    let restored_fonts = restore_pc_extra_barlow_fonts(game_dir, &bak_dir, &mut state_file, &mut log)?;
+    if restored_fonts > 0 {
+        log(
+            &format!("  Restored {} PC UI font package(s) -> Original JP.", restored_fonts),
+            LogLevel::Ok,
+        );
+    }
+    state_file.font_mode = "default".into();
     save_patch_state(&bak_dir, &state_file);
 
     if let Some(cache_dir) = news_cache_dir {
@@ -3254,5 +4375,87 @@ mod tests {
                 assert_ne!(sha256_bytes(&ui_out), sha256_bytes(&ui_en));
             }
         }
+    }
+
+    #[test]
+    fn verify_barlow_font_repack_on_static_pkg() {
+        let mut noop_log = |_: &str, _: LogLevel| {};
+        let orig_path = Path::new("../backups/6pq4a7hlp7zidu91dvvww.r.original");
+        if orig_path.is_file() {
+            let orig_buf = fs::read(orig_path).unwrap();
+            let bundle = UnityCnBundle::parse(&orig_buf, 0).unwrap();
+            let blk5 = bundle.read_block(5).unwrap();
+            let out = apply_barlow_font_to_static_pkg_bytes(&orig_buf, &bundle, 5, blk5, &mut noop_log).unwrap();
+            assert_eq!(out.len(), orig_buf.len());
+            let v_bun = UnityCnBundle::parse(&out, 0).unwrap();
+            let blk12 = v_bun.read_block(12).unwrap();
+            assert_eq!(&blk12[21140..21144], &[0x00, 0x01, 0x00, 0x00]);
+            let blk161 = v_bun.read_block(161).unwrap();
+            assert_eq!(&blk161[97628..97632], &[0x00, 0x01, 0x00, 0x00]);
+            println!("BARLOW_STATIC_PKG_SHA={}", sha256_bytes(&out));
+        }
+
+        // Verify ALL 6 active PC in-game font packages in live game dir (read-only!)
+        let game_dir = Path::new(r"E:\Program Files (x86)\YostarGames\AZUPRO_JP");
+        if !game_dir.is_dir() {
+            return;
+        }
+        let ttf_med = gunzip(EMBED_FONT_BARLOW_MED_GZ).unwrap();
+        let ttf_semi = gunzip(EMBED_FONT_BARLOW_SEMI_GZ).unwrap();
+        let supported = parse_ttf_cmap_unicodes(&ttf_med).unwrap();
+
+        let bak_dir = game_dir.join("_ENPatchBackup");
+        let load_orig = |rel: &str, fname: &str| -> Vec<u8> {
+            let bak = bak_dir.join(format!("{}.original", fname));
+            if bak.is_file() {
+                fs::read(bak).unwrap()
+            } else {
+                fs::read(game_dir.join(rel)).unwrap()
+            }
+        };
+
+        // 1. hqqoy0ojvzpggukcf5m85w.r (JP sdf_a00 & sdf_b00)
+        let jp_sdf = load_orig(PC_FONT_JP_SDF_REL, "hqqoy0ojvzpggukcf5m85w.r");
+        let (jp_sdf_out, jp_red) = patch_jp_sdf_container_bytes(&jp_sdf, &supported).unwrap();
+        assert_eq!(jp_sdf_out.len(), jp_sdf.len());
+        assert!(jp_red >= 200, "expected >=200 redirected JP SDF glyphs, got {}", jp_red);
+        println!("BARLOW_JP_SDF_OK red={} sha={}", jp_red, &sha256_bytes(&jp_sdf_out)[..12]);
+
+        // 2. xlpsyuxnoz1cjmawi1wcxa.r (JP a00 -> Barlow Medium)
+        let jp_a00 = load_orig(PC_FONT_JP_A00_REL, "xlpsyuxnoz1cjmawi1wcxa.r");
+        let (jp_a00_out, _, sw_a) = patch_unitycn_subbundle_fonts(&jp_a00, 0, &[], &[("a00", &ttf_med)], &supported, None).unwrap();
+        assert_eq!(jp_a00_out.len(), jp_a00.len());
+        assert_eq!(sw_a, 1);
+        println!("BARLOW_JP_A00_OK sha={}", &sha256_bytes(&jp_a00_out)[..12]);
+
+        // 3. awcxxitzquckttvmx0c5q.r (JP b00 -> Barlow SemiBold)
+        let jp_b00 = load_orig(PC_FONT_JP_B00_REL, "awcxxitzquckttvmx0c5q.r");
+        let (jp_b00_out, _, sw_b) = patch_unitycn_subbundle_fonts(&jp_b00, 0, &[], &[("b00", &ttf_semi)], &supported, None).unwrap();
+        assert_eq!(jp_b00_out.len(), jp_b00.len());
+        assert_eq!(sw_b, 1);
+        println!("BARLOW_JP_B00_OK sha={}", &sha256_bytes(&jp_b00_out)[..12]);
+
+        // 4. xyqjdcxirj4zgne0y168pw.r (Default sdf_a00 + fallback_sdf_a00)
+        let def_sdf = load_orig(PC_FONT_DEF_SDF_REL, "xyqjdcxirj4zgne0y168pw.r");
+        let (def_sdf_out, def_red, _) = patch_unitycn_subbundle_fonts(&def_sdf, 0, &["sdf_a00", "fallback_sdf_a00"], &[], &supported, None).unwrap();
+        assert_eq!(def_sdf_out.len(), def_sdf.len());
+        assert!(def_red >= 150, "expected >=150 redirected default SDF glyphs, got {}", def_red);
+        println!("BARLOW_DEF_SDF_OK red={} sha={}", def_red, &sha256_bytes(&def_sdf_out)[..12]);
+
+        // 5. 0cisenmukjlgwwq2lypujw.r (Default a00 -> Barlow Medium)
+        let def_a00 = load_orig(PC_FONT_DEF_A00_REL, "0cisenmukjlgwwq2lypujw.r");
+        let (def_a00_out, _, sw_da) = patch_unitycn_subbundle_fonts(&def_a00, 0, &[], &[("a00", &ttf_med)], &supported, None).unwrap();
+        assert_eq!(def_a00_out.len(), def_a00.len());
+        assert_eq!(sw_da, 1);
+        println!("BARLOW_DEF_A00_OK sha={}", &sha256_bytes(&def_a00_out)[..12]);
+
+        // 6. sharedassets0.assets (Startup a00 -> Barlow Medium) + resources.assets (sdf_a00)
+        let mut sh0 = load_orig(SHAREDASSETS0_REL, "sharedassets0.assets");
+        let (_, sw_sh0) = patch_raw_sf_fonts(&mut sh0, &[], &[("a00", &ttf_med)], &supported).unwrap();
+        assert_eq!(sw_sh0, 1);
+        let mut res = load_orig(RESOURCES_REL, "resources.assets");
+        let (red_res, _) = patch_raw_sf_fonts(&mut res, &["sdf_a00", "fallback_sdf_a00"], &[], &supported).unwrap();
+        assert!(red_res >= 150, "expected >=150 redirected resources.assets glyphs, got {}", red_res);
+        println!("BARLOW_STARTUP_OK sh0_sw={} res_red={}", sw_sh0, red_res);
     }
 }

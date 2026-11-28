@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.9.1`)
+# Ruza-Lang (`v0.9.2`)
 
 🌐 **Bahasa:** [English (`README.md`)](README.md) | **Bahasa Indonesia**
 
@@ -15,10 +15,11 @@ Suite lokalisasi & asset-repacking edukasional dengan ukuran byte identik (**Bah
 
 ---
 
-## Yang Baru di `v0.9.1`
+## Yang Baru di `v0.9.2`
 
-- **Perbaikan Tombol UI Gacha Anti-Kepotong (`EN` & `ID`):** Memperbaiki tombol Gacha yang sebelumnya kepotong / jebol 3 baris (`1x Observation` → `1x Observe`, `10 Observations` → `<size=88%>10x Observe</size>`, `ID` `<size=82%>1x Observasi</size>` / `<size=76%>10x Observasi</size>`, `Startrail Exchange` → `Exchange` / `Penukaran`, serta `Observation Details` → `Details` / `Detail`).
-- **Peningkatan Koneksi Shizuku & Panduan HyperOS / ColorOS di APK:** Menambah waktu tunggu koneksi `UserService` Shizuku hingga `2 detik`, auto-rescan otomatis saat kembali dari aplikasi Shizuku, log diagnosa izin OEM jika gagal terhubung, serta panduan khusus Xiaomi/POCO (HyperOS/MIUI) & OPPO/Realme langsung di dalam *Setup Guide* APK.
+- **Opsi Font UI PC Ringkas (`Compact font (PC Only)`):** Checkbox langsung di atas tombol **Pasang Patch** pada halaman Utama. Mengganti glyph Latin di seluruh paket font UI PC aktif ke **Barlow Semi Condensed** (~15% lebih ramping agar teks Inggris/Indonesia lebih lega di tombol & menu) sambil menjaga seluruh glyph CJK/JP tetap utuh (bebas kotak `□□□`), ukuran file identik (`0 B` delta), backup asli otomatis, dan otomatis kembali ke font bawaan saat centang dimatikan atau saat **Rollback JP**.
+- **Perbaikan Loading Screen Tips (`EN` & `ID`):** Membagi seluruh tips loading screen yang terlalu panjang menjadi 2 baris seimbang agar tidak keluar batas layar, serta merapikan istilah resmi (`Astral Insight`, `Star Journey Record`, `Level Astrologi`).
+- **Perbaikan Tombol UI Gacha & Koneksi Shizuku HyperOS (`v0.9.1`):** Merapikan tombol Gacha agar tidak terpotong (`1x Observasi`, `10x Observasi`, `Penukaran`, `Detail`), menambah polling `2 detik` + panduan Shizuku HyperOS/ColorOS, dan menambahkan dokumentasi penuh Bahasa Indonesia.
 - **Engine Universal Anti-Hotfix (`v0.9.0` · `PC` & `Android`):**
   - **Auto-Discovery Bundle Dinamis:** Otomatis mendeteksi file `.r` aktif untuk `VStringPool` (`raw_base_package`) dan `Static UI KeyConfig` (`default_package`, lewat signature Unity CAB) di PC maupun Android (Shizuku, SAF, Direct, dan ADB) — tidak lagi bergantung pada nama file `.r` atau offset hardcoded!
   - **Matching Berbasis Content-Hash Universal (`RZV2`):** Mencocokkan seluruh **`76.180`** string `VStringPool` menggunakan hash `FNV-1a64` + panjang byte dengan dynamic contiguous span repacking — otomatis jalan mulus di `r3219596`, `r3219598`, `r3273851`, `r3273853`, hingga hotfix resource berikutnya!

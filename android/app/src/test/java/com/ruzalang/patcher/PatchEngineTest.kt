@@ -30,9 +30,9 @@ class PatchEngineTest {
         assertEquals(target, exact.size)
         assertTrue(CryptoLz4.lz4Decompress(exact, sample.size).contentEquals(sample))
 
-        assertTrue(UpdateChecker.isNewer("v0.9.1", "0.9.0"))
-        assertTrue(!UpdateChecker.isNewer("v0.9.1", "0.9.1"))
-        assertTrue(!UpdateChecker.isNewer("v0.9.0", "0.9.1"))
+        assertTrue(UpdateChecker.isNewer("v0.9.2", "0.9.1"))
+        assertTrue(!UpdateChecker.isNewer("v0.9.2", "0.9.2"))
+        assertTrue(!UpdateChecker.isNewer("v0.9.1", "0.9.2"))
     }
 
     @Test
@@ -92,12 +92,12 @@ class PatchEngineTest {
                 for ((lang, expVs, expUi) in listOf(
                     Triple(
                         PatchLang.EN,
-                        "2124FBF99624837DD6C36F0712EDB573ACFDE62DAC304FEF87678E6B91EDE1FF",
+                        "08DC13585E76D90C11784B3B5F17E5A829FC353FFADE19A744FF9936477EBBBF",
                         "EB18599A3513CDF558F4716E0B70DEA233CAC9076D50BA6EFEB0D7958C87F01B",
                     ),
                     Triple(
                         PatchLang.ID,
-                        "43DA80F93DACA269313BCBF0B6D14BC3685F25AE479806419DFF848E24AD7150",
+                        "42B324F18C05D8F4DFEFCA605F82D082526CB54C1F621BE77991CD3F13EE305D",
                         "10939AD972515B9A6DF118AC5D7ADA99BBA7F0C0FBF54FCAE79698987B7EE59B",
                     ),
                 )) {
@@ -124,7 +124,7 @@ class PatchEngineTest {
                 val vsBuf = vsOrigFile.readBytes()
                 val vsCnt = PatchEngine.patchAndroidVStringInPlace(vsBuf, loader, PatchLang.EN, { _, _ -> }, esPack) { _, _ -> }
                 assertEquals(74058, vsCnt)
-                assertNotEquals("2124FBF99624837DD6C36F0712EDB573ACFDE62DAC304FEF87678E6B91EDE1FF", CryptoLz4.sha256Bytes(vsBuf))
+                assertNotEquals("08DC13585E76D90C11784B3B5F17E5A829FC353FFADE19A744FF9936477EBBBF", CryptoLz4.sha256Bytes(vsBuf))
 
                 val (uiOut, uiCnt) = PatchEngine.patchAndroidStaticUiBytes(uiOrig, foundUi.first, loader, PatchLang.EN, esPack) { _, _ -> }
                 assertEquals(3135, uiCnt)
@@ -148,12 +148,12 @@ class PatchEngineTest {
                 for ((lang, expVs, expUi) in listOf(
                     Triple(
                         PatchLang.EN,
-                        "D3749817194F947BE336AE855300EF9AE8CB59CCA6EC2B18D85AA93A006589D8",
+                        "2C9AB1152E21BFDC05B8C218EC8F81B4947B31CDE99DE67948D51A94B5899D40",
                         "7900C693A5C922A52B376AB3B62D03DA18E5C03E446B812D1D49CE3DA3FD6683",
                     ),
                     Triple(
                         PatchLang.ID,
-                        "2FC141815581A91928C2B8E730666D7EC6A831E0F7B3C59F0B85C8D78BF57433",
+                        "33A485100DC66FC37DAF9181E2EF6D7E7DCE83C564F5D23DC0B12BB6AEC4FAE8",
                         "DE9E6053428625B8CC78E4C126EB8BDDB41A4B5E5D895FD7FE14C5A37CE59336",
                     ),
                 )) {
