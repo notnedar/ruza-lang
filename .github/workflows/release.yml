@@ -216,12 +216,10 @@ jobs:
           | **Windows PC (x64)** | \`RuzaLangPatcher.exe\` | ${EXE_MB} MB | PC Client + Android ADB patcher |
           | **Android (Universal APK)** | \`RuzaLangPatcher.apk\` | ${APK_MB} MB | Android 8–17 · No PC, No Root (Shizuku / SAF / Direct) |
 
-          ### Standalone Android APK Preview (Portrait Phone & Landscape Tablet)
+          ### Standalone Android APK Preview
           | Phone (Home) | Phone (Files & Sync) |
           | :---: | :---: |
           | ![Android APK Home](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-home.png?v=094) | ![Android APK Files](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-files.png?v=094) |
-
-          ![Android APK Landscape](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-tablet.png?v=094)
 
           ### Desktop Usage Walkthrough
           ![Ruza-Lang Usage Demo](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/usage.webp?v=094)

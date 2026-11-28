@@ -40,13 +40,11 @@ Suite lokalisasi & asset-repacking edukasional dengan ukuran byte identik (**Bah
 
 ## Preview & Demo Pemakaian
 
-### APK Android Standalone (`RuzaLangPatcher.apk` · HP & Tablet)
+### APK Android Standalone (`RuzaLangPatcher.apk`)
 
 | HP Portrait (Utama) | HP Portrait (Paket & Sinkron) |
 | :---: | :---: |
 | ![Android APK Home](docs/screenshot-apk-home.png) | ![Android APK Files](docs/screenshot-apk-files.png) |
-
-![Android APK Landscape](docs/screenshot-apk-tablet.png)
 
 ### Demo Pemakaian Desktop (`EN` ↔ `ID` + Progres Rewrite)
 

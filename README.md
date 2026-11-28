@@ -40,13 +40,11 @@ An educational localization & asset-repacking suite demonstrating exact-size str
 
 ## Preview & Usage Demo
 
-### Standalone Android APK (`RuzaLangPatcher.apk` · Phone & Tablet)
+### Standalone Android APK (`RuzaLangPatcher.apk`)
 
 | Portrait Phone (Home) | Portrait Phone (Files & Sync) |
 | :---: | :---: |
 | ![Android APK Home](docs/screenshot-apk-home.png) | ![Android APK Files](docs/screenshot-apk-files.png) |
-
-![Android APK Landscape](docs/screenshot-apk-tablet.png)
 
 ### Desktop Live Usage Walkthrough (`EN` ↔ `ID` + Rewrite Progress)
 
