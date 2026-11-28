@@ -57,13 +57,14 @@ Suite lokalisasi & asset-repacking edukasional dengan ukuran byte identik (**Bah
 
 ![Android ADB Tab](docs/screenshot-android.png)
 
-### Contoh Tampilan di Dalam Game (`EN`)
+### Contoh Tampilan di Dalam Game (`EN`) — Font Bawaan vs. Compact Font (PC Only)
 
-| Menu Karakter | Catatan Perjalanan Bintang |
+| Font Bawaan (Default) | Compact Font (`Barlow Semi Condensed` · PC Only) |
 | :---: | :---: |
-| ![Character Screen Sample](docs/sample-ingame-character.jpg) | ![Star Journey Record Sample](docs/sample-ingame-journey.jpg) |
+| ![Menu Karakter — Font Bawaan](docs/sample-ingame-character.jpg) | ![Menu Karakter — Compact Font](docs/sample-ingame-character-barlow.jpg) |
+| ![Menu Pengaturan — Font Bawaan](docs/sample-ingame-en.jpg) | ![Menu Pengaturan — Compact Font](docs/sample-ingame-settings-barlow.jpg) |
 
-![Settings Menu Sample](docs/sample-ingame-en.jpg)
+![Catatan Perjalanan Bintang](docs/sample-ingame-journey.jpg)
 
 ---
 

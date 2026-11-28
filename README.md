@@ -57,13 +57,14 @@ An educational localization & asset-repacking suite demonstrating exact-size str
 
 ![Android ADB Tab](docs/screenshot-android.png)
 
-### In-Game Samples (`EN`)
+### In-Game Samples (`EN`) — Original Font vs. Compact Font (PC Only)
 
-| Character Screen | Star Journey Record |
+| Original Font (Default) | Compact Font (`Barlow Semi Condensed` · PC Only) |
 | :---: | :---: |
-| ![Character Screen Sample](docs/sample-ingame-character.jpg) | ![Star Journey Record Sample](docs/sample-ingame-journey.jpg) |
+| ![Character Screen — Original Font](docs/sample-ingame-character.jpg) | ![Character Screen — Compact Font](docs/sample-ingame-character-barlow.jpg) |
+| ![Settings Menu — Original Font](docs/sample-ingame-en.jpg) | ![Settings Menu — Compact Font](docs/sample-ingame-settings-barlow.jpg) |
 
-![Settings Menu Sample](docs/sample-ingame-en.jpg)
+![Star Journey Record Sample](docs/sample-ingame-journey.jpg)
 
 ---
 

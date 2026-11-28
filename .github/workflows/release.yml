@@ -196,12 +196,13 @@ jobs:
           ### Desktop Usage Walkthrough
           ![Ruza-Lang Usage Demo](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/usage.webp?v=093)
 
-          ### In-Game Samples (\`EN\`)
-          | Character Screen | Star Journey Record |
+          ### In-Game Samples (\`EN\`) — Original Font vs. Compact Font (PC Only)
+          | Original Font (Default) | Compact Font (\`Barlow Semi Condensed\` · PC Only) |
           | :---: | :---: |
-          | ![Character Screen](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-character.jpg) | ![Star Journey Record](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-journey.jpg) |
+          | ![Character Screen — Original](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-character.jpg) | ![Character Screen — Compact](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-character-barlow.jpg) |
+          | ![Settings Menu — Original](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-en.jpg) | ![Settings Menu — Compact](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-settings-barlow.jpg) |
 
-          ![Settings Menu](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-en.jpg)
+          ![Star Journey Record](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-journey.jpg)
 
           ### Highlights / Fitur Utama
           - **NEW — Raw \`<size=...%>\` Tag Hotfix (\`v0.9.3\`):**
