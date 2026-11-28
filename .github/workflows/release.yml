@@ -189,12 +189,12 @@ jobs:
           ### Standalone Android APK Preview (Portrait Phone & Landscape Tablet)
           | Phone (Home) | Phone (Files & Sync) |
           | :---: | :---: |
-          | ![Android APK Home](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-home.png?v=070) | ![Android APK Files](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-files.png?v=070) |
+          | ![Android APK Home](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-home.png?v=093) | ![Android APK Files](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-files.png?v=093) |
 
-          ![Android APK Landscape](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-tablet.png?v=070)
+          ![Android APK Landscape](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/screenshot-apk-tablet.png?v=093)
 
           ### Desktop Usage Walkthrough
-          ![Ruza-Lang Usage Demo](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/usage.webp?v=070)
+          ![Ruza-Lang Usage Demo](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/usage.webp?v=093)
 
           ### In-Game Samples (\`EN\`)
           | Character Screen | Star Journey Record |
