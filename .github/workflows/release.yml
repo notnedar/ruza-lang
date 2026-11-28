@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build & publish (e.g. v0.9.2)"
+        description: "Release tag to build & publish (e.g. v0.9.3)"
         required: true
-        default: "v0.9.2"
+        default: "v0.9.3"
 
 permissions:
   contents: write
@@ -204,7 +204,9 @@ jobs:
           ![Settings Menu](https://raw.githubusercontent.com/notnedar/ruza-lang/main/docs/sample-ingame-en.jpg)
 
           ### Highlights / Fitur Utama
-          - **NEW — Optional Compact PC UI Font (Barlow Semi Condensed) & Loading Tip Wrapping (\`v0.9.2\`):**
+          - **NEW — Raw \`<size=...%>\` Tag Hotfix (\`v0.9.3\`):**
+            - Removed all \`167\` injected percentage \`<size=NN%>\` tags across \`EN\` & \`ID\` (\`110\` in \`Static UI EN\`, \`40\` in \`Static UI ID\`, \`8\` in \`VStringPool EN\`, \`9\` in \`VStringPool ID\`) that could print literally on non-RichText buttons such as Gacha \`10x Observe\` / \`10x Observasi\`, and fixed the duplicated Indonesian label \`Pemeliharaan Pemeliharaan\`.
+          - **Optional Compact PC UI Font (Barlow Semi Condensed) & Loading Tip Wrapping (\`v0.9.2\`):**
             - **Optional Compact PC UI Font (\`Compact font (PC Only)\`):** Toggleable checkbox right above **Install Patch** on the Home screen! Replaces Latin UI glyphs across all active PC UI font assets with **Barlow Semi Condensed** (~15% narrower for cleaner button & menu fit) while preserving all original CJK glyphs (zero \`□□□\` tofu), exact \`0 B\` file sizes, automatic original backups, and automatic revert when unchecked or on **Rollback JP**.
             - **Wrapped Loading Screen Tips (\`EN\` & \`ID\`):** Wrapped all long single-line loading tips cleanly onto 2 centered lines (preventing horizontal off-screen clipping) and aligned terminology in \`1663607\` (\`Astral Insight\` / \`Star Journey Record\`).
           - **Gacha UI Fit Fixes & Android HyperOS Shizuku Improvements (\`v0.9.1\`):**

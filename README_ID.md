@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.9.2`)
+# Ruza-Lang (`v0.9.3`)
 
 🌐 **Bahasa:** [English (`README.md`)](README.md) | **Bahasa Indonesia**
 
@@ -15,10 +15,11 @@ Suite lokalisasi & asset-repacking edukasional dengan ukuran byte identik (**Bah
 
 ---
 
-## Yang Baru di `v0.9.2`
+## Yang Baru di `v0.9.3`
 
-- **Opsi Font UI PC Ringkas (`Compact font (PC Only)`):** Checkbox langsung di atas tombol **Pasang Patch** pada halaman Utama. Mengganti glyph Latin di seluruh paket font UI PC aktif ke **Barlow Semi Condensed** (~15% lebih ramping agar teks Inggris/Indonesia lebih lega di tombol & menu) sambil menjaga seluruh glyph CJK/JP tetap utuh (bebas kotak `□□□`), ukuran file identik (`0 B` delta), backup asli otomatis, dan otomatis kembali ke font bawaan saat centang dimatikan atau saat **Rollback JP**.
-- **Perbaikan Loading Screen Tips (`EN` & `ID`):** Membagi seluruh tips loading screen yang terlalu panjang menjadi 2 baris seimbang agar tidak keluar batas layar, serta merapikan istilah resmi (`Astral Insight`, `Star Journey Record`, `Level Astrologi`).
+- **Hotfix Tag `<size=...%>` Mentah (`EN` & `ID`):** Menghapus seluruh `167` tag persentase `<size=NN%>` di `Static UI` & `VStringPool` (`EN` & `ID`) yang sempat tercetak mentah di tombol non-RichText (seperti tombol Gacha `10x Observe` / `10x Observasi`), serta merapikan kata ganda `Pemeliharaan`.
+- **Opsi Font UI PC Ringkas (`Compact font (PC Only)` · `v0.9.2`):** Checkbox langsung di atas tombol **Pasang Patch** pada halaman Utama. Mengganti glyph Latin di seluruh paket font UI PC aktif ke **Barlow Semi Condensed** (~15% lebih ramping agar teks Inggris/Indonesia lebih lega di tombol & menu) sambil menjaga seluruh glyph CJK/JP tetap utuh (bebas kotak `□□□`), ukuran file identik (`0 B` delta), backup asli otomatis, dan otomatis kembali ke font bawaan saat centang dimatikan atau saat **Rollback JP**.
+- **Perbaikan Loading Screen Tips (`EN` & `ID` · `v0.9.2`):** Membagi seluruh tips loading screen yang terlalu panjang menjadi 2 baris seimbang agar tidak keluar batas layar, serta merapikan istilah resmi (`Astral Insight`, `Star Journey Record`, `Level Astrologi`).
 - **Perbaikan Tombol UI Gacha & Koneksi Shizuku HyperOS (`v0.9.1`):** Merapikan tombol Gacha agar tidak terpotong (`1x Observasi`, `10x Observasi`, `Penukaran`, `Detail`), menambah polling `2 detik` + panduan Shizuku HyperOS/ColorOS, dan menambahkan dokumentasi penuh Bahasa Indonesia.
 - **Engine Universal Anti-Hotfix (`v0.9.0` · `PC` & `Android`):**
   - **Auto-Discovery Bundle Dinamis:** Otomatis mendeteksi file `.r` aktif untuk `VStringPool` (`raw_base_package`) dan `Static UI KeyConfig` (`default_package`, lewat signature Unity CAB) di PC maupun Android (Shizuku, SAF, Direct, dan ADB) — tidak lagi bergantung pada nama file `.r` atau offset hardcoded!

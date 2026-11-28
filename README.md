@@ -1,4 +1,4 @@
-# Ruza-Lang (`v0.9.2`)
+# Ruza-Lang (`v0.9.3`)
 
 🌐 **Language:** **English** | [Bahasa Indonesia (`README_ID.md`)](README_ID.md)
 
@@ -15,10 +15,11 @@ An educational localization & asset-repacking suite demonstrating exact-size str
 
 ---
 
-## What's New in `v0.9.2`
+## What's New in `v0.9.3`
 
-- **Optional Compact PC UI Font (`Compact font (PC Only)`):** Toggleable checkbox directly above **Install Patch** on Home. Swaps Latin UI glyphs across all active PC font packages to **Barlow Semi Condensed** (~15% narrower for tighter English/Indonesian UI fit) while keeping all original CJK glyphs intact (zero `□□□` missing boxes), exact `0 B` file size delta, automatic original backups, and automatic restore when unchecked or on **Rollback JP**.
-- **Loading Screen Tip Wrapping (`EN` & `ID`):** Wrapped all long loading-screen tips onto 2 balanced lines so text no longer overflows off-screen horizontally, and aligned official terms (`Astral Insight`, `Star Journey Record`).
+- **Raw `<size=...%>` Tag Hotfix (`EN` & `ID`):** Removed all `167` injected percentage `<size=NN%>` tags across `Static UI` and `VStringPool` (`EN` & `ID`) that rendered literally on non-RichText controls (such as the Gacha `10x Observe` / `10x Observasi` buttons), and fixed a duplicated Indonesian label (`Pemeliharaan`).
+- **Optional Compact PC UI Font (`Compact font (PC Only)` · `v0.9.2`):** Toggleable checkbox directly above **Install Patch** on Home. Swaps Latin UI glyphs across all active PC font packages to **Barlow Semi Condensed** (~15% narrower for tighter English/Indonesian UI fit) while keeping all original CJK glyphs intact (zero `□□□` missing boxes), exact `0 B` file size delta, automatic original backups, and automatic restore when unchecked or on **Rollback JP**.
+- **Loading Screen Tip Wrapping (`EN` & `ID` · `v0.9.2`):** Wrapped all long loading-screen tips onto 2 balanced lines so text no longer overflows off-screen horizontally, and aligned official terms (`Astral Insight`, `Star Journey Record`).
 - **Gacha UI Fit Fixes & Android HyperOS Shizuku Improvements (`v0.9.1`):** Fixed truncated Gacha buttons (`1x Observe`, `10x Observe`, `Exchange`, `Details` in `EN` & `ID`), added `2s` Shizuku `UserService` polling + HyperOS/ColorOS guidance, and published [`README_ID.md`](README_ID.md).
 - **Hotfix-Proof Universal Engine & Full `r3273853` / `r3273851` Support (`v0.9.0`):**
   - **Dynamic Bundle Auto-Discovery:** Automatically locates the active `VStringPool` (`raw_base_package`) and `Static UI KeyConfig` (`default_package`, via constant Unity CAB signature) `.r` files on both PC and Android (Shizuku, SAF, Direct, and ADB) — zero hardcoded `.r` filenames or sub-bundle byte offsets!
